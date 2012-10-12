@@ -214,6 +214,7 @@ public:
       double GetAbsoluteMinScalePpm(){ return m_absolute_min_scale_ppm; }
       ViewPort &GetVP();
       ChartBase* GetChartAtCursor();
+      ChartBase* GetOverlayChartAtCursor();
 
       glChartCanvas *GetglCanvas(){ return m_glcc; }
       GSHHSChart* GetWorldBackgroundChart() { return pWorldBackgroundChart; }
@@ -457,6 +458,7 @@ private:
       wxMask      *pss_overlay_mask;
 
       wxRect      ship_draw_rect;
+      wxRect      ship_draw_last_rect;
       wxRect      ais_draw_rect;
       wxRect      alert_draw_rect;          // pjotrc 2010.02.22
 

@@ -685,6 +685,7 @@ public:
     bool RenderQuiltRegionViewOnDC( wxMemoryDC &dc, ViewPort &vp, wxRegion &chart_region );
     bool IsVPBlittable( ViewPort &VPoint, int dx, int dy, bool b_allow_vector = false );
     ChartBase *GetChartAtPix( wxPoint p );
+    ChartBase *GetOverlayChartAtPix( wxPoint p );
     int GetChartdbIndexAtPix( wxPoint p );
     void InvalidateAllQuiltPatchs( void );
     void Invalidate( void )
@@ -1177,14 +1178,38 @@ ChartBase *Quilt::GetChartAtPix( wxPoint p )
     ChartBase *pret = NULL;
     wxPatchListNode *cnode = m_PatchList.GetFirst();
     while( cnode ) {
-        if( cnode->GetData()->ActiveRegion.Contains( p ) == wxInRegion ) pret =
-                ChartData->OpenChartFromDB( cnode->GetData()->dbIndex, FULL_INIT );
+        QuiltPatch *pqp = cnode->GetData();
+        if( !pqp->b_overlay && (pqp->ActiveRegion.Contains( p ) == wxInRegion) )
+                pret = ChartData->OpenChartFromDB( pqp->dbIndex, FULL_INIT );
         cnode = cnode->GetNext();
     }
 
     m_bbusy = false;
     return pret;
 }
+
+ChartBase *Quilt::GetOverlayChartAtPix( wxPoint p )
+{
+    if( m_bbusy ) return NULL;
+
+    m_bbusy = true;
+
+    //    The patchlist is organized from small to large scale.
+    //    We generally will want the largest scale chart at this point, so
+    //    walk the whole list.  The result will be the last one found, i.e. the largest scale chart.
+    ChartBase *pret = NULL;
+    wxPatchListNode *cnode = m_PatchList.GetFirst();
+    while( cnode ) {
+        QuiltPatch *pqp = cnode->GetData();
+        if( pqp->b_overlay && ( pqp->ActiveRegion.Contains( p ) == wxInRegion) )
+                pret = ChartData->OpenChartFromDB( pqp->dbIndex, FULL_INIT );
+        cnode = cnode->GetNext();
+    }
+
+    m_bbusy = false;
+    return pret;
+}
+
 
 void Quilt::InvalidateAllQuiltPatchs( void )
 {
@@ -2257,7 +2282,8 @@ bool Quilt::Compose( const ViewPort &vp_in )
             if( pc->GetChartType() == CHART_TYPE_S57 ) {
                 s57chart *ps57 = dynamic_cast<s57chart *>( pc );
                 pqp->b_overlay = ( ps57->GetUsageChar() == 'L' || ps57->GetUsageChar() == 'A' );
-                m_bquilt_has_overlays = true;
+                if( pqp->b_overlay )
+                    m_bquilt_has_overlays = true;
             }
         }
     }
@@ -2357,22 +2383,21 @@ bool Quilt::RenderQuiltRegionViewOnDC( wxMemoryDC &dc, ViewPort &vp, wxRegion &c
         ChartBase *chart = GetFirstChart();
         int chartsDrawn = 0;
 
-        while( chart ) {
-            bool okToRender = cc1->IsChartLargeEnoughToRender( chart, vp );
+        if( !chart_region.IsEmpty() ) {
+            while( chart ) {
+                bool okToRender = cc1->IsChartLargeEnoughToRender( chart, vp );
 
-            if( chart->GetChartProjectionType() != PROJECTION_MERCATOR && vp.b_MercatorProjectionOverride )
-                okToRender = false;
+                if( chart->GetChartProjectionType() != PROJECTION_MERCATOR && vp.b_MercatorProjectionOverride )
+                    okToRender = false;
 
-            if( ! okToRender ) {
-                chart = GetNextChart();
-                continue;
-            }
-            QuiltPatch *pqp = GetCurrentPatch();
-            if( pqp->b_Valid  ) {
-                bool b_chart_rendered = false;
-                wxRegion get_region = pqp->ActiveRegion;
-
-                if( !chart_region.IsEmpty() ) {
+                if( ! okToRender ) {
+                    chart = GetNextChart();
+                    continue;
+                }
+                QuiltPatch *pqp = GetCurrentPatch();
+                if( pqp->b_Valid  ) {
+                    bool b_chart_rendered = false;
+                    wxRegion get_region = pqp->ActiveRegion;
 
                     get_region.Intersect( chart_region );
 
@@ -2390,50 +2415,47 @@ bool Quilt::RenderQuiltRegionViewOnDC( wxMemoryDC &dc, ViewPort &vp, wxRegion &c
                     while( upd ) {
                         wxRect rect = upd.GetRect();
                         dc.Blit( rect.x, rect.y, rect.width, rect.height, &tmp_dc, rect.x, rect.y,
-                                 wxCOPY, true );
+                                wxCOPY, true );
                         upd++;
                     }
 
                     tmp_dc.SelectObject( wxNullBitmap );
+
+                    if(b_chart_rendered)
+                        rendered_region.Union(get_region);
                 }
 
-                if(b_chart_rendered)
-                    rendered_region.Union(get_region);
+                chartsDrawn++;
+                chart = GetNextChart();
             }
-
-            chartsDrawn++;
-            chart = GetNextChart();
         }
 
         if( ! chartsDrawn ) cc1->GetVP().SetProjectionType( PROJECTION_MERCATOR );
 
         //    Render any Overlay patches for s57 charts(cells)
-        if( m_bquilt_has_overlays ) {
+        if( m_bquilt_has_overlays && !chart_region.IsEmpty() ) {
             chart = GetFirstChart();
             while( chart ) {
                 QuiltPatch *pqp = GetCurrentPatch();
                 if( pqp->b_Valid ) {
-                    if( !chart_region.IsEmpty() ) {
+                    if( pqp->b_overlay ) {
                         wxRegion get_region = pqp->ActiveRegion;
                         get_region.Intersect( chart_region );
 
                         if( !get_region.IsEmpty() ) {
-                            if( pqp->b_overlay ) {
-                                s57chart *Chs57 = dynamic_cast<s57chart*>( chart );
-                                Chs57->RenderOverlayRegionViewOnDC( tmp_dc, vp, get_region );
+                            s57chart *Chs57 = dynamic_cast<s57chart*>( chart );
+                            Chs57->RenderOverlayRegionViewOnDC( tmp_dc, vp, get_region );
+
+                            wxRegionIterator upd( get_region );
+                            while( upd ) {
+                                wxRect rect = upd.GetRect();
+                                dc.Blit( rect.x, rect.y, rect.width, rect.height, &tmp_dc, rect.x,
+                                      rect.y, wxCOPY, true );
+                                upd++;
                             }
+                            tmp_dc.SelectObject( wxNullBitmap );
                         }
-
-                        wxRegionIterator upd( get_region );
-                        while( upd ) {
-                            wxRect rect = upd.GetRect();
-                            dc.Blit( rect.x, rect.y, rect.width, rect.height, &tmp_dc, rect.x,
-                                     rect.y, wxCOPY, true );
-                            upd++;
-                        }
-
-                        tmp_dc.SelectObject( wxNullBitmap );
-                    }
+                     }
                 }
 
                 chart = GetNextChart();
@@ -3605,6 +3627,15 @@ ChartBase* ChartCanvas::GetChartAtCursor() {
             target_chart = cc1->m_pQuilt->GetChartAtPix( wxPoint( mouse_x, mouse_y ) );
         else
             target_chart = NULL;
+    return target_chart;
+}
+
+ChartBase* ChartCanvas::GetOverlayChartAtCursor() {
+    ChartBase* target_chart;
+    if( VPoint.b_quilt )
+        target_chart = cc1->m_pQuilt->GetOverlayChartAtPix( wxPoint( mouse_x, mouse_y ) );
+    else
+        target_chart = NULL;
     return target_chart;
 }
 
@@ -5315,10 +5346,15 @@ void ChartCanvas::ShipDraw( ocpnDC& dc )
                     img_height = h;
 
                     dc.DrawBitmap( os_bm, lShipMidPoint.x - w / 2, lShipMidPoint.y - h / 2, true );
+
+                    // Maintain dirty box,, missing in __WXMSW__ library
+                    dc.CalcBoundingBox( lShipMidPoint.x - w / 2, lShipMidPoint.y - h / 2 );
+                    dc.CalcBoundingBox( lShipMidPoint.x - w / 2 + w, lShipMidPoint.y - h / 2 + h );
                 }
 
                 else if( g_OwnShipIconType == 2 ) { // Scaled Vector
                     wxPoint ownship_icon[10];
+
                     for( int i = 0; i < 10; i++ ) {
                         int j = i * 2;
                         double pxa = (double) ( s_ownship_icon[j] );
@@ -5337,12 +5373,12 @@ void ChartCanvas::ShipDraw( ocpnDC& dc )
                     dc.SetPen( ppPen1 );
                     dc.SetBrush( wxBrush( ship_color ) );
 
-                    dc.DrawPolygon( 6, &ownship_icon[0], 0, 0 );
+                    dc.StrokePolygon( 6, &ownship_icon[0], 0, 0 );
 
                     //     draw reference point (midships) cross
-                    dc.DrawLine( ownship_icon[6].x, ownship_icon[6].y, ownship_icon[7].x,
+                    dc.StrokeLine( ownship_icon[6].x, ownship_icon[6].y, ownship_icon[7].x,
                                  ownship_icon[7].y );
-                    dc.DrawLine( ownship_icon[8].x, ownship_icon[8].y, ownship_icon[9].x,
+                    dc.StrokeLine( ownship_icon[8].x, ownship_icon[8].y, ownship_icon[9].x,
                                  ownship_icon[9].y );
                 }
 
@@ -5482,6 +5518,12 @@ void ChartCanvas::ShipDraw( ocpnDC& dc )
 
             for( int i = 1; i <= g_iNavAidRadarRingsNumberVisible; i++ )
                 dc.StrokeCircle( lShipMidPoint.x, lShipMidPoint.y, i * pix_radius );
+        }
+
+        if( dc.GetDC() ) {
+        ship_draw_rect = wxRect( dc.GetDC()->MinX(), dc.GetDC()->MinY(),
+                dc.GetDC()->MaxX() - dc.GetDC()->MinX(),
+                dc.GetDC()->MaxY() - dc.GetDC()->MinY() );
         }
     }         // if drawit
 }
@@ -6630,53 +6672,18 @@ void ChartCanvas::AlertDraw( ocpnDC& dc )
 
 void ChartCanvas::UpdateShips()
 {
-    //  Get the rectangle in the current dc which bounds the "ownship" symbol
-
-    //  Use this dc
-    wxClientDC dc( this );
-
-    if( !dc.IsOk() ) return;
-
-    // Get dc boundary
-    int sx, sy;
-    dc.GetSize( &sx, &sy );
-
-    //  Need a bitmap
-    wxBitmap test_bitmap( sx, sy, -1 );
-
-    // Create a memory DC
-    wxMemoryDC temp_dc;
-    temp_dc.SelectObject( test_bitmap );
-
-    temp_dc.ResetBoundingBox();
-    temp_dc.DestroyClippingRegion();
-    temp_dc.SetClippingRegion( wxRect( 0, 0, sx, sy ) );
-
-    // Draw the ownship on the temp_dc
-    ocpnDC ocpndc = ocpnDC( temp_dc );
-    ShipDraw( ocpndc );
-
-    //  Retrieve the drawing extents
-    wxRect ship_rect( temp_dc.MinX(), temp_dc.MinY(), temp_dc.MaxX() - temp_dc.MinX(),
-                      temp_dc.MaxY() - temp_dc.MinY() );
-
     wxRect own_ship_update_rect = ship_draw_rect;
 
-    if( !ship_rect.IsEmpty() ) {
-        ship_rect.Inflate( 2 );                // clear all drawing artifacts
+    if( !own_ship_update_rect.IsEmpty() ) {
+        own_ship_update_rect.Inflate( 2 );                // clear all drawing artifacts
 
-        //  The required invalidate rectangle is the union of the last drawn rectangle
-        //  and this drawn rectangle
-        own_ship_update_rect.Union( ship_rect );
+        own_ship_update_rect.Union( ship_draw_last_rect );
     }
 
-    if( !own_ship_update_rect.IsEmpty() ) RefreshRect( own_ship_update_rect, false );
+    if( !own_ship_update_rect.IsEmpty() )
+        RefreshRect( own_ship_update_rect, false );
 
-    //  Save this rectangle for next time
-    ship_draw_rect = ship_rect;
-
-    temp_dc.SelectObject( wxNullBitmap );      // clean up
-
+    ship_draw_last_rect = ship_draw_rect;
 }
 
 void ChartCanvas::UpdateAlerts()
@@ -8382,6 +8389,16 @@ void ChartCanvas::ShowObjectQueryWindow( int x, int y, float zlat, float zlon )
         if( !lightsVis ) gFrame->ToggleLights( true, true );
         ListOfObjRazRules* rule_list =
                 Chs57->GetObjRuleListAtLatLon( zlat, zlon, SelectRadius, &GetVP() );
+
+        ListOfObjRazRules* overlay_rule_list = NULL;
+        ChartBase *overlay_chart = GetOverlayChartAtCursor();
+        s57chart *CHs57_Overlay = dynamic_cast<s57chart*>( overlay_chart );
+
+        if( CHs57_Overlay ) {
+            overlay_rule_list =
+                CHs57_Overlay->GetObjRuleListAtLatLon( zlat, zlon, SelectRadius, &GetVP() );
+        }
+
         if( !lightsVis ) gFrame->ToggleLights( true, true );
 
         wxString objText;
@@ -8404,7 +8421,13 @@ void ChartCanvas::ShowObjectQueryWindow( int x, int y, float zlat, float zlon )
         objText += face;
         objText += _T("\">");
 
+        if( overlay_rule_list && CHs57_Overlay) {
+            objText << CHs57_Overlay->CreateObjDescriptions( overlay_rule_list );
+            objText << _T("<hr noshade>");
+        }
+
         objText << Chs57->CreateObjDescriptions( rule_list );
+
         objText << _T("</font></body></html>");
 
         g_pObjectQueryDialog->SetHTMLPage( objText );
@@ -8413,6 +8436,10 @@ void ChartCanvas::ShowObjectQueryWindow( int x, int y, float zlat, float zlon )
 
         rule_list->Clear();
         delete rule_list;
+
+        if( overlay_rule_list )
+            overlay_rule_list->Clear();
+        delete overlay_rule_list;
 
         SetCursor( wxCURSOR_ARROW );
     }
@@ -10567,7 +10594,6 @@ void ChartCanvas::DrawOverlayObjects( ocpnDC &dc, const wxRegion& ru )
 
     AISDraw( dc );
     ShipDraw( dc );
-
     AlertDraw( dc );
 
     RenderAllChartOutlines( dc, GetVP() );
@@ -14710,7 +14736,7 @@ void RolloverWin::SetBitmap( int rollover )
 
     int font_size = wxMax(8, dFont->GetPointSize());
     wxFont *plabelFont = wxTheFontList->FindOrCreateFont( font_size, dFont->GetFamily(),
-                         dFont->GetStyle(), dFont->GetWeight() );
+                         dFont->GetStyle(), dFont->GetWeight(), false, dFont->GetFaceName() );
 
     //    Draw the text
     mdc.SetFont( *plabelFont );
