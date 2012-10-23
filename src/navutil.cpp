@@ -187,6 +187,7 @@ extern bool             g_bAisTargetList_sortReverse;
 extern wxString         g_AisTargetList_column_spec;
 extern bool             g_bShowAreaNotices;
 extern bool             g_bDrawAISSize;
+extern bool             g_bShowAllCPA;
 
 extern int              g_S57_dialog_sx, g_S57_dialog_sy;
 
@@ -2505,6 +2506,7 @@ void Track::AddPointNow( bool do_add_point )
                         pRoutePointList->pop_back();
                         pRoutePointList->pop_back();
                         pRoutePointList->push_back( m_lastStoredTP );
+                        SetnPoints();
                         pSelect->DeletePointSelectableTrackSegments( m_removeTP );
                         pSelect->AddSelectableTrackSegment( m_fixedTP->m_lat, m_fixedTP->m_lon,
                                 m_lastStoredTP->m_lat, m_lastStoredTP->m_lon,
@@ -3171,7 +3173,8 @@ int MyConfig::LoadMyConfig( int iteration )
     Read( _T ( "bShowAreaNotices" ), &g_bShowAreaNotices );
 
     Read( _T ( "bDrawAISSize" ), &g_bDrawAISSize );
-
+    Read( _T ( "bShowAllCPA" ), &g_bShowAllCPA, 1 );
+    
     Read( _T ( "bAISAlertDialog" ), &g_bAIS_CPA_Alert );
 
     Read( _T ( "bAISAlertAudio" ), &g_bAIS_CPA_Alert_Audio );
@@ -4434,7 +4437,8 @@ void MyConfig::UpdateSettings()
     Write( _T ( "bAISAlertSuppressMoored" ), g_bAIS_CPA_Alert_Suppress_Moored );
     Write( _T ( "bShowAreaNotices" ), g_bShowAreaNotices );
     Write( _T ( "bDrawAISSize" ), g_bDrawAISSize );
-
+    Write( _T ( "bShowAllCPA" ), g_bShowAllCPA );
+    
     Write( _T ( "AlertDialogSizeX" ), g_ais_alert_dialog_sx );
     Write( _T ( "AlertDialogSizeY" ), g_ais_alert_dialog_sy );
     Write( _T ( "AlertDialogPosX" ), g_ais_alert_dialog_x );

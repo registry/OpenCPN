@@ -480,6 +480,7 @@ bool                      g_bAIS_ACK_Timeout;
 double                    g_AckTimeout_Mins;
 bool                      g_bShowAreaNotices;
 bool                      g_bDrawAISSize;
+bool                      g_bShowAllCPA;
 
 wxToolBarToolBase         *m_pAISTool;
 int                       g_nAIS_activity_timer;
@@ -1574,24 +1575,6 @@ if( 0 == g_memCacheLimit )
 
     console = new ConsoleCanvas( gFrame );                    // the console
 
-    g_FloatingCompassDialog = new ocpnFloatingCompassWindow( cc1 );
-
-    stats = new StatWin( cc1 );
-
-    ocpnStyle::Style* style = g_StyleManager->GetCurrentStyle();
-
-    if( cc1->GetQuiltMode() ) {
-        stats->pPiano->SetVizIcon( new wxBitmap( style->GetIcon( _T("viz") ) ) );
-        stats->pPiano->SetInVizIcon( new wxBitmap( style->GetIcon( _T("redX") ) ) );
-
-        stats->pPiano->SetRoundedRectangles( true );
-    }
-    stats->pPiano->SetTMercIcon( new wxBitmap( style->GetIcon( _T("tmercprj") ) ) );
-    stats->pPiano->SetPolyIcon( new wxBitmap( style->GetIcon( _T("polyprj") ) ) );
-    stats->pPiano->SetSkewIcon( new wxBitmap( style->GetIcon( _T("skewprj") ) ) );
-
-    stats->Show( true );
-
     pAPilot = new AutoPilotWindow( gFrame, *pNMEA_AP_Port );
 
     pthumbwin = new ThumbWin( cc1 );
@@ -1633,10 +1616,27 @@ if( 0 == g_memCacheLimit )
 
     if( g_bframemax ) gFrame->Maximize( true );
 
+    
+    stats = new StatWin( cc1 );
+    stats->SetColorScheme( global_color_scheme );
+    
+    ocpnStyle::Style* style = g_StyleManager->GetCurrentStyle();
+    
+    if( cc1->GetQuiltMode() ) {
+        stats->pPiano->SetVizIcon( new wxBitmap( style->GetIcon( _T("viz") ) ) );
+        stats->pPiano->SetInVizIcon( new wxBitmap( style->GetIcon( _T("redX") ) ) );
+        
+        stats->pPiano->SetRoundedRectangles( true );
+    }
+    stats->pPiano->SetTMercIcon( new wxBitmap( style->GetIcon( _T("tmercprj") ) ) );
+    stats->pPiano->SetPolyIcon( new wxBitmap( style->GetIcon( _T("polyprj") ) ) );
+    stats->pPiano->SetSkewIcon( new wxBitmap( style->GetIcon( _T("skewprj") ) ) );
+    
+    stats->Show( true );
+    
+    
     //  Yield to pick up the OnSize() calls that result from Maximize()
     Yield();
-
-    stats->Show();              // sometimes gets turned off in gtk??
 
     wxString perspective;
     pConfig->SetPath( _T ( "/AUI" ) );
@@ -1905,6 +1905,8 @@ if( 0 == g_memCacheLimit )
 
     cc1->ReloadVP();                  // once more, and good to go
 
+    g_FloatingCompassDialog = new ocpnFloatingCompassWindow( cc1 );
+    
     if( g_FloatingCompassDialog ) g_FloatingCompassDialog->UpdateStatus( true );
 
     g_FloatingToolbarDialog->Raise();
@@ -3846,14 +3848,30 @@ int MyFrame::DoOptionsDialog()
     Raise();                      // I dunno why...
 #endif
 
+    bool ret_val = false;
     if( rr ) {
         ProcessOptionsDialog( rr, &optionsDlg );
-        delete pWorkDirArray;
-        return true;
+        ret_val = true;
     }
 
     delete pWorkDirArray;
-    return false;
+    
+    //    Restart the async classes
+    if( g_pAIS ) g_pAIS->UnPause();
+    if( g_pnmea ) g_pnmea->UnPause();
+    
+    bDBUpdateInProgress = false;
+    
+    if( g_FloatingToolbarDialog ) {
+        if( IsFullScreen() && !g_bFullscreenToolbar ) g_FloatingToolbarDialog->Submerge();
+    }
+    
+#ifdef __WXMAC__
+    if(stats) stats->Show();
+#endif
+    
+    Refresh( false );
+    return ret_val;
 }
 
 int MyFrame::ProcessOptionsDialog( int rr, options* dialog )
@@ -3973,6 +3991,7 @@ int MyFrame::ProcessOptionsDialog( int rr, options* dialog )
 
     SetChartUpdatePeriod( cc1->GetVP() );              // Pick up changes to skew compensator
 
+#if 0    
 //    Restart the async classes
     if( g_pAIS ) g_pAIS->UnPause();
     if( g_pnmea ) g_pnmea->UnPause();
@@ -3988,6 +4007,7 @@ int MyFrame::ProcessOptionsDialog( int rr, options* dialog )
 #endif
 
     Refresh( false );
+#endif    
     return 0;
 }
 
