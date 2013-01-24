@@ -287,6 +287,8 @@ private:
       ViewPort    VPoint;
       void        PositionConsole(void);
       void        FinishRoute(void);
+      wxString    FindValidUploadPort();
+      
 
       ChInfoWin   *m_pCIWin;
 
@@ -305,7 +307,7 @@ private:
       RoutePoint  *m_pRoutePointEditTarget;
       SelectItem  *m_pFoundPoint;
       bool        m_bChartDragging;
-
+      wxString    m_active_upload_port;
       Route       *m_pMouseRoute;
       Route       *m_pSelectedRoute;
       Route       *m_pSelectedTrack;
@@ -544,6 +546,7 @@ private:
       IDX_entry   *m_pIDXCandidate;
 
       glChartCanvas *m_glcc;
+      wxGLContext   *m_pGLcontext;
 
       //Smooth zoom member variables
       wxTimer     m_zoom_timer;
@@ -553,7 +556,6 @@ private:
       double      m_zoom_target_factor;
       double      m_zoom_current_factor;
 
-      wxSound     m_anchorwatch_sound;
 
 DECLARE_EVENT_TABLE()
 };
@@ -575,6 +577,8 @@ public:
 
       glChartCanvas(wxWindow *parent);
       ~glChartCanvas();
+      
+      void SetContext(wxGLContext *pcontext) { m_pcontext = pcontext; }
 
       void OnPaint(wxPaintEvent& event);
       void OnEraseBG(wxEraseEvent& evt);
@@ -597,6 +601,8 @@ protected:
       void SetClipRegion(ViewPort &vp, wxRegion &region, bool b_clear);
       void ComputeRenderQuiltViewGLRegion( ViewPort &vp, wxRegion Region );
 
+      wxGLContext       *m_pcontext;
+      
       int m_cacheinvalid;
       int max_texture_dimension;
 
@@ -832,6 +838,7 @@ private:
     int m_timeout_sec;
     int m_mmouse_propogate;
     bool isActive;
+    wxFont *m_plabelFont;
 
 DECLARE_EVENT_TABLE()
 };

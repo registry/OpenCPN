@@ -39,6 +39,12 @@ wxFont *g_pFontData;
 wxFont *g_pFontLabel;
 wxFont *g_pFontSmall;
 
+#if !defined(NAN)
+static const long long lNaN = 0xfff8000000000000;
+#define NAN (*(double*)&lNaN)
+#endif
+
+
 // the class factories, used to create and destroy instances of the PlugIn
 
 extern "C" DECL_EXP opencpn_plugin* create_pi( void *ppimgr )
@@ -65,7 +71,7 @@ enum {
     ID_DBP_I_DPT, ID_DBP_D_DPT, ID_DBP_I_TMP, ID_DBP_I_VMG, ID_DBP_D_VMG, ID_DBP_I_RSA,
     ID_DBP_D_RSA, ID_DBP_I_SAT, ID_DBP_D_GPS, ID_DBP_I_PTR, ID_DBP_I_CLK, ID_DBP_I_SUN,
     ID_DBP_D_MON, ID_DBP_I_ATMP, ID_DBP_I_AWA, ID_DBP_I_TWA, ID_DBP_I_TWD, ID_DBP_I_TWS,
-    ID_DBP_D_TWD, ID_DBP_I_HDM, ID_DBP_D_HDT,
+    ID_DBP_D_TWD, ID_DBP_I_HDM, ID_DBP_D_HDT,ID_DBP_D_WDH,
     ID_DBP_LAST_ENTRY //this has a reference in one of the routines; defining a "LAST_ENTRY" and setting the reference to it, is one codeline less to change (and find) when adding new instruments :-)
 };
 
@@ -144,6 +150,8 @@ wxString getInstrumentCaption( unsigned int id )
             return _("Sunrise/Sunset");
         case ID_DBP_D_MON:
             return _("Moon phase");
+        case ID_DBP_D_WDH:
+            return _("Wind history");
     }
     return _T("");
 }
@@ -188,6 +196,7 @@ void getListItemForInstrument( wxListItem &item, unsigned int id )
         case ID_DBP_D_GPS:
         case ID_DBP_D_HDT:
         case ID_DBP_D_MON:
+        case ID_DBP_D_WDH:
             item.SetImage( 1 );
             break;
     }
@@ -279,6 +288,10 @@ int dashboard_pi::Init( void )
     mPriAWA = 99; // Relative wind
     mPriTWA = 99; // True wind
     mPriDepth = 99;
+    m_config_version = -1;
+    mHDx_Watchdog = 2;
+    mHDT_Watchdog = 2;
+    mGPS_Watchdog = 2;
 
     g_pFontTitle = new wxFont( 10, wxFONTFAMILY_SWISS, wxFONTSTYLE_ITALIC, wxFONTWEIGHT_NORMAL );
     g_pFontData = new wxFont( 14, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL );
@@ -300,6 +313,12 @@ int dashboard_pi::Init( void )
             _("Dashboard"), _T(""), NULL, DASHBOARD_TOOL_POSITION, 0, this );
 
     ApplyConfig();
+
+    //  If we loaded a version 1 config setup, convert now to version 2
+    if(m_config_version == 1) {
+        SaveConfig();
+    }
+
     Start( 1000, wxTIMER_CONTINUOUS );
 
     return ( WANTS_CURSOR_LATLON | WANTS_TOOLBAR_CALLBACK | INSTALLS_TOOLBAR_TOOL
@@ -341,6 +360,29 @@ void dashboard_pi::Notify()
     for( size_t i = 0; i < m_ArrayOfDashboardWindow.GetCount(); i++ ) {
         DashboardWindow *dashboard_window = m_ArrayOfDashboardWindow.Item( i )->m_pDashboardWindow;
         if( dashboard_window ) dashboard_window->Refresh();
+    }
+    //  Manage the watchdogs
+    mHDx_Watchdog--;
+    if( mHDx_Watchdog <= 0 ) {
+        mHdm = NAN;
+        SendSentenceToAllInstruments( OCPN_DBP_STC_HDM, mHdm, _T("Deg") );
+    }
+
+    mHDT_Watchdog--;
+    if( mHDT_Watchdog <= 0 ) {
+        SendSentenceToAllInstruments( OCPN_DBP_STC_HDT, NAN, _T("DegT") );
+    }
+
+    mGPS_Watchdog--;
+    if( mGPS_Watchdog <= 0 ) {
+        SAT_INFO sats[4];
+        for(int i=0 ; i < 4 ; i++) {
+            sats[i].SatNumber = 0;
+            sats[i].SignalToNoiseRatio = 0;
+        }
+        SendSatInfoToAllInstruments( 0, 1, sats );
+        SendSatInfoToAllInstruments( 0, 2, sats );
+        SendSatInfoToAllInstruments( 0, 3, sats );
     }
 }
 
@@ -524,6 +566,8 @@ void dashboard_pi::SetNMEASentence( wxString &sentence )
                 SendSentenceToAllInstruments( OCPN_DBP_STC_SAT, m_NMEA0183.Gsv.SatsInView, _T("") );
                 SendSatInfoToAllInstruments( m_NMEA0183.Gsv.SatsInView,
                         m_NMEA0183.Gsv.MessageNumber, m_NMEA0183.Gsv.SatInfo );
+
+                mGPS_Watchdog = gps_watchdog_timeout_ticks;
             }
         }
 
@@ -543,6 +587,9 @@ void dashboard_pi::SetNMEASentence( wxString &sentence )
                     SendSentenceToAllInstruments( OCPN_DBP_STC_HDM, mHdm, _T("Deg") );
                     //SendSentenceToAllInstruments(OCPN_DBP_STC_HDT, mHdm + mVar, _T("Deg"));
                 }
+                if( !wxIsNaN(m_NMEA0183.Hdg.MagneticSensorHeadingDegrees) )
+                       mHDx_Watchdog = gps_watchdog_timeout_ticks;
+
             }
         }
 
@@ -554,6 +601,9 @@ void dashboard_pi::SetNMEASentence( wxString &sentence )
                     SendSentenceToAllInstruments( OCPN_DBP_STC_HDM, mHdm, _T("DegM") );
                     //SendSentenceToAllInstruments(OCPN_DBP_STC_HDT, mHdm + mVar, _T("Deg"));
                 }
+                if( !wxIsNaN(m_NMEA0183.Hdm.DegreesMagnetic) )
+                    mHDx_Watchdog = gps_watchdog_timeout_ticks;
+
             }
         }
 
@@ -566,6 +616,9 @@ void dashboard_pi::SetNMEASentence( wxString &sentence )
                                 _T("DegT") );
                     }
                 }
+                if( !wxIsNaN(m_NMEA0183.Hdt.DegreesTrue) )
+                    mHDT_Watchdog = gps_watchdog_timeout_ticks;
+
             }
         } else if( m_NMEA0183.LastSentenceIDReceived == _T("MTA") ) {  //Air temperature
             if( m_NMEA0183.Parse() ) {
@@ -602,7 +655,7 @@ void dashboard_pi::SetNMEASentence( wxString &sentence )
                 }
 
                 SendSentenceToAllInstruments( OCPN_DBP_STC_TWS2, m_NMEA0183.Mwd.WindSpeedKnots,
-                        _("Kts") );
+                        _T("Kts") );
                 //m_NMEA0183.Mwd.WindSpeedms
             }
         }
@@ -723,6 +776,12 @@ void dashboard_pi::SetNMEASentence( wxString &sentence )
                     SendSentenceToAllInstruments( OCPN_DBP_STC_STW, m_NMEA0183.Vhw.Knots,
                             _T("Kts") );
                 }
+
+                if( !wxIsNaN(m_NMEA0183.Vhw.DegreesMagnetic) )
+                    mHDx_Watchdog = gps_watchdog_timeout_ticks;
+                if( !wxIsNaN(m_NMEA0183.Vhw.DegreesTrue) )
+                    mHDT_Watchdog = gps_watchdog_timeout_ticks;
+
             }
         }
 
@@ -814,6 +873,25 @@ void dashboard_pi::SetNMEASentence( wxString &sentence )
                     mUTCDateTime.ParseFormat( dt.c_str(), _T("%Y%m%d%H%M%S") );
                 }
             }
+        }
+    }
+        //      Process an AIVDO message
+    else if( sentence.Mid( 1, 5 ).IsSameAs( _T("AIVDO") ) ) {
+        PlugIn_Position_Fix_Ex gpd;
+        if( DecodeSingleVDOMessage(sentence, &gpd, &m_VDO_accumulator) ) {
+
+            if( !wxIsNaN(gpd.Lat) )
+                SendSentenceToAllInstruments( OCPN_DBP_STC_LAT, gpd.Lat, _T("SDMM") );
+
+            if( !wxIsNaN(gpd.Lon) )
+                SendSentenceToAllInstruments( OCPN_DBP_STC_LON, gpd.Lon, _T("SDMM") );
+
+            SendSentenceToAllInstruments( OCPN_DBP_STC_SOG, gpd.Sog, _T("Kts") );
+            SendSentenceToAllInstruments( OCPN_DBP_STC_COG, gpd.Cog, _T("Deg") );
+            SendSentenceToAllInstruments( OCPN_DBP_STC_HDT, gpd.Hdt, _T("DegT") );
+            if( !wxIsNaN(gpd.Hdt) )
+                mHDT_Watchdog = gps_watchdog_timeout_ticks;
+
         }
     }
 }
@@ -931,6 +1009,15 @@ void dashboard_pi::OnToolbarToolCallback( int id )
 {
     int cnt = GetDashboardWindowShownCount();
 
+    bool b_anyviz = false;
+    for( size_t i = 0; i < m_ArrayOfDashboardWindow.GetCount(); i++ ) {
+        DashboardWindowContainer *cont = m_ArrayOfDashboardWindow.Item( i );
+        if( cont->m_bIsVisible ) {
+            b_anyviz = true;
+            break;
+        }
+    }
+
     for( size_t i = 0; i < m_ArrayOfDashboardWindow.GetCount(); i++ ) {
         DashboardWindowContainer *cont = m_ArrayOfDashboardWindow.Item( i );
         DashboardWindow *dashboard_window = cont->m_pDashboardWindow;
@@ -969,8 +1056,15 @@ void dashboard_pi::OnToolbarToolCallback( int id )
 
                 if( b_reset_pos ) pane.FloatingPosition( 50, 50 );
 
-                cont->m_bIsVisible = cnt == 0;
-                pane.Show( cnt == 0 );
+                if( cnt == 0 )
+                    if( b_anyviz )
+                        pane.Show( cont->m_bIsVisible );
+                    else {
+                       cont->m_bIsVisible = true;
+                       pane.Show( true );       // show all if none are marked visible and none are shown
+                    }
+                else
+                    pane.Show( false );
             }
 
             //  This patch fixes a bug in wxAUIManager
@@ -1032,6 +1126,7 @@ bool dashboard_pi::LoadConfig( void )
         // TODO: Memory leak? We should destroy everything first
         m_ArrayOfDashboardWindow.Clear();
         if( version.IsEmpty() && d_cnt == -1 ) {
+            m_config_version = 1;
             // Let's load version 1 or default settings.
             int i_cnt;
             pConf->Read( _T("InstrumentCount"), &i_cnt, -1 );
@@ -1053,6 +1148,7 @@ bool dashboard_pi::LoadConfig( void )
                     new DashboardWindowContainer( NULL, GetUUID(), _("Dashboard"), _T("V"), ar ) );
         } else {
             // Version 2
+            m_config_version = 2;
             for( int i = 0; i < d_cnt; i++ ) {
                 pConf->SetPath( wxString::Format( _T("/PlugIns/Dashboard/Dashboard%d"), i + 1 ) );
                 wxString name;
@@ -1061,8 +1157,11 @@ bool dashboard_pi::LoadConfig( void )
                 pConf->Read( _T("Caption"), &caption, _("Dashboard") );
                 wxString orient;
                 pConf->Read( _T("Orientation"), &orient, _T("V") );
+                int b_viz;
+                pConf->Read( _T("Visible"), &b_viz, 1 );
                 int i_cnt;
                 pConf->Read( _T("InstrumentCount"), &i_cnt, -1 );
+
                 wxArrayInt ar;
                 for( int i = 0; i < i_cnt; i++ ) {
                     int id;
@@ -1070,8 +1169,10 @@ bool dashboard_pi::LoadConfig( void )
                     if( id != -1 ) ar.Add( id );
                 }
 // TODO: Do not add if GetCount == 0
-                m_ArrayOfDashboardWindow.Add(
-                        new DashboardWindowContainer( NULL, name, caption, orient, ar ) );
+                DashboardWindowContainer *cont = new DashboardWindowContainer( NULL, name, caption, orient, ar );
+                cont->m_bIsVisible = b_viz;
+
+                m_ArrayOfDashboardWindow.Add( cont );
             }
         }
 
@@ -1099,6 +1200,8 @@ bool dashboard_pi::SaveConfig( void )
             pConf->Write( _T("Name"), cont->m_sName );
             pConf->Write( _T("Caption"), cont->m_sCaption );
             pConf->Write( _T("Orientation"), cont->m_sOrientation );
+            pConf->Write( _T("Visible"), cont->m_bIsVisible );
+
             pConf->Write( _T("InstrumentCount"), (int) cont->m_aInstrumentList.GetCount() );
             for( size_t j = 0; j < cont->m_aInstrumentList.GetCount(); j++ )
                 pConf->Write( wxString::Format( _T("Instrument%d"), j + 1 ),
@@ -1125,14 +1228,19 @@ void dashboard_pi::ApplyConfig( void )
             }
             m_ArrayOfDashboardWindow.Remove( cont );
             delete cont;
+
         } else if( !cont->m_pDashboardWindow ) {
             // A new dashboard is created
             cont->m_pDashboardWindow = new DashboardWindow( GetOCPNCanvasWindow(), wxID_ANY,
                     m_pauimgr, this, orient, cont );
             cont->m_pDashboardWindow->SetInstrumentList( cont->m_aInstrumentList );
             bool vertical = orient == wxVERTICAL;
-            //wxSize sz = cont->m_pDashboardWindow->GetSize( orient, wxDefaultSize );
             wxSize sz = cont->m_pDashboardWindow->GetMinSize();
+// Mac has a little trouble with initial Layout() sizing...
+#ifdef __WXOSX__
+            if(sz.x == 0)
+                sz.IncTo( wxSize( 160, 388) );
+#endif
             m_pauimgr->AddPane( cont->m_pDashboardWindow,
                 wxAuiPaneInfo().Name( cont->m_sName ).Caption( cont->m_sCaption ).CaptionVisible( true ).TopDockable(
                 !vertical ).BottomDockable( !vertical ).LeftDockable( vertical ).RightDockable( vertical ).MinSize(
@@ -1142,7 +1250,6 @@ void dashboard_pi::ApplyConfig( void )
             pane.Caption( cont->m_sCaption ).Show( cont->m_bIsVisible );
             if( !cont->m_pDashboardWindow->isInstrumentListEqual( cont->m_aInstrumentList ) ) {
                 cont->m_pDashboardWindow->SetInstrumentList( cont->m_aInstrumentList );
-                //wxSize sz = cont->m_pDashboardWindow->GetSize( orient, wxDefaultSize );
                 wxSize sz = cont->m_pDashboardWindow->GetMinSize();
                 pane.MinSize( sz ).BestSize( sz ).FloatingSize( sz );
             }
@@ -1296,11 +1403,14 @@ DashboardPreferencesDialog::DashboardPreferencesDialog( wxWindow *parent, wxWind
     itemBoxSizer04->Add( m_pButtonAdd, 0, wxEXPAND | wxALL, border_size );
     m_pButtonAdd->Connect( wxEVT_COMMAND_BUTTON_CLICKED,
             wxCommandEventHandler(DashboardPreferencesDialog::OnInstrumentAdd), NULL, this );
+
+/* TODO  Instrument Properties
     m_pButtonEdit = new wxButton( m_pPanelDashboard, wxID_ANY, _("Edit"), wxDefaultPosition,
             wxDefaultSize );
     itemBoxSizer04->Add( m_pButtonEdit, 0, wxEXPAND | wxALL, border_size );
     m_pButtonEdit->Connect( wxEVT_COMMAND_BUTTON_CLICKED,
             wxCommandEventHandler(DashboardPreferencesDialog::OnInstrumentEdit), NULL, this );
+*/
     m_pButtonDelete = new wxButton( m_pPanelDashboard, wxID_ANY, _("Delete"), wxDefaultPosition,
             wxSize( 20, -1 ) );
     itemBoxSizer04->Add( m_pButtonDelete, 0, wxEXPAND | wxALL, border_size );
@@ -1440,7 +1550,9 @@ void DashboardPreferencesDialog::OnDashboardAdd( wxCommandEvent& event )
     // Data is index in m_Config
     m_pListCtrlDashboards->SetItemData( idx, m_Config.GetCount() );
     wxArrayInt ar;
-    m_Config.Add( new DashboardWindowContainer( NULL, GetUUID(), _("Dashboard"), _T("V"), ar ) );
+    DashboardWindowContainer *dwc = new DashboardWindowContainer( NULL, GetUUID(), _("Dashboard"), _T("V"), ar );
+    dwc->m_bIsVisible = true;
+    m_Config.Add( dwc );
 }
 
 void DashboardPreferencesDialog::OnDashboardDelete( wxCommandEvent& event )
@@ -1466,7 +1578,7 @@ void DashboardPreferencesDialog::UpdateButtonsState()
     bool enable = ( item != -1 );
 
     m_pButtonDelete->Enable( enable );
-    m_pButtonEdit->Enable( false ); // TODO: Properties
+//    m_pButtonEdit->Enable( false ); // TODO: Properties
     m_pButtonUp->Enable( item > 0 );
     m_pButtonDown->Enable( item != -1 && item < m_pListCtrlInstruments->GetItemCount() - 1 );
 }
@@ -1649,6 +1761,8 @@ void DashboardWindow::OnContextMenuSelect( wxCommandEvent& event )
 {
     if( event.GetId() < ID_DASH_PREFS ) { // Toggle dashboard visibility
         m_plugin->ShowDashboard( event.GetId(), event.IsChecked() );
+        if( m_plugin )
+            SetToolbarItemState( m_plugin->GetToolbarItemId(), m_plugin->GetDashboardWindowShownCount() != 0 );
     }
 
     switch( event.GetId() ){
@@ -1921,6 +2035,10 @@ void DashboardWindow::SetInstrumentList( wxArrayInt list )
                 instrument = new DashboardInstrument_Moon( this, wxID_ANY,
                         getInstrumentCaption( id ) );
                 break;
+            case ID_DBP_D_WDH:
+                instrument = new DashboardInstrument_WindDirHistory(this, wxID_ANY,
+                        getInstrumentCaption( id ) );
+                  break;
         }
         if( instrument ) {
             instrument->instrumentTypeId = id;

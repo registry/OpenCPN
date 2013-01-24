@@ -34,10 +34,15 @@
 #include <wx/config.h>
 #include <wx/confbase.h>
 #include <wx/fileconf.h>
+#include <wx/sound.h>
 
 #ifdef __WXMSW__
 #include <wx/msw/regconf.h>
 #include <wx/msw/iniconf.h>
+#endif
+
+#ifdef OCPN_USE_PORTAUDIO
+#include "portaudio.h"
 #endif
 
 #include "bbox.h"
@@ -175,6 +180,9 @@ public:
     void Set( RoutePoint* p ) { lat = p->m_lat; lon = p->m_lon; }
     friend bool operator==( vector2D &a, vector2D &b ) { return a.x == b.x && a.y == b.y; }
     friend bool operator!=( vector2D &a, vector2D &b ) { return a.x != b.x || a.y != b.y; }
+    friend vector2D operator-( vector2D a, vector2D b ) { return vector2D( a.x - b.x, a.y - b.y ); }
+    friend vector2D operator+( vector2D a, vector2D b ) { return vector2D( a.x + b.x, a.y + b.y ); }
+    friend vector2D operator*( double t, vector2D a ) { return vector2D( a.x * t, a.y * t ); }
 
     union{ double x; double lon; };
     union{ double y; double lat; };
@@ -430,8 +438,8 @@ public:
       virtual void UpdateNavObj();
       virtual void StoreNavObjChanges();
 
-      void ExportGPX(wxWindow* parent);
-	void ImportGPX(wxWindow* parent, bool islayer = false, wxString dirpath = _T(""), bool isdirectory = true);
+      void ExportGPX(wxWindow* parent, bool bviz_only = false, bool blayer = false);
+      void ImportGPX(wxWindow* parent, bool islayer = false, wxString dirpath = _T(""), bool isdirectory = true);
 
       bool ExportGPXRoute(wxWindow* parent, Route *pRoute);
       bool ExportGPXWaypoint(wxWindow* parent, RoutePoint *pRoutePoint);
@@ -730,6 +738,7 @@ class TTYScroll : public wxScrolledWindow
             TTYScroll(wxWindow *parent, int n_lines)
       : wxScrolledWindow(parent), m_nLines( n_lines )
             {
+                  bpause = false;
                   wxClientDC dc(this);
                   dc.GetTextExtent(_T("Line Height"), NULL, &m_hLine);
 
@@ -748,6 +757,7 @@ class TTYScroll : public wxScrolledWindow
             virtual void OnDraw(wxDC& dc);
             virtual void Add(wxString &line);
             void OnSize(wxSizeEvent& event);
+            void Pause(bool pause) { bpause = pause; }
 
       protected:
 
@@ -755,6 +765,8 @@ class TTYScroll : public wxScrolledWindow
             size_t m_nLines;        // the number of lines we draw
 
             wxArrayString     *m_plineArray;
+            bool               bpause;
+
 };
 
 
@@ -766,25 +778,22 @@ class TTYWindow : public wxDialog
 
       public:
             TTYWindow();
-            TTYWindow(wxWindow *parent, int n_lines)
-      : wxDialog(parent, -1, _T("Title"), wxDefaultPosition, wxDefaultSize,
-                 wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER)
-                 {
-                       m_pScroll = new TTYScroll(this, n_lines);
-                       m_pScroll->Scroll(-1, 1000);        // start with full scroll down
-                 }
+            TTYWindow(wxWindow *parent, int n_lines);
+            ~TTYWindow();
 
-                 ~TTYWindow();
-
-                 void Add(wxString &line);
-                 void OnCloseWindow(wxCloseEvent& event);
-                 void Close();
-                 void OnSize( wxSizeEvent& event );
-                 void OnMove( wxMoveEvent& event );
-
+             void Add(wxString &line);
+             void OnCloseWindow(wxCloseEvent& event);
+             void Close();
+             void OnSize( wxSizeEvent& event );
+             void OnMove( wxMoveEvent& event );
+             void OnPauseClick( wxCommandEvent& event );
 
       protected:
+            void CreateLegendBitmap();
             TTYScroll   *m_pScroll;
+            wxButton    *m_buttonPause;
+            bool        bpause;
+            wxBitmap    m_bm_legend;
 };
 
 
@@ -804,6 +813,61 @@ extern "C" pVector2D vSubtractVectors(pVector2D v0, pVector2D v1, pVector2D v);
 extern "C" double vVectorMagnitude(pVector2D v0);
 extern "C" double vVectorSquared(pVector2D v0);
 
+
+
+//---------------------------------------------------------------------------------
+//      OpenCPN internal Sound support class
+//---------------------------------------------------------------------------------
+
+/// Sound data, as loaded from .wav file:
+class OCPNSoundData
+{
+public:
+    OCPNSoundData() : m_dataWithHeader(NULL) {}
+    ~OCPNSoundData() {};
+    
+    // .wav header information:
+    unsigned m_channels;       // num of channels (mono:1, stereo:2)
+    unsigned m_samplingRate;
+    unsigned m_bitsPerSample;  // if 8, then m_data contains unsigned 8bit
+    // samples (wxUint8), if 16 then signed 16bit
+    // (wxInt16)
+    unsigned m_samples;        // length in samples:
+    
+    // wave data:
+    size_t   m_dataBytes;
+    wxUint8 *m_data;           // m_dataBytes bytes of data
+    
+    wxUint8 *m_dataWithHeader; // ditto, but prefixed with .wav header
+};
+
+
+
+
+class OCPN_Sound: public wxSound
+{
+public:
+    OCPN_Sound();
+    ~OCPN_Sound();
+    
+    bool IsOk() const;
+    bool Create(const wxString& fileName, bool isResource = false);
+    bool Play(unsigned flags = wxSOUND_ASYNC) const;
+    bool IsPlaying() const;
+    void Stop();
+    
+private:
+    bool m_OK;
+    
+#ifdef OCPN_USE_PORTAUDIO
+    bool LoadWAV(const wxUint8 *data, size_t length, bool copyData);
+    void FreeMem(void);
+    
+    OCPNSoundData *m_osdata;
+    PaStream *m_stream;
+#endif    
+    
+};
 
 
 #endif

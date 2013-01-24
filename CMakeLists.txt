@@ -18,7 +18,7 @@
 ## *   You should have received a copy of the GNU General Public License     *
 ## *   along with this program; if not, write to the                         *
 ## *   Free Software Foundation, Inc.,                                       *
-## *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301,  USA.             *
+## *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301,  USA.         *
 ## ***************************************************************************
 
 
@@ -67,7 +67,7 @@ IF (NOT WIN32)
   SET (LIB_INSTALL_DIR "lib")
   IF (EXISTS /etc/debian_version)
     SET (PACKAGE_FORMAT "DEB")
-    SET (PACKAGE_DEPS "libc6, libwxgtk2.8-0 (>= 2.8.7.1), libglu1-mesa (>= 7.0.0), libgl1-mesa-glx (>= 7.0.0), zlib1g, bzip2, libsdl1.2debian, libtinyxml2.6.2")
+    SET (PACKAGE_DEPS "libc6, libwxgtk2.8-0 (>= 2.8.7.1), libglu1-mesa (>= 7.0.0), libgl1-mesa-glx (>= 7.0.0), zlib1g, bzip2, libtinyxml2.5.3, libportaudio2")
     SET (PACKAGE_RECS "xcalib")
     SET (LIB_INSTALL_DIR "lib")
     IF (CMAKE_SIZEOF_VOID_P MATCHES "8")
@@ -115,8 +115,13 @@ ELSE (NOT WIN32)
 ENDIF (NOT WIN32)
 
 IF (CMAKE_SYSTEM_PROCESSOR MATCHES "arm*")
-  SET (ARCH "armel")
+  SET (ARCH "armhf")
 ENDIF (CMAKE_SYSTEM_PROCESSOR MATCHES "arm*")
+
+IF (ARCH MATCHES "armhf")
+  ADD_DEFINITIONS(-DARMHF)
+ENDIF (ARCH MATCHES "armhf")
+
 MESSAGE (STATUS "*** Build Architecture is ${ARCH}")
 SET(PACKAGE_RELEASE "1" CACHE STRING "Package release number")
 
@@ -147,6 +152,8 @@ SET( wxWidgets_USE_STATIC OFF)
 
 FIND_PACKAGE(wxWidgets REQUIRED)
 INCLUDE(${wxWidgets_USE_FILE})
+    MESSAGE (STATUS "Found wxWidgets..." )
+    MESSAGE (STATUS "${wxWidgets_LIBRARIES}")
 
 #  Search for wxWidgets 2.9
 STRING(REGEX MATCHALL "2.9" wx_Version "${wxWidgets_INCLUDE_DIRS}")
@@ -192,6 +199,8 @@ SET(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/build)
 # Let cmake find additional modules private to opencpn
 SET(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/")
 
+IF (NOT WIN32 AND NOT APPLE)
+
 FIND_PACKAGE(GTK2 2.6)
 IF (GTK2_FOUND)
     MESSAGE (STATUS "Found GTK2")
@@ -209,6 +218,24 @@ ELSE(GTK2_FOUND)
     MESSAGE (STATUS "GTK2 Not found...")
 ENDIF (GTK2_FOUND)
 
+IF(UNIX)
+INCLUDE("FindPortaudio.cmake")
+IF (PORTAUDIO_FOUND)
+    MESSAGE (STATUS "Portaudio Found")
+    INCLUDE_DIRECTORIES(${PORTAUDIO_INCLUDE_DIRS})
+    SET(EXTRA_LIBS ${EXTRA_LIBS} ${PORTAUDIO_LIBRARIES})
+    ADD_DEFINITIONS(${PORTAUDIO_DEFINITIONS})
+    ADD_DEFINITIONS(-DOCPN_USE_PORTAUDIO)
+ELSE (PORTAUDIO_FOUND)
+    MESSAGE (STATUS "Portaudio Not Found...")
+ENDIF (PORTAUDIO_FOUND)
+
+#SET(EXTRA_LIBS ${EXTRA_LIBS} "/usr/lib/i386-linux-gnu/libportaudio.so.2.0.0")
+#ADD_DEFINITIONS(-DOCPN_USE_PORTAUDIO)
+ENDIF(UNIX)
+
+ENDIF (NOT WIN32 AND NOT APPLE)
+
 FIND_PACKAGE(Gettext REQUIRED)
 
 IF(UNIX)
@@ -223,8 +250,6 @@ ENDIF(UNIX)
 # header files and cpp/c files and CMake will sort them out
 
 SET(SRC_NMEA0183
-		include/nmea.h
-		src/nmea.cpp
 		src/nmea0183/LatLong.hpp
 		src/nmea0183/latlong.cpp
 		src/nmea0183/long.cpp
@@ -267,31 +292,32 @@ ADD_LIBRARY(NMEA0183 ${SRC_NMEA0183})
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/src/nmea0183)
 
 
-IF(NOT WIN32)
-OPTION (USE_GPSD "Enable GPSD Library" ON)
-IF (USE_GPSD)
-      message (STATUS "GPSD Library support: enabled")
-
- #     FIND_PACKAGE(gps QUIET)
-     FIND_PACKAGE(gps)
-      IF (GPS_FOUND)
-            message (STATUS "Building with libgps includes")
-            INCLUDE_DIRECTORIES(${GPS_INCLUDE_DIR})
-            ADD_DEFINITIONS(${GPS_DEFINITIONS})
-            ADD_DEFINITIONS(-DBUILD_WITH_LIBGPS)
-            message (STATUS "GPS library include location is ${GPS_INCLUDE_DIR}")
-      ELSE (GPS_FOUND)
-            message (STATUS "Gps library not found")
-      ENDIF (GPS_FOUND)
-ENDIF (USE_GPSD)
-ENDIF (NOT WIN32)
+#IF(NOT WIN32)
+#OPTION (USE_GPSD "Enable GPSD Library" ON)
+#IF (USE_GPSD)
+#      message (STATUS "GPSD Library support: enabled")
+#
+##     FIND_PACKAGE(gps QUIET)
+#     FIND_PACKAGE(gps)
+#      IF (GPS_FOUND)
+#            message (STATUS "Building with libgps includes")
+#            INCLUDE_DIRECTORIES(${GPS_INCLUDE_DIR})
+#            ADD_DEFINITIONS(${GPS_DEFINITIONS})
+#            ADD_DEFINITIONS(-DBUILD_WITH_LIBGPS)
+#            message (STATUS "GPS library include location is ${GPS_INCLUDE_DIR}")
+##            SET(EXTRA_LIBS ${EXTRA_LIBS} ${GPS_LIBRARY})
+#      ELSE (GPS_FOUND)
+#            message (STATUS "Gps library not found")
+#      ENDIF (GPS_FOUND)
+#ENDIF (USE_GPSD)
+#ENDIF (NOT WIN32)
 
 
 
 
 SET(HDRS
-                include/ocpn_types.h
-                include/ocpndc.h
+        include/ocpn_types.h
+        include/ocpndc.h
 		include/chart1.h
 		include/bbox.h
 		include/ocpn_pixel.h
@@ -327,13 +353,15 @@ SET(HDRS
 		include/toolbar.h
 		include/compasswin.h
 		include/geodesic.h
+		include/datastream.h
+        include/multiplexer.h
 )
 
 SET(SRCS
 		src/chart1.cpp
 		src/bbox.cpp
 		src/ocpn_pixel.cpp
-                src/ocpndc.cpp
+        src/ocpndc.cpp
 		src/chartdb.cpp
 		src/chartdbs.cpp
 		src/chartimg.cpp
@@ -365,6 +393,8 @@ SET(SRCS
 		src/toolbar.cpp
 		src/compasswin.cpp
 		src/geodesic.cpp
+		src/datastream.cpp
+        src/multiplexer.cpp
     )
 
 IF(wx_Version MATCHES "2.9")
@@ -492,11 +522,11 @@ IF (USE_GARMINHOST)
 	SET(SRC_GARMINHOST
                   src/garmin/jeeps/gpsapp.c
                   src/garmin/jeeps/gpscom.c
-	          src/garmin/jeeps/gpsmath.c
+                  src/garmin/jeeps/gpsmath.c
                   src/garmin/jeeps/gpsmem.c
-	          src/garmin/jeeps/gpsprot.c
+	              src/garmin/jeeps/gpsprot.c
                   src/garmin/jeeps/gpsread.c
-	          src/garmin/jeeps/gpsdevice.c
+	              src/garmin/jeeps/gpsdevice.c
                   src/garmin/jeeps/gpsdevice_ser.c
                   src/garmin/jeeps/gpsdevice_usb.c
                   src/garmin/jeeps/gpsrqst.c
@@ -530,7 +560,6 @@ IF (USE_GARMINHOST)
                   src/garmin/jeeps/gpssend.h
                   src/garmin/jeeps/gpsusbcommon.h
                   src/garmin/jeeps/gpsutil.h
-
 	)
         IF(WIN32)
            SET(SRC_GARMINHOST ${SRC_GARMINHOST} src/garmin/jeeps/gpsusbwin.c)
@@ -608,7 +637,6 @@ IF (USE_S57)
             data/s57data/rastersymbols-day.png
             data/s57data/rastersymbols-dusk.png
             data/s57data/chartsymbols.xml
-
              )
 ENDIF (USE_S57)
 
@@ -629,11 +657,11 @@ IF(APPLE)
   SET(CMAKE_C_FLAGS_RELEASE "-O3 -arch ${ARCH}")
   SET(CMAKE_C_FLAGS_RELWITHDEBINFO "-g -O3 -arch ${ARCH}")
 
-  SET(CMAKE_CXX_FLAGS "-O2 -arch ${ARCH}")
-  SET(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -arch ${ARCH}")
-  SET(CMAKE_CXX_FLAGS_MINSIZEREL "-O2 -arch ${ARCH}")
-  SET(CMAKE_CXX_FLAGS_RELEASE "-O3 -arch ${ARCH}")
-  SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g -O3 -arch ${ARCH}")
+  SET(CMAKE_CXX_FLAGS "-O2 -arch ${ARCH} -Wno-deprecated -Wno-deprecated-declarations")
+  SET(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -arch ${ARCH} -Wno-deprecated -Wno-deprecated-declarations")
+  SET(CMAKE_CXX_FLAGS_MINSIZEREL "-O2 -arch ${ARCH} -Wno-deprecated -Wno-deprecated-declarations")
+  SET(CMAKE_CXX_FLAGS_RELEASE "-O3 -arch ${ARCH} -Wno-deprecated -Wno-deprecated-declarations")
+  SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g -O3 -arch ${ARCH} -Wno-deprecated -Wno-deprecated-declarations")
 
   SET(CMAKE_EXE_LINKER_FLAGS "-O2 -arch ${ARCH}")
   SET(CMAKE_SHARED_LINKER_FLAGS "-O2 -arch ${ARCH}")
@@ -645,6 +673,17 @@ IF(APPLE)
     )
 ENDIF(APPLE)
 
+#  Mac has trouble finding libgobject-2.0.dylib
+#  We look for it explicitely
+IF(APPLE)
+#       Assume pkg-config is available.
+    INCLUDE( FindPkgConfig )
+    PKG_SEARCH_MODULE( GOBJECT REQUIRED gobject-2.0 )
+#    MESSAGE (STATUS "    GOBJECT: " ${GOBJECT_LDFLAGS})
+
+    SET(EXTRA_LIBS ${EXTRA_LIBS} ${GOBJECT_LDFLAGS})
+    SET(EXTRA_LIBS ${EXTRA_LIBS} "iconv")
+ENDIF(APPLE)
 
 IF(WIN32)
     IF(MSVC)
@@ -1036,6 +1075,7 @@ IF(UNIX AND NOT APPLE)
     SET(CPACK_RPM_PACKAGE_VERSION "${CPACK_PACKAGE_VERSION}")
     SET(CPACK_RPM_PACKAGE_ARCHITECTURE  ${ARCH})
     SET(CPACK_RPM_PACKAGE_REQUIRES  ${PACKAGE_DEPS})
+    SET(CPACK_RPM_USER_BINARY_SPECFILE "${CMAKE_SOURCE_DIR}/opencpn.spec.in")
     SET(CPACK_PACKAGE_DESCRIPTION_SUMMARY "OpenSource Chart Plotter/Navigator")
     SET(CPACK_PACKAGE_DESCRIPTION "OpenCPN is a concise ChartPlotter/Navigator. The application supports: GPS/GPDS Position Input, BSB Raster Chart Display, S57 Vector ENChart Display, AIS Input Decoding, Waypoint Autopilot Navigation .")
     SET(CPACK_SET_DESTDIR ON)

@@ -5,7 +5,7 @@
  * Author:   David Register
  *
  ***************************************************************************
- *   Copyright (C) 2010 by David S. Register   *
+ *   Copyright (C) 2010 by David S. Register                               *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -20,7 +20,7 @@
  *   You should have received a copy of the GNU General Public License     *
  *   along with this program; if not, write to the                         *
  *   Free Software Foundation, Inc.,                                       *
- *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301,  USA.             *
+ *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301,  USA.         *
  ***************************************************************************
  *
  */
@@ -45,12 +45,12 @@
 #include "styles.h"
 #include "routeman.h"
 #include "concanv.h"
-#include "nmea.h"                   // for Autopilot
 #include "navutil.h"
 #include "georef.h"
 #include "routeprop.h"
 #include "routemanagerdialog.h"
 #include "pluginmanager.h"
+#include "multiplexer.h"
 
 #include <wx/dir.h>
 #include <wx/filename.h>
@@ -62,8 +62,6 @@ extern ConsoleCanvas    *console;
 extern RouteList        *pRouteList;
 extern Select           *pSelect;
 extern MyConfig         *pConfig;
-extern NMEA0183         *pNMEA0183;
-extern AutoPilotWindow  *pAPilot;
 extern WayPointman      *pWayPointMan;
 extern Routeman         *g_pRouteMan;
 
@@ -83,9 +81,11 @@ extern RouteManagerDialog *pRouteManagerDialog;
 extern RoutePoint      *pAnchorWatchPoint1;
 extern RoutePoint      *pAnchorWatchPoint2;
 extern int              g_route_line_width;
+extern Multiplexer     *g_pMUX;
 
 extern PlugInManager    *g_pi_manager;
 extern ocpnStyle::StyleManager* g_StyleManager;
+extern wxString         g_uploadConnection;
 
 //    List definitions for Waypoint Manager Icons
 WX_DECLARE_LIST(wxBitmap, markicon_bitmap_list_type);
@@ -514,20 +514,10 @@ bool Routeman::DeactivateRoute( bool b_arrival )
 
 bool Routeman::UpdateAutopilot()
 {
-    if( !pAPilot->IsOK() ) return false;
-
-    //    Get the requested A/P sentence
-    wxString ap_sentence = _T("RMB");               // default
-    pConfig->SetPath( _T ( "/Settings" ) );
-    pConfig->Read( _T("AutoPilot NMEA Sentence Out"), &ap_sentence );
-
-    wxString str_buf;
-
-    wxStringTokenizer tkz( ap_sentence, _T(";") );
-    while( tkz.HasMoreTokens() ) {
-        wxString token = tkz.GetNextToken();
-
-        if( token.IsSameAs( _T("RMB"), false ) ) {
+    //Send all known Autopilot messages upstream
+    
+    //RMB
+        {
 
             m_NMEA0183.TalkerID = _T("EC");
 
@@ -562,15 +552,11 @@ bool Routeman::UpdateAutopilot()
 
             m_NMEA0183.Rmb.Write( snt );
 
-            //      stats->pTStat2->TextDraw(( const char *)snt.Sentence);
-//                  char t[200];
-//                  strncpy(t, snt.Sentence, 199);
-//                  printf("%s", t);
-
-            pAPilot->AutopilotOut( snt.Sentence );
+            g_pMUX->SendNMEAMessage( snt.Sentence );
         }
 
-        if( token.IsSameAs( _T("RMC"), false ) ) {
+        // RMC
+        {
 
             m_NMEA0183.TalkerID = _T("EC");
 
@@ -609,17 +595,53 @@ bool Routeman::UpdateAutopilot()
 
             m_NMEA0183.Rmc.Write( snt );
 
-            pAPilot->AutopilotOut( snt.Sentence );
-
-//                  char t[200];
-//                  strncpy(t, snt.Sentence, 199);
-//                  printf("%s", t);
-
+            g_pMUX->SendNMEAMessage( snt.Sentence );
         }
 
-    }           // while
+
     return true;
 }
+
+bool Routeman::DoesRouteContainSharedPoints( Route *pRoute )
+{
+    if( pRoute ) {
+        // walk the route, looking at each point to see if it is used by another route
+        // or is isolated
+        wxRoutePointListNode *pnode = ( pRoute->pRoutePointList )->GetFirst();
+        while( pnode ) {
+            RoutePoint *prp = pnode->GetData();
+
+            // check all other routes to see if this point appears in any other route
+            wxArrayPtrVoid *pRA = GetRouteArrayContaining( prp );
+            
+             if( pRA ) {
+                 for( unsigned int ir = 0; ir < pRA->GetCount(); ir++ ) {
+                    Route *pr = (Route *) pRA->Item( ir );
+                    if( pr == pRoute)
+                        continue;               // self
+                    else 
+                        return true;
+                }
+            }
+                
+            if( pnode ) pnode = pnode->GetNext();
+        }
+        
+        //      Now walk the route again, looking for isolated type shared waypoints
+        pnode = ( pRoute->pRoutePointList )->GetFirst();
+        while( pnode ) {
+            RoutePoint *prp = pnode->GetData();
+            if( prp->m_bKeepXRoute == true )
+                return true;
+            
+           if( pnode ) pnode = pnode->GetNext();
+        }
+    }
+    
+    return false;
+}
+  
+
 
 void Routeman::DeleteRoute( Route *pRoute )
 {
@@ -910,7 +932,6 @@ void SendToGpsDlg::CreateControls( const wxString& hint )
     itemDialog1->SetSizer( itemBoxSizer2 );
 
 //      Create the ScrollBox list of available com ports in a labeled static box
-
     wxStaticBox* comm_box = new wxStaticBox( this, wxID_ANY, _("GPS/Plotter Port") );
 
     wxStaticBoxSizer* comm_box_sizer = new wxStaticBoxSizer( comm_box, wxVERTICAL );
@@ -921,21 +942,20 @@ void SendToGpsDlg::CreateControls( const wxString& hint )
     m_itemCommListBox = new wxComboBox( this, ID_STG_CHOICE_COMM );
 
     //    Fill in the listbox with all detected serial ports
-    for( unsigned int iPortIndex = 0; iPortIndex < pSerialArray->GetCount(); iPortIndex++ )
-        m_itemCommListBox->Append( pSerialArray->Item( iPortIndex ) );
-
+    for( unsigned int iPortIndex = 0; iPortIndex < pSerialArray->GetCount(); iPortIndex++ ) {
+        wxString full_port = pSerialArray->Item( iPortIndex );
+        full_port.Prepend(_T("Serial:"));
+        m_itemCommListBox->Append( full_port );
+    }
+    
     delete pSerialArray;
 
     //    Make the proper inital selection
-    int sidx = 0;
-    if( hint.Upper().Contains( _T("SERIAL") ) ) {
-        wxString sourcex = hint.Mid( 7 );
-        sidx = m_itemCommListBox->FindString( sourcex );
-    } else
-        sidx = m_itemCommListBox->FindString( hint );
-
-    m_itemCommListBox->SetSelection( sidx );
-
+    if( !g_uploadConnection.IsEmpty() ) 
+        m_itemCommListBox->SetValue( g_uploadConnection );
+    else
+        m_itemCommListBox->SetSelection( 0 );
+    
     comm_box_sizer->Add( m_itemCommListBox, 0, wxEXPAND | wxALL, 5 );
 
     //    Add a reminder text box
@@ -972,11 +992,9 @@ void SendToGpsDlg::CreateControls( const wxString& hint )
 void SendToGpsDlg::OnSendClick( wxCommandEvent& event )
 {
     //    Get the selected comm port
-    int i = m_itemCommListBox->GetSelection();
-    wxString src( m_itemCommListBox->GetString( i ) );
-
-    src = m_itemCommListBox->GetValue();
-
+    wxString src = m_itemCommListBox->GetValue();
+    g_uploadConnection = src;                   // save for persistence
+    
     //    And send it out
     if( m_pRoute ) m_pRoute->SendToGPS( src, true, m_pgauge );
     if( m_pRoutePoint ) m_pRoutePoint->SendToGPS( src, m_pgauge );
@@ -1194,7 +1212,7 @@ wxImageList *WayPointman::Getpmarkicon_image_list( void )
         wxImage icon_larger;
         if( h0 <= h && w0 <= w ) {
             // Resize & Center smaller icons in the bitmap, so menus won't look so weird.
-            icon_larger = icon_image.Resize( wxSize( h, w ), wxPoint( (w-w0)/2, (h-h0)/2 ) );
+            icon_larger = icon_image.Resize( wxSize( w, h ), wxPoint( (w-w0)/2, (h-h0)/2 ) );
         } else {
             // rescale in one or two directions to avoid cropping, then resize to fit to cell
             int h1 = h;
@@ -1204,7 +1222,7 @@ wxImageList *WayPointman::Getpmarkicon_image_list( void )
             else if( w0 > w ) h1 = wxRound( (double) h0 * ( (double) w / (double) w0 ) );
 
             icon_larger = icon_image.Rescale( w1, h1 );
-            icon_larger = icon_larger.Resize( wxSize( h, w ), wxPoint( 0, 0 ) );
+            icon_larger = icon_larger.Resize( wxSize( w, h ), wxPoint( 0, 0 ) );
         }
 
         pmarkicon_image_list->Add( icon_larger );

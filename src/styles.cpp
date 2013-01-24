@@ -213,7 +213,12 @@ wxBitmap Style::GetToolIcon( wxString toolname, int iconType, bool rollover )
             wxSize size = tool->customSize;
             if( size.x == 0 ) size = toolSize[currentOrientation];
             wxRect location( tool->iconLoc, size );
-            if( rollover ) location = wxRect( tool->rolloverLoc, size );
+            
+            //  If rollover icon does not exist, use the defult icon
+            if( rollover ) {
+                if( (tool->rolloverLoc.x != 0) || (tool->rolloverLoc.y != 0) )
+                    location = wxRect( tool->rolloverLoc, size );
+            }                    
 
             if( currentOrientation ) {
                 location.x -= verticalIconOffset.x;
@@ -450,9 +455,17 @@ void Style::SetColorScheme( ColorScheme cs )
 {
     colorscheme = cs;
     Unload();
-    wxBitmap bm = graphics->GetSubBitmap(
+    
+    if( (consoleTextBackgroundSize.x) && (consoleTextBackgroundSize.y)) {
+        wxBitmap bm = graphics->GetSubBitmap(
             wxRect( consoleTextBackgroundLoc, consoleTextBackgroundSize ) );
-    consoleTextBackground = SetBitmapBrightness( bm );
+
+    // The background bitmap in the icons file may be too small, so will grow it arbitrailly
+        wxImage image = bm.ConvertToImage();
+        image.Rescale( consoleTextBackgroundSize.GetX() * 2, consoleTextBackgroundSize.GetY() * 2 , wxIMAGE_QUALITY_NORMAL );
+        wxBitmap bn( image );
+        consoleTextBackground = SetBitmapBrightness( bn );
+    }
 }
 
 void Style::Unload()
@@ -875,7 +888,7 @@ void StyleManager::Init( wxString fromPath )
 
 void StyleManager::SetStyle( wxString name )
 {
-    Style* style;
+    Style* style = NULL;
     bool ok = true;
     if( currentStyle ) currentStyle->Unload();
     else ok = false;
@@ -928,9 +941,16 @@ void StyleManager::SetStyle( wxString name )
         return;
     }
 
-    style->consoleTextBackground = style->graphics->GetSubBitmap(
+    if(style) {
+        if( (style->consoleTextBackgroundSize.x) && (style->consoleTextBackgroundSize.y)) {
+            style->consoleTextBackground = style->graphics->GetSubBitmap(
             wxRect( style->consoleTextBackgroundLoc, style->consoleTextBackgroundSize ) );
-    nextInvocationStyle = style->name;
+        }
+    }
+
+    if(style)
+        nextInvocationStyle = style->name;
+    
     return;
 }
 
