@@ -632,7 +632,7 @@ void RouteManagerDialog::Create()
 
     m_pWptListCtrl->InsertColumn( colWPTICON, _("Icon"), wxLIST_FORMAT_LEFT, 44 );
     m_pWptListCtrl->InsertColumn( colWPTNAME, _("Waypoint Name"), wxLIST_FORMAT_LEFT, 180 );
-    m_pWptListCtrl->InsertColumn( colWPTDIST, _("Distance"), wxLIST_FORMAT_LEFT, 180 );
+    m_pWptListCtrl->InsertColumn( colWPTDIST, _("Distance from Ownship"), wxLIST_FORMAT_LEFT, 180 );
 
     wxBoxSizer *bsWptButtons = new wxBoxSizer( wxVERTICAL );
     itemBoxSizer4->Add( bsWptButtons, 0, wxALIGN_RIGHT );
@@ -1969,11 +1969,11 @@ void RouteManagerDialog::WptShowPropertiesDialog( RoutePoint* wp, wxWindow* pare
     pMarkPropDialog->SetRoutePoint( wp );
     pMarkPropDialog->UpdateProperties();
     if( wp->m_bIsInLayer ) {
-        wxString caption( _T("Mark Properties, Layer: ") );
+        wxString caption( _("Waypoint Properties, Layer: ") );
         caption.Append( GetLayerName( wp->m_LayerID ) );
         pMarkPropDialog->SetDialogTitle( caption );
     } else
-        pMarkPropDialog->SetDialogTitle( _T("Mark Properties") );
+        pMarkPropDialog->SetDialogTitle( _("Waypoint Properties") );
 
     if( !pMarkPropDialog->IsShown() ) pMarkPropDialog->ShowModal();
 
