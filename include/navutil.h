@@ -120,6 +120,12 @@ public:
       void SetName(wxString name);
       void CalculateNameExtents(void);
 
+      void SetApproach( bool appr = false ) { m_bIsApproach = appr; }
+      bool IsApproach () { return m_bIsApproach; }
+      void SetApproachName( wxString name);
+      wxString GetApproachName() { return m_ApproachName; } 
+      void CalculateApproachNameExtents(void);
+
       void SetCourse( double course) { m_routeprop_course = course; };
       double GetCourse() { return m_routeprop_course; };
       void SetDistance( double distance) { m_routeprop_distance = distance; };
@@ -166,6 +172,11 @@ public:
       bool              m_bBlink;
       bool              m_bDynamicName;
       bool              m_bShowName;
+      
+      bool              m_bIsApproach;
+      wxString          m_ApproachName;
+      wxSize            m_ApproachNameExtents;
+      
       wxRect            CurrentRect_in_DC;
       int               m_NameLocationOffsetX;
       int               m_NameLocationOffsetY;

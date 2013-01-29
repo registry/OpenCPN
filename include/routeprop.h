@@ -268,6 +268,7 @@ class MarkInfoDef : public wxDialog
         wxButton*               m_buttonAddLink;
         wxButton*               m_buttonExtDescription;
         wxCheckBox*             m_checkBoxShowName;
+        wxCheckBox*             m_checkBoxApproach;
         wxCheckBox*             m_checkBoxVisible;
         wxHyperlinkCtrl*        m_hyperlink17;
         wxObject*               m_contextObject;
@@ -289,6 +290,7 @@ class MarkInfoDef : public wxDialog
         wxStaticText*           m_staticTextLayer;
         wxStaticText*           m_staticTextLongitude;
         wxStaticText*           m_staticTextName;
+        wxStaticText*           m_staticTextApproachName;	
         wxTextCtrl*             m_textCtrlExtDescription;
         wxTextCtrl*             m_textCtrlGpx;
         wxTextCtrl*             m_textCtrlGuid;
@@ -296,6 +298,7 @@ class MarkInfoDef : public wxDialog
         wxTextCtrl*             m_textLatitude;
         wxTextCtrl*             m_textLongitude;
         wxTextCtrl*             m_textName;
+        wxTextCtrl*             m_textApproachName;	
         wxToggleButton*         m_toggleBtnEdit;
         wxStaticBoxSizer*       sbSizerLinks;
 

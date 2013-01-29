@@ -1077,6 +1077,26 @@ void RoutePoint::CalculateNameExtents( void )
 
 }
 
+
+void RoutePoint::SetApproachName( wxString name )
+{
+    m_ApproachName = name;
+    CalculateApproachNameExtents();
+}
+
+void RoutePoint::CalculateApproachNameExtents( void )
+{
+    if( m_pMarkFont ) {
+        wxScreenDC dc;
+
+        dc.SetFont( *m_pMarkFont );
+        m_ApproachNameExtents = dc.GetTextExtent( m_ApproachName );
+    } else
+        m_ApproachNameExtents = wxSize( 0, 0 );
+}
+
+
+
 wxString RoutePoint::CreatePropString( void )
 {
     wxString ret;

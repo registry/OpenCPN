@@ -2043,13 +2043,19 @@ MarkInfoDef::MarkInfoDef( wxWindow* parent, wxWindowID id, const wxString& title
             wxDefaultPosition, wxDefaultSize, 0 );
     bSizerLatLon->Add( m_textLongitude, 1, wxALL, 5 );
 
+        
     bSizerTextProperties->Add( bSizerLatLon, 0, wxEXPAND, 5 );
-
+    
+    wxBoxSizer* bSizerApproach;
+    bSizerApproach = new wxBoxSizer( wxHORIZONTAL );
+    
     m_staticTextDescription = new wxStaticText( m_panelBasicProperties, wxID_ANY, _("Description"),
             wxDefaultPosition, wxDefaultSize, 0 );
     m_staticTextDescription->Wrap( -1 );
     bSizerTextProperties->Add( m_staticTextDescription, 0, wxALL, 5 );
 
+
+    
     wxBoxSizer* bSizer14;
     bSizer14 = new wxBoxSizer( wxHORIZONTAL );
 
@@ -2063,8 +2069,30 @@ MarkInfoDef::MarkInfoDef( wxWindow* parent, wxWindowID id, const wxString& title
             wxDefaultPosition, wxSize( 20, -1 ), 0 );
     bSizer14->Add( m_buttonExtDescription, 0, wxALL | wxEXPAND, 5 );
 
+    
     bSizerTextProperties->Add( bSizer14, 1, wxEXPAND, 5 );
 
+    
+       
+    
+    m_checkBoxApproach = new wxCheckBox( m_panelBasicProperties, wxID_ANY, _("Approach"),
+            wxDefaultPosition, wxDefaultSize, wxALIGN_RIGHT );
+    bSizerApproach->Add( m_checkBoxApproach, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5 );
+
+    m_staticTextApproachName = new wxStaticText( m_panelBasicProperties, wxID_ANY, _("Approach name"),
+            wxDefaultPosition, wxDefaultSize, 0 );
+    m_staticTextApproachName->Wrap( -1 );
+    bSizerApproach->Add( m_staticTextApproachName, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5 );
+
+    m_textApproachName = new wxTextCtrl( m_panelBasicProperties, wxID_ANY, wxEmptyString,
+            wxDefaultPosition, wxDefaultSize, 0 );
+    bSizerApproach->Add( m_textApproachName, 1, wxALL, 5 );
+    
+    bSizerTextProperties->Add( bSizerApproach, 0, wxEXPAND, 5 ); 
+    
+    
+    
+    
     bSizerInnerProperties->Add( bSizerTextProperties, 1, wxEXPAND, 5 );
 
     sbSizerProperties->Add( bSizerInnerProperties, 1, wxEXPAND, 5 );
@@ -2401,6 +2429,7 @@ bool MarkInfoImpl::UpdateProperties( bool positionOnly )
             m_toggleBtnEdit->SetValue( false );
             m_checkBoxShowName->Enable( false );
             m_checkBoxVisible->Enable( false );
+            m_checkBoxApproach->Enable( false );
         } else {
             m_staticTextLayer->Enable( false );
             m_staticTextLayer->Show( false );
@@ -2414,6 +2443,7 @@ bool MarkInfoImpl::UpdateProperties( bool positionOnly )
             m_toggleBtnEdit->Enable( true );
             m_checkBoxShowName->Enable( true );
             m_checkBoxVisible->Enable( true );
+            m_checkBoxApproach->Enable( true );
         }
         m_textName->SetValue( m_pRoutePoint->GetName() );
         m_textDescription->SetValue( m_pRoutePoint->m_MarkDescription );
@@ -2433,7 +2463,11 @@ bool MarkInfoImpl::UpdateProperties( bool positionOnly )
         }
         m_scrolledWindowLinks->DestroyChildren();
         m_checkBoxShowName->SetValue( m_pRoutePoint->m_bShowName );
-        m_checkBoxVisible->SetValue( m_pRoutePoint->m_bIsVisible );
+        m_checkBoxVisible->SetValue( m_pRoutePoint->m_bIsVisible ); 
+        m_checkBoxApproach->SetValue( m_pRoutePoint->m_bIsApproach );   
+        m_textApproachName->SetValue( m_pRoutePoint->m_ApproachName );
+        
+        
         m_textCtrlGuid->SetValue( m_pRoutePoint->m_GUID );
 
         int NbrOfLinks = m_pRoutePoint->m_HyperlinkList->GetCount();
@@ -2676,6 +2710,9 @@ bool MarkInfoImpl::SaveChanges()
                 *( pWayPointMan->GetIconKey( m_bcomboBoxIcon->GetSelection() ) );
         m_pRoutePoint->ReLoadIcon();
 
+        m_pRoutePoint->SetApproach( m_checkBoxApproach->GetValue()  );   
+        m_pRoutePoint->SetApproachName( m_textApproachName->GetValue() );
+        
         // Here is some logic....
         // If the Markname is completely numeric, and is part of a route,
         // Then declare it to be of attribute m_bDynamicName = true
