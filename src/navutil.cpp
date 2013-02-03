@@ -4947,13 +4947,13 @@ GpxWptElement *CreateGPXWpt( RoutePoint *pr, char * waypoint_type, bool b_props_
         exts->LinkEndChild( new GpxSimpleElement( wxString( _T("opencpn:guid") ), pr->m_GUID ) );
 
         //    Create all opencpn extension properties explicitely
+        exts->LinkEndChild(
+                new GpxSimpleElement( wxString( _T("opencpn:viz") ),
+                        pr->m_bIsVisible == true ? _T("1") : _T("0")) );
+        exts->LinkEndChild(
+                new GpxSimpleElement( wxString( _T("opencpn:viz_name") ),
+                        pr->m_bShowName == true ? _T("1") : _T("0")) );
         if( b_props_explicit ) {
-            exts->LinkEndChild(
-                    new GpxSimpleElement( wxString( _T("opencpn:viz") ),
-                            pr->m_bIsVisible == true ? _T("1") : _T("0")) );
-            exts->LinkEndChild(
-                    new GpxSimpleElement( wxString( _T("opencpn:viz_name") ),
-                            pr->m_bShowName == true ? _T("1") : _T("0")) );
             exts->LinkEndChild(
                     new GpxSimpleElement( wxString( _T("opencpn:auto_name") ),
                             pr->m_bDynamicName == true ? _T("1") : _T("0")) );
@@ -4962,13 +4962,6 @@ GpxWptElement *CreateGPXWpt( RoutePoint *pr, char * waypoint_type, bool b_props_
                             pr->m_bKeepXRoute == true ? _T("1") : _T("0")) );
         } else {
             //      if(!pr->m_bIsVisible)
-            exts->LinkEndChild(
-                    new GpxSimpleElement( wxString( _T("opencpn:viz") ),
-                            pr->m_bIsVisible == true ? _T("1") : _T("0")) );
-            //           if(pr->m_bShowName)
-            exts->LinkEndChild(
-                    new GpxSimpleElement( wxString( _T("opencpn:viz_name") ),
-                            pr->m_bShowName == true ? _T("1") : _T("0")) );
             if( pr->m_bDynamicName ) exts->LinkEndChild(
                     new GpxSimpleElement( wxString( _T("opencpn:auto_name") ),
                             pr->m_bDynamicName == true ? _T("1") : _T("0")) );
@@ -4976,6 +4969,12 @@ GpxWptElement *CreateGPXWpt( RoutePoint *pr, char * waypoint_type, bool b_props_
                     new GpxSimpleElement( wxString( _T("opencpn:shared") ),
                             pr->m_bKeepXRoute == true ? _T("1") : _T("0")) );
         }
+        exts->LinkEndChild(
+                new GpxSimpleElement( wxString( _T("opencpn:is_approach") ),
+                        pr->IsApproach() == true ? _T("1") : _T("0")) );
+        exts->LinkEndChild(
+                new GpxSimpleElement( wxString( _T("opencpn:approach_name") ),
+                        pr->IsApproach() == true ? pr->GetApproachName() : _T("")) );        
     }
 
     ListOfGpxLinks lnks;
@@ -5786,6 +5785,7 @@ RoutePoint *LoadGPXWaypoint( GpxWptElement *wptnode, wxString def_symbol_name, b
     bool bshared = false;
     bool b_propvizname = false;
     bool b_propviz = false;
+    bool bis_approach = false;
 
     wxString SymString = def_symbol_name; //_T ( "empty" );                // default icon
     wxString NameString;
@@ -5795,6 +5795,8 @@ RoutePoint *LoadGPXWaypoint( GpxWptElement *wptnode, wxString def_symbol_name, b
     wxString PropString;
     wxString GuidString;
     wxDateTime dt;
+    
+    wxString ApproachName;
 
     HyperlinkList *linklist = NULL;
 
@@ -5902,7 +5904,6 @@ RoutePoint *LoadGPXWaypoint( GpxWptElement *wptnode, wxString def_symbol_name, b
                                                             wxString::FromUTF8(
                                                                     prop_child->ToText()->Value() );
                                                 }
-
                                                 else
                                                     if( ext_name == _T ( "opencpn:viz" ) ) {
                                                         TiXmlNode *prop_child =
@@ -5954,6 +5955,27 @@ RoutePoint *LoadGPXWaypoint( GpxWptElement *wptnode, wxString def_symbol_name, b
                                                                                 ( v != 0 );
                                                                     }
                                                                 }
+                                                                else
+                                                                if( ext_name
+                                                                        == _T ( "opencpn:is_approach" ) ) {
+                                                                    TiXmlNode *prop_child =
+                                                                            ext_child->FirstChild();
+                                                                    if( prop_child != NULL ) {
+                                                                        wxString s =
+                                                                                wxString::FromUTF8(
+                                                                                        prop_child->ToText()->Value() );
+                                                                        long v = 0;
+                                                                        if( s.ToLong( &v ) ) bis_approach =
+                                                                                ( v != 0 );
+                                                                    }
+                                                                }
+                                                                else
+                                                                if( ext_name == _T ( "opencpn:approach_name" ) ) {
+                                                                TiXmlNode *prop_child = ext_child->FirstChild();
+                                                                if( prop_child != NULL ) ApproachName =
+                                                                        wxString::FromUTF8(
+                                                                                prop_child->ToText()->Value() );
+                                                                }
                                         }
                                     }
     }
@@ -5989,7 +6011,10 @@ RoutePoint *LoadGPXWaypoint( GpxWptElement *wptnode, wxString def_symbol_name, b
         delete pWP->m_HyperlinkList;                    // created in RoutePoint ctor
         pWP->m_HyperlinkList = linklist;
     }
-
+    
+    pWP->SetApproach(bis_approach);
+    pWP->SetApproachName(ApproachName);
+    
     return ( pWP );
 }
 

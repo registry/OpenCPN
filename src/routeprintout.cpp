@@ -165,6 +165,16 @@ MyRoutePrintout::MyRoutePrintout( std::vector<bool> _toPrintOut,
             table << cell;
         }
         table << "\n";
+        
+        // here we collect points, which do participate as approaches
+        if (point->IsApproach())
+        {
+                wxString _approach_name = point->GetApproachName();
+                approach_points[_approach_name].push_back(point);
+        }
+        
+        
+        
     }
 }
 

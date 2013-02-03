@@ -26,6 +26,8 @@
  *
  */
 #include <iostream>
+#include <map>
+#include <vector>
 using namespace std;
 
 
@@ -75,6 +77,8 @@ public:
 protected:
     wxDC*             myDC;
     PrintTable        table;
+    std::map<wxString,PrintTable> approach_tables;
+    std::map<wxString, std::vector<RoutePoint*> > approach_points;
     Route*            myRoute;
     std::vector<bool> toPrintOut; // list of fields of bool, if certain element should be print out.
     static const int  pN = 5;     // number of fields sofar
