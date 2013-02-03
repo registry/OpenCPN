@@ -172,10 +172,36 @@ MyRoutePrintout::MyRoutePrintout( std::vector<bool> _toPrintOut,
                 wxString _approach_name = point->GetApproachName();
                 approach_points[_approach_name].push_back(point);
         }
-        
-        
-        
-    }
+     }
+     
+     for (std::map<wxString, std::vector<RoutePoint* > >::iterator iter=approach_points.begin(); iter != approach_points.end(); iter++)
+     {
+        std::vector<RoutePoint* > _approach = (*iter).second;
+        Table &_table = approach_tables[(*iter).first];        
+        _table.StartFillHeader();
+        _table << (char *)::wxGetTranslation ((const wxChar *)"Name");
+        _table << (char *)::wxGetTranslation ((const wxChar *)"Description");
+        _table << (char *)::wxGetTranslation ((const wxChar *)"Passing");
+        _table << (char *)::wxGetTranslation ((const wxChar *)"Passed?");
+        _table.StartFillWidths();
+        _table << 23;
+        _table << 140;
+        _table << 50;
+        _table << 10;
+        _table.StartFillData();
+        for (std::vector<RoutePoint* >::iterator p_iter=_approach.begin(); p_iter != _approach.end(); p_iter++)
+        { 
+            RoutePoint * _point = *p_iter;
+            string cell1( _point->GetName().mb_str() );
+            _table << cell1;
+            string cell2( _point->GetDescription().mb_str() );
+            _table << cell2;
+            string cell3( "Strb" );
+            _table << cell3;
+            string cell4( "   " );
+            _table << cell4;
+        }
+     }
 }
 
 

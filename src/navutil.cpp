@@ -4974,7 +4974,27 @@ GpxWptElement *CreateGPXWpt( RoutePoint *pr, char * waypoint_type, bool b_props_
                         pr->IsApproach() == true ? _T("1") : _T("0")) );
         exts->LinkEndChild(
                 new GpxSimpleElement( wxString( _T("opencpn:approach_name") ),
-                        pr->IsApproach() == true ? pr->GetApproachName() : _T("")) );        
+                        pr->IsApproach() == true ? pr->GetApproachName() : _T("")) );      
+        wxString _side(_T(""));
+        switch (pr->GetBouyPassingSide())
+        {
+            case BOUY_SB:
+                _side = _T("1");
+                break;  
+            case BOUY_P:
+                _side = _T("2");
+                break; 
+            case BOUY_GATE:
+                _side = _T("3");
+                break;                 
+            case BOUY_NONE:
+            default:
+                _side = _T("");
+                break;
+        }
+        exts->LinkEndChild(
+                new GpxSimpleElement( wxString( _T("opencpn:approach_bouy_passing_side") ),
+                        pr->IsApproach() == true ? _side : _T("")) );        
     }
 
     ListOfGpxLinks lnks;
@@ -5787,6 +5807,8 @@ RoutePoint *LoadGPXWaypoint( GpxWptElement *wptnode, wxString def_symbol_name, b
     bool b_propviz = false;
     bool bis_approach = false;
 
+    long rbouy_approach_side=0;
+    
     wxString SymString = def_symbol_name; //_T ( "empty" );                // default icon
     wxString NameString;
     wxString DescString;
@@ -5971,11 +5993,22 @@ RoutePoint *LoadGPXWaypoint( GpxWptElement *wptnode, wxString def_symbol_name, b
                                                                 }
                                                                 else
                                                                 if( ext_name == _T ( "opencpn:approach_name" ) ) {
-                                                                TiXmlNode *prop_child = ext_child->FirstChild();
-                                                                if( prop_child != NULL ) ApproachName =
-                                                                        wxString::FromUTF8(
-                                                                                prop_child->ToText()->Value() );
+                                                                    TiXmlNode *prop_child = ext_child->FirstChild();
+                                                                    if( prop_child != NULL ) ApproachName =
+                                                                            wxString::FromUTF8(
+                                                                                    prop_child->ToText()->Value() );
                                                                 }
+                                                                else
+                                                                    if( ext_name == _T ( "opencpn:approach_bouy_passing_side" ) ) {
+                                                                        TiXmlNode *prop_child = ext_child->FirstChild();
+                                                                        if( prop_child != NULL ) {
+                                                                                wxString s =
+                                                                                        wxString::FromUTF8(
+                                                                                                prop_child->ToText()->Value() );
+                                                                                s.ToLong( &rbouy_approach_side );
+                                                                        }
+                                                                }
+
                                         }
                                     }
     }
@@ -6014,6 +6047,23 @@ RoutePoint *LoadGPXWaypoint( GpxWptElement *wptnode, wxString def_symbol_name, b
     
     pWP->SetApproach(bis_approach);
     pWP->SetApproachName(ApproachName);
+    switch(rbouy_approach_side)
+    {
+        case 1:
+            pWP->SetBouyPassingSide(BOUY_SB);
+            break;
+        case 2:
+            pWP->SetBouyPassingSide(BOUY_P);
+            break;
+        case 3:
+            pWP->SetBouyPassingSide(BOUY_GATE);
+            break;
+        case 0:
+        default:
+            pWP->SetBouyPassingSide(BOUY_NONE);
+            break;    
+    }
+    
     
     return ( pWP );
 }

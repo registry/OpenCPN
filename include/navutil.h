@@ -87,6 +87,9 @@ class Hyperlink { // toh, 2009.02.14
             wxString Type;
 };
 
+
+enum BouyPassingSide { BOUY_NONE=0, BOUY_SB=1, BOUY_P=2, BOUY_GATE=3 };
+
 WX_DECLARE_LIST(Hyperlink, HyperlinkList);// establish class as list member
 
 class RoutePoint
@@ -125,6 +128,8 @@ public:
       void SetApproachName( wxString name);
       wxString GetApproachName() { return m_ApproachName; } 
       void CalculateApproachNameExtents(void);
+      BouyPassingSide GetBouyPassingSide() { return m_BouyPassingSide; }
+      void SetBouyPassingSide ( BouyPassingSide side=BOUY_NONE  ) { m_BouyPassingSide = side; }; 
 
       void SetCourse( double course) { m_routeprop_course = course; };
       double GetCourse() { return m_routeprop_course; };
@@ -176,6 +181,7 @@ public:
       bool              m_bIsApproach;
       wxString          m_ApproachName;
       wxSize            m_ApproachNameExtents;
+      BouyPassingSide   m_BouyPassingSide;
       
       wxRect            CurrentRect_in_DC;
       int               m_NameLocationOffsetX;
