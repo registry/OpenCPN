@@ -299,9 +299,14 @@ class MarkInfoDef : public wxDialog
         wxTextCtrl*             m_textLongitude;
         wxTextCtrl*             m_textName;
         wxTextCtrl*             m_textApproachName;	
-        wxToggleButton*         m_toggleBtnEdit;
-        wxStaticBoxSizer*       sbSizerLinks;
+        
+        wxRadioButton*          m_radioButtonPassingNone;
+        wxRadioButton*          m_radioButtonPassingSB;
+        wxRadioButton*          m_radioButtonPassingP;
+        wxRadioButton*          m_radioButtonPassingGate;
 
+        wxStaticBoxSizer*       sbSizerLinks;
+        wxToggleButton*         m_toggleBtnEdit;
 		// Virtual event handlers, overide them in your derived class
         virtual void OnPositionCtlUpdated( wxCommandEvent& event ) { event.Skip(); }
 		virtual void OnDescChangedBasic( wxCommandEvent& event ) { event.Skip(); }

@@ -2046,8 +2046,7 @@ MarkInfoDef::MarkInfoDef( wxWindow* parent, wxWindowID id, const wxString& title
         
     bSizerTextProperties->Add( bSizerLatLon, 0, wxEXPAND, 5 );
     
-    wxBoxSizer* bSizerApproach;
-    bSizerApproach = new wxBoxSizer( wxHORIZONTAL );
+ 
     
     m_staticTextDescription = new wxStaticText( m_panelBasicProperties, wxID_ANY, _("Description"),
             wxDefaultPosition, wxDefaultSize, 0 );
@@ -2073,7 +2072,8 @@ MarkInfoDef::MarkInfoDef( wxWindow* parent, wxWindowID id, const wxString& title
     bSizerTextProperties->Add( bSizer14, 1, wxEXPAND, 5 );
 
     
-       
+    wxBoxSizer* bSizerApproach;
+    bSizerApproach = new wxBoxSizer( wxHORIZONTAL );   
     
     m_checkBoxApproach = new wxCheckBox( m_panelBasicProperties, wxID_ANY, _("Approach"),
             wxDefaultPosition, wxDefaultSize, wxALIGN_RIGHT );
@@ -2090,6 +2090,26 @@ MarkInfoDef::MarkInfoDef( wxWindow* parent, wxWindowID id, const wxString& title
     
     bSizerTextProperties->Add( bSizerApproach, 0, wxEXPAND, 5 ); 
     
+    
+    
+    wxBoxSizer* bSizerBouyPassing;
+    bSizerBouyPassing = new wxBoxSizer( wxHORIZONTAL );    
+ 
+     m_radioButtonPassingNone = new wxRadioButton( m_panelBasicProperties, wxID_ANY, _("None"),
+            wxDefaultPosition, wxDefaultSize, wxRB_GROUP );
+    bSizerBouyPassing->Add( m_radioButtonPassingNone, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5 );  
+    
+     m_radioButtonPassingSB = new wxRadioButton( m_panelBasicProperties, wxID_ANY, _("Starboard") );
+    bSizerBouyPassing->Add( m_radioButtonPassingSB, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5 );   
+    
+     m_radioButtonPassingP = new wxRadioButton( m_panelBasicProperties, wxID_ANY, _("Port") );
+    bSizerBouyPassing->Add( m_radioButtonPassingP, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5 );     
+
+    m_radioButtonPassingGate = new wxRadioButton( m_panelBasicProperties, wxID_ANY, _("Gate") );
+    bSizerBouyPassing->Add( m_radioButtonPassingGate, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5 );     
+       
+    
+    bSizerTextProperties->Add( bSizerBouyPassing, 0, wxEXPAND, 5 ); 
     
     
     
