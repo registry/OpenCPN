@@ -1942,6 +1942,25 @@ void LatLonTextCtrl::OnKillFocus( wxFocusEvent& event )
 //
 //-------------------------------------------------------------------------------
 
+// IMPLEMENT_DYNAMIC_CLASS( MarkInfoDef, wxDialog )
+/*!
+ * RouteProp event table definition
+ */
+
+// BEGIN_EVENT_TABLE( MarkInfoDef, wxDialog )
+//     EVT_TEXT( ID_PLANSPEEDCTL, RouteProp::OnPlanSpeedCtlUpdated )
+//     EVT_TEXT_ENTER( ID_STARTTIMECTL, RouteProp::OnStartTimeCtlUpdated )
+//     EVT_RADIOBOX ( ID_TIMEZONESEL, RouteProp::OnTimeZoneSelected )
+//     EVT_BUTTON( ID_ROUTEPROP_CANCEL, RouteProp::OnRoutepropCancelClick )
+//     EVT_BUTTON( ID_ROUTEPROP_OK, RouteProp::OnRoutepropOkClick )
+//     EVT_LIST_ITEM_SELECTED( ID_LISTCTRL, RouteProp::OnRoutepropListClick )
+//     EVT_LIST_ITEM_SELECTED( ID_TRACKLISTCTRL, RouteProp::OnRoutepropListClick )
+//     EVT_BUTTON( ID_ROUTEPROP_SPLIT, RouteProp::OnRoutepropSplitClick )
+//     EVT_BUTTON( ID_ROUTEPROP_EXTEND, RouteProp::OnRoutepropExtendClick )
+//     EVT_BUTTON( ID_ROUTEPROP_PRINT, RouteProp::OnRoutepropPrintClick )
+//         EVT_CHECKBOX(ID_IS_APPROACH, MarkInfoDef::OnRoutePointIsApproach )
+// END_EVENT_TABLE()
+
 MarkInfoDef::MarkInfoDef( wxWindow* parent, wxWindowID id, const wxString& title,
         const wxPoint& pos, const wxSize& size, long style )
 {
@@ -2095,9 +2114,6 @@ MarkInfoDef::MarkInfoDef( wxWindow* parent, wxWindowID id, const wxString& title
     wxBoxSizer* bSizerBouyPassing;
     bSizerBouyPassing = new wxBoxSizer( wxHORIZONTAL );    
  
-     m_radioButtonPassingNone = new wxRadioButton( m_panelBasicProperties, wxID_ANY, _("None"),
-            wxDefaultPosition, wxDefaultSize, wxRB_GROUP );
-    bSizerBouyPassing->Add( m_radioButtonPassingNone, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5 );  
     
      m_radioButtonPassingSB = new wxRadioButton( m_panelBasicProperties, wxID_ANY, _("Starboard") );
     bSizerBouyPassing->Add( m_radioButtonPassingSB, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5 );   
@@ -2292,6 +2308,10 @@ MarkInfoDef::MarkInfoDef( wxWindow* parent, wxWindowID id, const wxString& title
             wxCommandEventHandler( MarkInfoDef::OnMarkInfoCancelClick ), NULL, this );
     m_sdbSizerButtonsOK->Connect( wxEVT_COMMAND_BUTTON_CLICKED,
             wxCommandEventHandler( MarkInfoDef::OnMarkInfoOKClick ), NULL, this );
+    
+    m_checkBoxApproach->Connect( wxEVT_COMMAND_CHECKBOX_CLICKED,
+            wxCommandEventHandler( MarkInfoDef::OnRoutePointIsApproach ), NULL, this );
+    
 }
 
 MarkInfoDef::~MarkInfoDef()
@@ -2322,8 +2342,24 @@ MarkInfoDef::~MarkInfoDef()
     m_sdbSizerButtonsOK->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED,
             wxCommandEventHandler( MarkInfoDef::OnMarkInfoOKClick ), NULL, this );
 
+    m_checkBoxApproach->Disconnect( wxEVT_COMMAND_CHECKBOX_CLICKED,
+            wxCommandEventHandler( MarkInfoDef::OnRoutePointIsApproach ), NULL, this );
     delete m_menuLink;
 }
+
+void
+MarkInfoDef::OnRoutePointIsApproach( wxCommandEvent& event )
+{
+    bool status = m_checkBoxApproach->GetValue();
+    
+    m_staticTextApproachName->Enable(status);
+    m_textApproachName->Enable(status);
+    m_radioButtonPassingSB->Enable(status);
+    m_radioButtonPassingP->Enable(status);
+    m_radioButtonPassingGate->Enable(status);    
+}
+
+
 
 LinkPropDlgDef::LinkPropDlgDef( wxWindow* parent, wxWindowID id, const wxString& title,
         const wxPoint& pos, const wxSize& size, long style ) :

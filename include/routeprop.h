@@ -108,6 +108,8 @@ class   HyperlinkList;
 #define ID_LONCTRL 8005
 #define ID_SHOWNAMECHECKBOX1 8006
 
+#define ID_IS_APPROACH 8010
+
 ////@end control identifiers
 
 /*!
@@ -260,7 +262,8 @@ public:
 class MarkInfoDef : public wxDialog
 {
 	private:
-
+//     DECLARE_DYNAMIC_CLASS( MarkInfoDef )
+//     DECLARE_EVENT_TABLE()
 	protected:
         wxBoxSizer*             bSizerLinks;
         wxBitmapComboBox*       m_bcomboBoxIcon;
@@ -318,6 +321,9 @@ class MarkInfoDef : public wxDialog
 		virtual void OnDescChangedExt( wxCommandEvent& event ) { event.Skip(); }
 		virtual void OnMarkInfoCancelClick( wxCommandEvent& event ) { event.Skip(); }
 		virtual void OnMarkInfoOKClick( wxCommandEvent& event ) { event.Skip(); }
+		
+		virtual void OnRoutePointIsApproach( wxCommandEvent& event );
+		
 		void OnCopyPasteLatLon( wxCommandEvent& event );
 
 	public:
