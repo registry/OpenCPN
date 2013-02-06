@@ -51,6 +51,10 @@ using namespace std;
 #include <wx/brush.h>
 #include <wx/colour.h>
 #include <wx/tokenzr.h>
+#include <wx/url.h>
+#include <wx/mstream.h>
+
+#define BUFSIZE 0x10000
 
 #if wxCHECK_VERSION( 2, 9, 0 )
 #include <wx/dialog.h>
@@ -128,14 +132,60 @@ void
 wxImagePanel::loadImage(wxString file, wxBitmapType format) 
 {
     // load the file... ideally add a check to see if loading was successful
-    if (image.LoadFile(file, format))
-    {
-        cout << " SUCCESS" << endl;
+    wxURL url(file);
+
+   if(url.GetError()==wxURL_NOERR)
+   {
+        wxInputStream *in = url.GetInputStream();
+        wxMemoryBuffer buf;
+        if(in && in->IsOk())
+        {
+            unsigned char tempbuf[BUFSIZE];
+
+
+            size_t total_len = in->GetSize();
+            size_t data_loaded = 0;
+            bool abort = false;
+
+            wxProgressDialog progress( wxT("Downloading..."), wxT("Download in progress"), total_len, this, wxPD_CAN_ABORT | wxPD_AUTO_HIDE | wxPD_APP_MODAL);
+            while( in->CanRead() && !in->Eof() && !abort )
+            {
+                in->Read(tempbuf, BUFSIZE);
+                size_t readlen = in->LastRead();
+                if( readlen>0 )   
+                {
+                buf.AppendData(tempbuf, readlen);
+                data_loaded += readlen;
+                }
+
+                if( total_len>0 )
+                {
+                // if we know the length of the file, display correct progress
+                wxString msg;
+                msg.Printf( wxT("Downloaded %ld of %ld bytes"), data_loaded, total_len);
+                abort = !progress.Update( data_loaded, msg );
+                }
+                else
+                {
+                // if we don't know the length of the file, just Pulse
+                abort = !progress.Pulse();
+                }
+            }
+
+            if( abort )
+            {
+                wxLogMessage( wxT("Download was cancelled.") );
+            }
+            else
+            {
+                // wxMemoryBuffer buf now contains the downloaded data
+                wxLogMessage( wxT("Downloaded %ld bytes"), buf.GetDataLen());
+        }
     }
-    else
-    {
-        cout << " NO " << endl;
-    }    
+    wxMemoryInputStream mis(buf.GetData(), buf.GetBufSize()); 
+    image.LoadFile(mis);
+    delete in;
+   }
     w = -1;
     h = -1;
 }
@@ -170,7 +220,7 @@ void wxImagePanel::paintNow()
     wxSize _size = GetContainingSizer()->GetSize ();
     SetSize(_size);
     
-    wxClientDC dc(this);
+    wxPaintDC dc(this);
     render(dc);
 }
  
@@ -186,17 +236,16 @@ void wxImagePanel::render(wxDC&  dc)
     dc.GetSize( &neww, &newh );
     neww-=30;
     newh-=30;
-    
-    
-    
+ 
     if( neww != w || newh != h )
     {
         resized = wxBitmap( image.Scale( neww, newh /*, wxIMAGE_QUALITY_HIGH*/ ) );
         w = neww;
         h = newh;
-        dc.DrawBitmap( resized, 0, 0, false );
-    }else{
-        dc.DrawBitmap( resized, 0, 0, false );
+        dc.DrawBitmap( resized, 0, 0, true );
+    }else
+    {
+        dc.DrawBitmap( resized, 0, 0, true );
     }
 }
  
@@ -204,7 +253,8 @@ void wxImagePanel::render(wxDC&  dc)
  * Here we call refresh to tell the panel to draw itself again.
  * So when the user resizes the image panel the image should be resized too.
  */
-void wxImagePanel::OnSize(wxSizeEvent& event){
+void wxImagePanel::OnSize(wxSizeEvent& event)
+{
     Refresh();
     //skip the event.
     event.Skip();

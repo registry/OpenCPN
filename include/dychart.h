@@ -207,9 +207,13 @@
 
 #ifdef __WXGTK__
 #ifdef ocpnUSE_GTK_OPTIMIZE
-    #include <gtk/gtk.h>
+#define GSocket WXGSocket
+    #include <gtk/gtk.h>  
+#undef GSocket    
 #endif
 #endif
+
+
 
 #ifndef OCPN_GL_INCLUDES
 #define OCPN_GL_INCLUDES 1

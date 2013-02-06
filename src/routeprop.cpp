@@ -2470,10 +2470,10 @@ LinkPropDlgDef::~LinkPropDlgDef()
 void
 LinkPropDlgDef::OnLoadPreviewClick(wxCommandEvent& event)
 {
-    cout << m_textCtrlLinkUrl->GetValue().mb_str() << endl;
+    event.Skip(); 
     m_PreviewImage->loadImage( m_textCtrlLinkUrl->GetValue(), wxBITMAP_TYPE_JPEG); 
     m_PreviewImage->paintNow();
-    event.Skip(); 
+    return;
 }
 
 

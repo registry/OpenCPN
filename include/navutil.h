@@ -85,6 +85,7 @@ class Hyperlink { // toh, 2009.02.14
             wxString DescrText;
             wxString Link;
             wxString Type;
+            wxString localCopy;
 };
 
 
