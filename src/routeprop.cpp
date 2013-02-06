@@ -2357,6 +2357,7 @@ MarkInfoDef::OnRoutePointIsApproach( wxCommandEvent& event )
     m_radioButtonPassingSB->Enable(status);
     m_radioButtonPassingP->Enable(status);
     m_radioButtonPassingGate->Enable(status);    
+    event.Skip();
 }
 
 
@@ -2370,6 +2371,10 @@ LinkPropDlgDef::LinkPropDlgDef( wxWindow* parent, wxWindowID id, const wxString&
     wxBoxSizer* bSizerMain;
     bSizerMain = new wxBoxSizer( wxVERTICAL );
 
+    wxBoxSizer* bSizerLinkAndPreview;
+    bSizerLinkAndPreview = new wxBoxSizer( wxHORIZONTAL );    
+    
+    
     wxStaticBoxSizer* sbSizerLnkProp;
     sbSizerLnkProp = new wxStaticBoxSizer( new wxStaticBox( this, wxID_ANY, _("Link") ),
             wxVERTICAL );
@@ -2392,11 +2397,36 @@ LinkPropDlgDef::LinkPropDlgDef( wxWindow* parent, wxWindowID id, const wxString&
             wxDefaultSize, 0 );
     sbSizerLnkProp->Add( m_textCtrlLinkUrl, 0, wxALL | wxEXPAND, 5 );
 
+    
+    wxBoxSizer* bSizerBrowseAndLoad;
+    bSizerBrowseAndLoad = new wxBoxSizer( wxHORIZONTAL );  
+    
     m_buttonBrowseLocal = new wxButton( this, wxID_ANY, _("Local file..."), wxDefaultPosition,
             wxDefaultSize, 0 );
-    sbSizerLnkProp->Add( m_buttonBrowseLocal, 0, wxALL, 5 );
+    
+    bSizerBrowseAndLoad->Add( m_buttonBrowseLocal, 0, wxALL, 5 );
+    
+    m_buttonLoad = new wxButton( this, wxID_ANY, _("Load"), wxDefaultPosition,
+            wxDefaultSize, 0 );
+    bSizerBrowseAndLoad->Add( m_buttonLoad, 0, wxALL, 5 );
+    
+    sbSizerLnkProp->Add( bSizerBrowseAndLoad, 1, wxALL | wxEXPAND, 5 );
+    
+    
+    bSizerLinkAndPreview->Add( sbSizerLnkProp, 1, wxALL | wxEXPAND, 5 );
+    
+    wxStaticBoxSizer* sbSizerLnkPreview;
+    sbSizerLnkPreview = new wxStaticBoxSizer( new wxStaticBox( this, wxID_ANY, _("Preview") ),
+            wxVERTICAL );
 
-    bSizerMain->Add( sbSizerLnkProp, 1, wxALL | wxEXPAND, 5 );
+//     wxFrame* frame = new wxFrame(this, wxID_ANY, wxT(""), wxPoint(0,00), wxSize(200,200));
+    
+    m_PreviewImage = new wxImagePanel( this );
+    sbSizerLnkPreview->Add( m_PreviewImage, 0, wxALL, 5 );
+    
+    bSizerLinkAndPreview->Add( sbSizerLnkPreview, 1, wxALL | wxEXPAND, 5 );
+    
+    bSizerMain->Add( bSizerLinkAndPreview, 1, wxALL | wxEXPAND, 5 );
 
     m_sdbSizerButtons = new wxStdDialogButtonSizer();
     m_sdbSizerButtonsOK = new wxButton( this, wxID_OK );
@@ -2419,6 +2449,8 @@ LinkPropDlgDef::LinkPropDlgDef( wxWindow* parent, wxWindowID id, const wxString&
             wxCommandEventHandler( LinkPropDlgDef::OnCancelClick ), NULL, this );
     m_sdbSizerButtonsOK->Connect( wxEVT_COMMAND_BUTTON_CLICKED,
             wxCommandEventHandler( LinkPropDlgDef::OnOkClick ), NULL, this );
+    m_buttonLoad->Connect( wxEVT_COMMAND_BUTTON_CLICKED,
+            wxCommandEventHandler( LinkPropDlgDef::OnLoadPreviewClick ), NULL, this );
 }
 
 LinkPropDlgDef::~LinkPropDlgDef()
@@ -2430,7 +2462,23 @@ LinkPropDlgDef::~LinkPropDlgDef()
             wxCommandEventHandler( LinkPropDlgDef::OnCancelClick ), NULL, this );
     m_sdbSizerButtonsOK->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED,
             wxCommandEventHandler( LinkPropDlgDef::OnOkClick ), NULL, this );
+    m_buttonLoad->Disconnect( wxEVT_COMMAND_BUTTON_CLICKED,
+            wxCommandEventHandler( LinkPropDlgDef::OnLoadPreviewClick ), NULL, this );
 }
+
+
+void
+LinkPropDlgDef::OnLoadPreviewClick(wxCommandEvent& event)
+{
+    cout << m_textCtrlLinkUrl->GetValue().mb_str() << endl;
+    m_PreviewImage->loadImage( m_textCtrlLinkUrl->GetValue(), wxBITMAP_TYPE_JPEG); 
+    m_PreviewImage->paintNow();
+    event.Skip(); 
+}
+
+
+
+
 
 MarkInfoImpl::MarkInfoImpl( wxWindow* parent, wxWindowID id, const wxString& title,
         const wxPoint& pos, const wxSize& size, long style ) :
@@ -2520,9 +2568,10 @@ bool MarkInfoImpl::UpdateProperties( bool positionOnly )
         m_scrolledWindowLinks->DestroyChildren();
         m_checkBoxShowName->SetValue( m_pRoutePoint->m_bShowName );
         m_checkBoxVisible->SetValue( m_pRoutePoint->m_bIsVisible ); 
-        m_checkBoxApproach->SetValue( m_pRoutePoint->m_bIsApproach );   
+        m_checkBoxApproach->SetValue( m_pRoutePoint->m_bIsApproach );
         m_textApproachName->SetValue( m_pRoutePoint->m_ApproachName );
-        
+        wxCommandEvent _dummy_event;
+        OnRoutePointIsApproach( _dummy_event ); // invoke event with "NO EVEN" to update state of widgets...
         
         m_textCtrlGuid->SetValue( m_pRoutePoint->m_GUID );
 

@@ -47,6 +47,8 @@
 #include "scrollingdialog.h"
 #endif
 
+#include "imagepreview.h"
+
 /*!
  * Forward declarations
  */
@@ -349,15 +351,18 @@ class LinkPropDlgDef : public wxDialog
 		wxStaticText* m_staticTextLinkDesc;
 		wxStaticText* m_staticTextLinkUrl;
 		wxButton* m_buttonBrowseLocal;
+        wxButton* m_buttonLoad;
 		wxStdDialogButtonSizer* m_sdbSizerButtons;
 		wxButton* m_sdbSizerButtonsOK;
 		wxButton* m_sdbSizerButtonsCancel;
+        
+        wxImagePanel* m_PreviewImage;
 
 		// Virtual event handlers, overide them in your derived class
 		virtual void OnLocalFileClick( wxCommandEvent& event ) { event.Skip(); }
 		virtual void OnCancelClick( wxCommandEvent& event ) { event.Skip(); }
 		virtual void OnOkClick( wxCommandEvent& event ) { event.Skip(); }
-
+        virtual void OnLoadPreviewClick( wxCommandEvent& event );
 
 	public:
 		wxTextCtrl* m_textCtrlLinkDescription;
