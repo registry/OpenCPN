@@ -239,6 +239,13 @@ ostream& operator<<( ostream& out, Table& table )
 PrintTable::PrintTable() : Table()
 {
     rows_heights.clear();
+    start_page = 0;
+}
+
+void
+PrintTable::SetStartPage( int page )
+{
+    start_page = page;
 }
 
 
@@ -298,7 +305,7 @@ void PrintTable::AdjustCells( wxDC* dc, int marginX, int marginY )
         int row_page = current_page;
         vector<PrintCell> & contents_row = contents[ i ];
         for ( size_t j = 0; j < contents_row.size(); j++ ) {
-            contents_row[ j ].SetPage( row_page );
+            contents_row[ j ].SetPage( row_page + start_page );
             contents_row[ j ].SetHeight( row_height );
         }
         number_of_pages = std::max( row_page, number_of_pages );

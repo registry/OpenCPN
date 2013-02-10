@@ -174,23 +174,21 @@ MyRoutePrintout::MyRoutePrintout( std::vector<bool> _toPrintOut,
         }
      }
      
-     for (std::map<wxString, std::vector<RoutePoint* > >::iterator iter=approach_points.begin(); iter != approach_points.end(); iter++)
-     {
+     for (std::map<wxString, std::vector<RoutePoint* > >::iterator iter=approach_points.begin(); iter != approach_points.end(); iter++) {
         std::vector<RoutePoint* > _approach = (*iter).second;
-        Table &_table = approach_tables[(*iter).first];        
+        PrintTable &_table = approach_tables[(*iter).first];        
         _table.StartFillHeader();
         _table << (char *)::wxGetTranslation ((const wxChar *)"Name");
         _table << (char *)::wxGetTranslation ((const wxChar *)"Description");
         _table << (char *)::wxGetTranslation ((const wxChar *)"Passing");
-        _table << (char *)::wxGetTranslation ((const wxChar *)"Passed?");
+        _table << (char *)::wxGetTranslation ((const wxChar *)"OK?");
         _table.StartFillWidths();
         _table << 23;
         _table << 140;
-        _table << 50;
-        _table << 10;
+        _table << 40;
+        _table << 15;
         _table.StartFillData();
-        for (std::vector<RoutePoint* >::iterator p_iter=_approach.begin(); p_iter != _approach.end(); p_iter++)
-        { 
+        for (std::vector<RoutePoint* >::iterator p_iter=_approach.begin(); p_iter != _approach.end(); p_iter++) { 
             RoutePoint * _point = *p_iter;
             string cell1( _point->GetName().mb_str() );
             _table << cell1;
@@ -244,6 +242,13 @@ void MyRoutePrintout::OnPreparePrinting()
     
     table.AdjustCells( dc, marginX, marginY );
     numberOfPages = table.GetNumberPages();
+    for (std::map<wxString, std::vector<RoutePoint* > >::iterator iter=approach_points.begin(); iter != approach_points.end(); iter++) {
+        PrintTable &_table = approach_tables[(*iter).first];   
+        _table.SetStartPage(numberOfPages);
+        _table.AdjustCells( dc, marginX, marginY );        
+        numberOfPages += _table.GetNumberPages();       
+    }
+
 }
 
 
@@ -265,7 +270,27 @@ bool MyRoutePrintout::OnPrintPage( int page )
 
 void MyRoutePrintout::DrawPage( wxDC* dc )
 {
+    PrintTable & __table = table;
+    bool table_found = false;
+    for (std::map<wxString, std::vector<RoutePoint* > >::iterator iter=approach_points.begin(); iter != approach_points.end(); iter++) {
+        PrintTable &_table = approach_tables[(*iter).first];   
     
+        vector< vector < PrintCell > > & cells = _table.GetContent();
+        for ( size_t i = 0; i < cells.size(); i++ ) {
+            vector< PrintCell >& content_row = cells[ i ];
+            for ( size_t j = 0; j < content_row.size(); j++ ) {
+                PrintCell& cell = content_row[ j ];
+                if ( cell.GetPage() == pageToPrint ) {
+                    table_found = true;
+                    __table = _table;   
+                    break;
+                }
+            }
+            if (table_found)
+                break;
+        }
+   
+     }
 
     wxFont routePrintFont_bold( 10, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD );
     dc->SetFont( routePrintFont_bold );
@@ -277,7 +302,7 @@ void MyRoutePrintout::DrawPage( wxDC* dc )
     
     int currentX = marginX;
     int currentY = marginY;
-    vector< PrintCell >& header_content = table.GetHeader();
+    vector< PrintCell >& header_content = __table.GetHeader();
     for ( size_t j = 0; j < header_content.size(); j++ ) {
         PrintCell& cell = header_content[ j ];
         dc->DrawRectangle( currentX, currentY, cell.GetWidth(), cell.GetHeight() );
@@ -288,8 +313,8 @@ void MyRoutePrintout::DrawPage( wxDC* dc )
     wxFont  routePrintFont_normal( 10, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL );
     dc->SetFont( routePrintFont_normal );
 
-    vector< vector < PrintCell > > & cells = table.GetContent();
-    currentY = marginY + table.GetHeaderHeight();
+    vector< vector < PrintCell > > & cells = __table.GetContent();
+    currentY = marginY + __table.GetHeaderHeight();
     int currentHeight = 0;
     for ( size_t i = 0; i < cells.size(); i++ ) {
         vector< PrintCell >& content_row = cells[ i ];

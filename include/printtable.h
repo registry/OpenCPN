@@ -236,10 +236,11 @@ public:
  */
 class PrintTable : public Table {
 protected:
-    vector< vector < PrintCell > > contents;
-    vector < PrintCell >           header_content;
-    vector< int >                  rows_heights;
-    int                            header_height;
+    vector< vector < PrintCell > >  contents;
+    vector < PrintCell >            header_content;
+    vector< int >                   rows_heights;
+    int                             header_height;
+    int                             start_page;
 
 
     int number_of_pages;                // stores the number of pages for printing of this table. It is set by AdjustCells(...)
@@ -251,6 +252,9 @@ public:
     void AdjustCells( wxDC* _dc,
                  int   marginX,
                  int   marginY );
+    
+    // some tables are printed not from the page 0 but from page n.
+    void SetStartPage(int page);
 
     // delivers content of the table
     vector< vector < PrintCell > >& GetContent()
