@@ -162,6 +162,15 @@ void Table::NewRow()
     data.push_back( empty_row );
 }
 
+void Table::SetTableTitle( wxString _title )
+{
+    title = _title;
+}
+
+wxString Table::GetTableTitle( )
+{
+    return title;
+}
 
 Table& Table::operator<<( const double& cellcontent )
 {
@@ -242,11 +251,18 @@ PrintTable::PrintTable() : Table()
     start_page = 0;
 }
 
-void
-PrintTable::SetStartPage( int page )
+
+void PrintTable::SetStartPage( int page )
 {
     start_page = page;
 }
+
+int PrintTable::GetStartPage( )
+{
+    return start_page;
+}
+
+
 
 
 void PrintTable::AdjustCells( wxDC* dc, int marginX, int marginY )
@@ -294,6 +310,19 @@ void PrintTable::AdjustCells( wxDC* dc, int marginX, int marginY )
     int stripped_page = h - 4 * marginY - header_height;
     int current_page = 1;
     int current_y = 0;
+    
+    wxFont orig_font = dc->GetFont();
+    wxFont _font = orig_font;
+    _font.SetWeight( wxFONTWEIGHT_BOLD );
+    _font.SetPixelSize( orig_font.GetPixelSize().Scale(1.5, 1.5)  );
+
+    dc->SetFont( _font );
+    int title_w, title_h;
+    dc->GetMultiLineTextExtent( title, &title_w, &title_h );
+    dc->SetFont( orig_font );    
+    
+    current_y = title_h + 3;
+    
     for ( size_t i = 0; i < data.size(); i++ ) {
         int row_height = rows_heights[ i ];
         if ( row_height + current_y > stripped_page ) {

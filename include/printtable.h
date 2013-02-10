@@ -75,6 +75,7 @@ protected:
     int ncols;
 
     bool create_next_row;
+    wxString title;
 
     vector< vector < wxString > > data;
     vector< double > widths;
@@ -92,6 +93,9 @@ public:
     Table& operator<<( const string& );
     Table& operator<<( const int& );
     Table& operator<<( const double& );
+    
+    void SetTableTitle( wxString );
+    wxString GetTableTitle( );    
 
     vector< vector < wxString > > & GetData()
     {
@@ -255,7 +259,8 @@ public:
     
     // some tables are printed not from the page 0 but from page n.
     void SetStartPage(int page);
-
+    int GetStartPage();
+    
     // delivers content of the table
     vector< vector < PrintCell > >& GetContent()
     {

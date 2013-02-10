@@ -97,7 +97,7 @@ MyRoutePrintout::MyRoutePrintout( std::vector<bool> _toPrintOut,
     // Offset text from the edge of the cell (Needed on Linux)
     textOffsetX = 5;
     textOffsetY = 8;
-
+    table.SetTableTitle( route->GetRouteName() );
     table.StartFillHeader();
     // setup widths for columns
     if ( toPrintOut[ PRINT_WP_NAME ] ) {
@@ -176,7 +176,8 @@ MyRoutePrintout::MyRoutePrintout( std::vector<bool> _toPrintOut,
      
      for (std::map<wxString, std::vector<RoutePoint* > >::iterator iter=approach_points.begin(); iter != approach_points.end(); iter++) {
         std::vector<RoutePoint* > _approach = (*iter).second;
-        PrintTable &_table = approach_tables[(*iter).first];        
+        PrintTable &_table = approach_tables[(*iter).first];      
+        _table.SetTableTitle( (*iter).first );
         _table.StartFillHeader();
         _table << (char *)::wxGetTranslation ((const wxChar *)"Name");
         _table << (char *)::wxGetTranslation ((const wxChar *)"Description");
@@ -292,16 +293,39 @@ void MyRoutePrintout::DrawPage( wxDC* dc )
    
      }
 
+
+    int currentX = marginX;
+    int currentY = marginY;    
+     
     wxFont routePrintFont_bold( 10, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD );
     dc->SetFont( routePrintFont_bold );
+    if (pageToPrint == __table.GetStartPage() + 1)
+    {
+        // adjust font for title
+        wxFont orig_font = dc->GetFont();
+        wxFont _font = orig_font;
+        
+        _font.SetWeight( wxFONTWEIGHT_BOLD );
+        _font.SetPixelSize( orig_font.GetPixelSize().Scale(1.5, 1.5) );
+        
+        dc->SetFont( _font );
+        int title_w, title_h;
+        dc->GetMultiLineTextExtent( __table.GetTableTitle(), &title_w, &title_h );
+        
+        dc->DrawText( __table.GetTableTitle(),  currentX, currentY  );
+        currentY += title_h;
+        
+        dc->SetFont( orig_font );    
+    }
+    currentY += marginY;    
+    
     wxBrush brush( wxColour(255,255,255),  wxTRANSPARENT );
     dc->SetBrush( brush );
+
 
     int header_textOffsetX = 2;
     int header_textOffsetY = 2;
     
-    int currentX = marginX;
-    int currentY = marginY;
     vector< PrintCell >& header_content = __table.GetHeader();
     for ( size_t j = 0; j < header_content.size(); j++ ) {
         PrintCell& cell = header_content[ j ];
@@ -314,7 +338,7 @@ void MyRoutePrintout::DrawPage( wxDC* dc )
     dc->SetFont( routePrintFont_normal );
 
     vector< vector < PrintCell > > & cells = __table.GetContent();
-    currentY = marginY + __table.GetHeaderHeight();
+    currentY += marginY + __table.GetHeaderHeight();
     int currentHeight = 0;
     for ( size_t i = 0; i < cells.size(); i++ ) {
         vector< PrintCell >& content_row = cells[ i ];

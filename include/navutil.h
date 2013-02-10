@@ -278,6 +278,9 @@ public:
       double GetRouteArrivalRadius(void){ return m_ArrivalRadius;}
       void SetRouteArrivalRadius(double radius){m_ArrivalRadius = radius;}
 
+      wxString GetRouteName() { return m_RouteNameString; }
+      
+      
       int         m_ConfigRouteNum;
       bool        m_bRtIsSelected;
       bool        m_bRtIsActive;
