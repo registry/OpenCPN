@@ -245,6 +245,8 @@ protected:
     vector< int >                   rows_heights;
     int                             header_height;
     int                             start_page;
+    
+    wxImage                         approach_plan;
 
 
     int number_of_pages;                // stores the number of pages for printing of this table. It is set by AdjustCells(...)
@@ -282,5 +284,19 @@ public:
     {
         return header_height;
     };
+    
+    // Sets an image, which should be printed
+    void SetImage( wxImage& _image)
+    {
+        approach_plan = _image;
+    }
+    
+     // Sets an image, which should be printed
+    wxImage& GetImage( )
+    {
+        return approach_plan;
+    }   
+    
+    
 };
 #endif

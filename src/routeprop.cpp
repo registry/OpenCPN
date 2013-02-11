@@ -2406,7 +2406,7 @@ LinkPropDlgDef::LinkPropDlgDef( wxWindow* parent, wxWindowID id, const wxString&
     
     bSizerBrowseAndLoad->Add( m_buttonBrowseLocal, 0, wxALL, 5 );
     
-    m_buttonLoad = new wxButton( this, wxID_ANY, _("Load"), wxDefaultPosition,
+    m_buttonLoad = new wxButton( this, wxID_ANY, _("Preview"), wxDefaultPosition,
             wxDefaultSize, 0 );
     bSizerBrowseAndLoad->Add( m_buttonLoad, 0, wxALL, 5 );
     

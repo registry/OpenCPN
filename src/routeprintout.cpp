@@ -78,6 +78,8 @@ using namespace std;
 #define PRINT_WP_DISTANCE 3
 #define PRINT_WP_DESCRIPTION 4
 
+#define PRINT_WP_IMAGE_APPROACH 5
+
 // Global print data, to remember settings during the session
 extern wxPrintData*     g_printData;
 // Global page setup data
@@ -480,7 +482,16 @@ void RoutePrintSelection::CreateControls()
     wxStaticText* label5 = new  wxStaticText( itemDialog1, wxID_ANY, _( "Show Waypoint description." ), wxDefaultPosition, wxDefaultSize );
     fgSizer2->Add( label5, 1, wxALL | wxALIGN_CENTER_VERTICAL, 5 );
 
+    
+    m_checkBoxApproachImage = new wxCheckBox( itemDialog1, wxID_ANY, _( "Approach/Harbour plan" ),
+                                              wxDefaultPosition, wxDefaultSize, wxALIGN_LEFT );
+    m_checkBoxApproachImage->SetValue( true );
+    fgSizer2->Add( m_checkBoxApproachImage, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5 );
+    wxStaticText* label6 = new  wxStaticText( itemDialog1, wxID_ANY, _( "Approach/Harbour plan." ), wxDefaultPosition, wxDefaultSize );
+    fgSizer2->Add( label6, 1, wxALL | wxALIGN_CENTER_VERTICAL, 5 );
+
     itemBoxSizer1->Add( fgSizer2, 5, wxEXPAND, 5 );
+    
 
     wxBoxSizer* itemBoxSizer16 = new wxBoxSizer( wxHORIZONTAL );
     itemBoxSizer1->Add( itemBoxSizer16, 0, wxALIGN_RIGHT | wxALL, 5 );
@@ -535,7 +546,7 @@ void RoutePrintSelection::OnRoutepropOkClick( wxCommandEvent& event )
     toPrintOut.push_back( m_checkBoxWPCourse->GetValue() );
     toPrintOut.push_back( m_checkBoxWPDistanceToNext->GetValue() );
     toPrintOut.push_back( m_checkBoxWPDescription->GetValue() );
-
+    toPrintOut.push_back( m_checkBoxApproachImage->GetValue() );
     if ( NULL == g_printData ) {
         g_printData = new wxPrintData;
         g_printData->SetOrientation( wxLANDSCAPE );

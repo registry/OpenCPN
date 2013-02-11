@@ -156,6 +156,7 @@ public:
     wxCheckBox* m_checkBoxWPCourse;
     wxCheckBox* m_checkBoxWPDistanceToNext;
     wxCheckBox* m_checkBoxWPDescription;
+    wxCheckBox* m_checkBoxApproachImage;
 
     Route*      route;
 };
