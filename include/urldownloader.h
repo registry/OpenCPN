@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Project:  OpenCPN
- * Purpose:  OpenCPN Image preview widget
+ * Purpose:  OpenCPN Url Download class
  * Author:   Pavel Saviankou (taken and adopted from 
  * http://wiki.wxwidgets.org/An_image_panel)
  *
@@ -31,8 +31,8 @@
 using namespace std;
 
 
-#ifndef __IMAGEPREVIEW_H__
-#define __IMAGEPREVIEW_H__
+#ifndef __URL_DOWNLOAD_H__
+#define __URL_DOWNLOAD_H__
 
 #include <wx/print.h>
 #include <wx/datetime.h>
@@ -44,34 +44,12 @@ using namespace std;
 
 
 
-class wxImagePanel : public wxPanel
+class UrlDownloader 
 {
-    wxImage image;
-    wxBitmap resized;
-    int w, h;
     
 public:
-    wxImagePanel(wxWindow* parent);
-    
-    void paintEvent(wxPaintEvent & evt);
-    void paintNow();
-    void OnSize(wxSizeEvent& event);
-    void render(wxDC& dc);
-    void loadImage( wxString file);
-    
-    // some useful events
-    /*
-     void mouseMoved(wxMouseEvent& event);
-     void mouseDown(wxMouseEvent& event);
-     void mouseWheelMoved(wxMouseEvent& event);
-     void mouseReleased(wxMouseEvent& event);
-     void rightClick(wxMouseEvent& event);
-     void mouseLeftWindow(wxMouseEvent& event);
-     void keyPressed(wxKeyEvent& event);
-     void keyReleased(wxKeyEvent& event);
-     */
-    
-    DECLARE_EVENT_TABLE()
+    static
+    wxImage LoadImage( wxString url );
 };
 
 

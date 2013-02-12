@@ -249,6 +249,7 @@ PrintTable::PrintTable() : Table()
 {
     rows_heights.clear();
     start_page = 0;
+    hasImage = false;
 }
 
 
@@ -339,4 +340,9 @@ void PrintTable::AdjustCells( wxDC* dc, int marginX, int marginY )
         }
         number_of_pages = std::max( row_page, number_of_pages );
     }
+    
+    // we print image of the plan after the table on additional page
+    if ( hasImage )
+        number_of_pages++ ; 
+    
 }

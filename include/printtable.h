@@ -247,6 +247,8 @@ protected:
     int                             start_page;
     
     wxImage                         approach_plan;
+    wxString                        approach_plan_url;
+    bool                            hasImage;
 
 
     int number_of_pages;                // stores the number of pages for printing of this table. It is set by AdjustCells(...)
@@ -286,9 +288,10 @@ public:
     };
     
     // Sets an image, which should be printed
-    void SetImage( wxImage& _image)
+    void SetImage( wxImage _image)
     {
         approach_plan = _image;
+        hasImage = true;
     }
     
      // Sets an image, which should be printed
@@ -297,6 +300,20 @@ public:
         return approach_plan;
     }   
     
+    void SetApproachImageUrl( wxString _url)
+    {
+        approach_plan_url = _url;
+        hasImage = true;
+    }
     
+    wxString& GetApproachImageUrl( )
+    {
+        return approach_plan_url;
+    }    
+    
+    bool HasImage() 
+    {
+        return hasImage;
+    }
 };
 #endif

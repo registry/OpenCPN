@@ -337,6 +337,7 @@ SET(HDRS
 		include/routeprintout.h
 		include/printtable.h
         include/imagepreview.h		
+        include/urldownloader.h      
 		include/statwin.h
 		include/tcmgr.h
 		include/thumbwin.h
@@ -381,6 +382,7 @@ SET(SRCS
 		src/routeprintout.cpp
 		src/printtable.cpp
         src/imagepreview.cpp
+        src/urldownloader.cpp
 		src/statwin.cpp
 		src/tcmgr.cpp
 		src/thumbwin.cpp

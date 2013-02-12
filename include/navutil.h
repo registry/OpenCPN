@@ -85,7 +85,7 @@ class Hyperlink { // toh, 2009.02.14
             wxString DescrText;
             wxString Link;
             wxString Type;
-            wxString localCopy;
+            wxImage  Image;
 };
 
 
@@ -130,7 +130,9 @@ public:
       wxString GetApproachName() { return m_ApproachName; } 
       void CalculateApproachNameExtents(void);
       BouyPassingSide GetBouyPassingSide() { return m_BouyPassingSide; }
-      void SetBouyPassingSide ( BouyPassingSide side=BOUY_NONE  ) { m_BouyPassingSide = side; }; 
+      void SetBouyPassingSide ( BouyPassingSide side=BOUY_NONE  ) { m_BouyPassingSide = side; };  
+      
+      
 
       void SetCourse( double course) { m_routeprop_course = course; };
       double GetCourse() { return m_routeprop_course; };

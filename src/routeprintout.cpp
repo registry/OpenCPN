@@ -71,6 +71,7 @@ using namespace std;
 
 #include "routeprintout.h"
 #include "printtable.h"
+#include "urldownloader.h"
 
 #define PRINT_WP_NAME 0
 #define PRINT_WP_POSITION 1
@@ -193,11 +194,27 @@ MyRoutePrintout::MyRoutePrintout( std::vector<bool> _toPrintOut,
         _table.StartFillData();
         for (std::vector<RoutePoint* >::iterator p_iter=_approach.begin(); p_iter != _approach.end(); p_iter++) { 
             RoutePoint * _point = *p_iter;
+            
+             if ( toPrintOut[ PRINT_WP_IMAGE_APPROACH ] ) {
+                HyperlinkList::iterator iter;
+                HyperlinkList* href_list = _point->m_HyperlinkList;
+                for (iter = href_list->begin(); iter != href_list->end(); ++iter)
+                {
+                    Hyperlink *link = *iter;
+                    if (link->DescrText.CmpNoCase(_T("APPROACH"))==0 || link->DescrText.CmpNoCase(_T("PLAN"))==0  )
+                    {
+                        _table.SetApproachImageUrl( link->Link );
+                        _table.SetImage( UrlDownloader::LoadImage( link->Link ) );
+                        break;
+                    }
+                }    
+            }
             string cell1( _point->GetName().mb_str() );
             _table << cell1;
             string cell2( _point->GetDescription().mb_str() );
             _table << cell2;
-            string cell3( "Strb" );
+            BouyPassingSide passing_side =  _point->GetBouyPassingSide();
+            string cell3(  (passing_side == BOUY_SB) ? "Strb" : ((passing_side == BOUY_P)? "Port" : "Gate") );
             _table << cell3;
             string cell4( "   " );
             _table << cell4;
@@ -328,14 +345,16 @@ void MyRoutePrintout::DrawPage( wxDC* dc )
     int header_textOffsetX = 2;
     int header_textOffsetY = 2;
     
-    vector< PrintCell >& header_content = __table.GetHeader();
-    for ( size_t j = 0; j < header_content.size(); j++ ) {
-        PrintCell& cell = header_content[ j ];
-        dc->DrawRectangle( currentX, currentY, cell.GetWidth(), cell.GetHeight() );
-        dc->DrawText( cell.GetText(),  currentX +header_textOffsetX, currentY + header_textOffsetY );
-        currentX += cell.GetWidth();
+   if ( ! pageToPrint == (__table.GetStartPage() + __table.GetNumberPages()) ) // dont print header if image
+    {
+        vector< PrintCell >& header_content = __table.GetHeader();
+        for ( size_t j = 0; j < header_content.size(); j++ ) {
+            PrintCell& cell = header_content[ j ];
+            dc->DrawRectangle( currentX, currentY, cell.GetWidth(), cell.GetHeight() );
+            dc->DrawText( cell.GetText(),  currentX +header_textOffsetX, currentY + header_textOffsetY );
+            currentX += cell.GetWidth();
+        }
     }
-
     wxFont  routePrintFont_normal( 10, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_NORMAL );
     dc->SetFont( routePrintFont_normal );
 
@@ -358,6 +377,42 @@ void MyRoutePrintout::DrawPage( wxDC* dc )
         }
         currentY += currentHeight;
     }
+    
+    if (__table.HasImage() && pageToPrint == (__table.GetStartPage() + __table.GetNumberPages()) )
+    {
+        // resale to fil into page with preserving proportions...
+        int w, h;
+        dc->GetSize(&w, &h);
+        
+        int image_margin = 10;
+        w -= 4*image_margin;
+        h -= 4*image_margin;
+        wxImage __image = __table.GetImage();
+        int image_h = __image.GetHeight();
+        int image_w = __image.GetWidth();
+        int new_w = 0;
+        int new_h = 0;
+        
+        if ((image_h >= h) || (image_w >= w ))
+        {
+            double ratio = (double)image_w/(double)image_h;
+            if (ratio > 1.)
+            {
+                new_w = w;
+                new_h = h / ratio * ( (double)w / (double)image_w);
+            }else
+            {
+                new_h = h;
+                new_w = w * ratio* ( (double)h / (double)image_h);
+            }
+        }else
+        {
+            new_h = image_h;
+            new_w = image_w;
+        }
+        dc->DrawBitmap( wxBitmap(__image.Scale( new_w , new_h, wxIMAGE_QUALITY_HIGH )), image_margin, image_margin, false );
+    }
+    
 }
 
 
