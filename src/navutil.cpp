@@ -2862,6 +2862,8 @@ int Track::Simplify( double maxDelta ) {
 
     SetnPoints();
     pSelect->AddAllSelectableTrackSegments( this );
+    
+    UpdateSegmentDistances();
     ::wxEndBusyCursor();
     return reduction;
 }
