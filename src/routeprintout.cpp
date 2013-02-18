@@ -218,6 +218,7 @@ MyRoutePrintout::MyRoutePrintout( std::vector<bool> _toPrintOut,
             _table << cell3;
             string cell4( "   " );
             _table << cell4;
+            _table << "\n";
         }
      }
 }
@@ -294,7 +295,6 @@ void MyRoutePrintout::DrawPage( wxDC* dc )
     bool table_found = false;
     for (std::map<wxString, std::vector<RoutePoint* > >::iterator iter=approach_points.begin(); iter != approach_points.end(); iter++) {
         PrintTable &_table = approach_tables[(*iter).first];   
-    
         vector< vector < PrintCell > > & cells = _table.GetContent();
         for ( size_t i = 0; i < cells.size(); i++ ) {
             vector< PrintCell >& content_row = cells[ i ];
