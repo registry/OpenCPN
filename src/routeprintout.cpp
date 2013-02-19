@@ -141,7 +141,7 @@ MyRoutePrintout::MyRoutePrintout( std::vector<bool> _toPrintOut,
 
     for ( int n = 1; n <= myRoute->GetnPoints(); n++ ) {
         RoutePoint* point = myRoute->GetPoint( n );
-
+        RoutePoint* next_point = (n < myRoute->GetnPoints())?myRoute->GetPoint( n+1 ):NULL;
         if ( toPrintOut[ PRINT_WP_NAME ] ) {
             string cell( point->GetName().mb_str() );
             table << cell;
@@ -159,7 +159,7 @@ MyRoutePrintout::MyRoutePrintout( std::vector<bool> _toPrintOut,
         }
         if ( toPrintOut[ PRINT_WP_DISTANCE ] ) {
             wxString point_distance;
-            point_distance.Printf( _T( "%6.2f NM" ), point->GetDistance() );
+            point_distance.Printf( _T( "%6.2f NM" ), (next_point!= NULL)?(next_point->GetDistance()):0. );
             string   cell( point_distance.mb_str() );
             table << cell;
         }
@@ -345,7 +345,7 @@ void MyRoutePrintout::DrawPage( wxDC* dc )
     int header_textOffsetX = 2;
     int header_textOffsetY = 2;
     
-   if ( ! pageToPrint == (__table.GetStartPage() + __table.GetNumberPages()) ) // dont print header if image
+   if ( ! ( pageToPrint == (__table.GetStartPage() + __table.GetNumberPages() + 1) ) ) // dont print header if image
     {
         vector< PrintCell >& header_content = __table.GetHeader();
         for ( size_t j = 0; j < header_content.size(); j++ ) {
