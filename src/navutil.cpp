@@ -5030,6 +5030,12 @@ GpxWptElement *CreateGPXWpt( RoutePoint *pr, char * waypoint_type, bool b_props_
             case BOUY_GATE:
                 _side = _T("3");
                 break;                 
+            case BOUY_AHEAD:
+                _side = _T("4");
+                break; 
+            case BOUY_REAR:
+                _side = _T("5");
+                break; 
             case BOUY_NONE:
             default:
                 _side = _T("");
@@ -6082,7 +6088,6 @@ RoutePoint *LoadGPXWaypoint( GpxWptElement *wptnode, wxString def_symbol_name, b
     if( dt.IsValid() ) pWP->m_CreateTime = dt;
     else
         pWP->m_CreateTime = wxInvalidDateTime;
-
     if( linklist ) {
         delete pWP->m_HyperlinkList;                    // created in RoutePoint ctor
         pWP->m_HyperlinkList = linklist;
@@ -6101,6 +6106,12 @@ RoutePoint *LoadGPXWaypoint( GpxWptElement *wptnode, wxString def_symbol_name, b
         case 3:
             pWP->SetBouyPassingSide(BOUY_GATE);
             break;
+        case 4:
+            pWP->SetBouyPassingSide(BOUY_AHEAD);
+            break;
+        case 5:
+            pWP->SetBouyPassingSide(BOUY_REAR);
+            break;            
         case 0:
         default:
             pWP->SetBouyPassingSide(BOUY_NONE);

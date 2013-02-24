@@ -100,7 +100,8 @@ MyRoutePrintout::MyRoutePrintout( std::vector<bool> _toPrintOut,
     // Offset text from the edge of the cell (Needed on Linux)
     textOffsetX = 5;
     textOffsetY = 8;
-    table.SetTableTitle( route->GetRouteName() );
+    wxString _title = _T("From ") + route->GetRouteStart() + _T(" to ") + route->GetRouteEnd(); 
+    table.SetTableTitle( _title );
     table.StartFillHeader();
     // setup widths for columns
     if ( toPrintOut[ PRINT_WP_NAME ] ) {
@@ -214,7 +215,14 @@ MyRoutePrintout::MyRoutePrintout( std::vector<bool> _toPrintOut,
             string cell2( _point->GetDescription().mb_str() );
             _table << cell2;
             BouyPassingSide passing_side =  _point->GetBouyPassingSide();
-            string cell3(  (passing_side == BOUY_SB) ? "Strb" : ((passing_side == BOUY_P)? "Port" : "Gate") );
+            cout << passing_side << " ";
+            string cell3(  (passing_side == BOUY_SB) ? "Strb" : 
+                           (passing_side == BOUY_P)? "Port" : 
+                           (passing_side == BOUY_GATE)? "Gate" : 
+                           (passing_side == BOUY_AHEAD)? "Ahead" : 
+                           (passing_side == BOUY_REAR)? "Rear" : 
+                           "None" );
+            cout << cell3 << endl;
             _table << cell3;
             string cell4( "   " );
             _table << cell4;

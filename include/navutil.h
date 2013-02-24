@@ -89,7 +89,7 @@ class Hyperlink { // toh, 2009.02.14
 };
 
 
-enum BouyPassingSide { BOUY_NONE=0, BOUY_SB=1, BOUY_P=2, BOUY_GATE=3 };
+enum BouyPassingSide { BOUY_NONE=0, BOUY_SB=1, BOUY_P=2, BOUY_GATE=3, BOUY_AHEAD=4, BOUY_REAR=5 };
 
 WX_DECLARE_LIST(Hyperlink, HyperlinkList);// establish class as list member
 
@@ -281,7 +281,8 @@ public:
       void SetRouteArrivalRadius(double radius){m_ArrivalRadius = radius;}
 
       wxString GetRouteName() { return m_RouteNameString; }
-      
+      wxString GetRouteStart() { return m_RouteStartString; }
+      wxString GetRouteEnd() { return m_RouteEndString; }
       
       int         m_ConfigRouteNum;
       bool        m_bRtIsSelected;

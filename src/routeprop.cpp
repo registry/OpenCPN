@@ -2114,8 +2114,10 @@ MarkInfoDef::MarkInfoDef( wxWindow* parent, wxWindowID id, const wxString& title
     wxBoxSizer* bSizerBouyPassing;
     bSizerBouyPassing = new wxBoxSizer( wxHORIZONTAL );    
  
+    m_radioButtonPassingNone = new wxRadioButton( m_panelBasicProperties, wxID_ANY, _("None") );
+    bSizerBouyPassing->Add( m_radioButtonPassingNone, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5 );   
     
-     m_radioButtonPassingSB = new wxRadioButton( m_panelBasicProperties, wxID_ANY, _("Starboard") );
+    m_radioButtonPassingSB = new wxRadioButton( m_panelBasicProperties, wxID_ANY, _("Starboard") );
     bSizerBouyPassing->Add( m_radioButtonPassingSB, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5 );   
     
      m_radioButtonPassingP = new wxRadioButton( m_panelBasicProperties, wxID_ANY, _("Port") );
@@ -2124,6 +2126,11 @@ MarkInfoDef::MarkInfoDef( wxWindow* parent, wxWindowID id, const wxString& title
     m_radioButtonPassingGate = new wxRadioButton( m_panelBasicProperties, wxID_ANY, _("Gate") );
     bSizerBouyPassing->Add( m_radioButtonPassingGate, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5 );     
        
+     m_radioButtonPassingAhead = new wxRadioButton( m_panelBasicProperties, wxID_ANY, _("Ahead") );
+    bSizerBouyPassing->Add( m_radioButtonPassingAhead, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5 );     
+
+    m_radioButtonPassingRear = new wxRadioButton( m_panelBasicProperties, wxID_ANY, _("Rear") );
+    bSizerBouyPassing->Add( m_radioButtonPassingRear, 0, wxALL | wxALIGN_CENTER_VERTICAL, 5 );   
     
     bSizerTextProperties->Add( bSizerBouyPassing, 0, wxEXPAND, 5 ); 
     
@@ -2357,6 +2364,8 @@ MarkInfoDef::OnRoutePointIsApproach( wxCommandEvent& event )
     m_radioButtonPassingSB->Enable(status);
     m_radioButtonPassingP->Enable(status);
     m_radioButtonPassingGate->Enable(status);    
+    m_radioButtonPassingAhead->Enable(status);
+    m_radioButtonPassingRear->Enable(status);    
     event.Skip();
 }
 
@@ -2570,6 +2579,15 @@ bool MarkInfoImpl::UpdateProperties( bool positionOnly )
         m_checkBoxVisible->SetValue( m_pRoutePoint->m_bIsVisible ); 
         m_checkBoxApproach->SetValue( m_pRoutePoint->m_bIsApproach );
         m_textApproachName->SetValue( m_pRoutePoint->m_ApproachName );
+
+        m_radioButtonPassingNone->SetValue( m_pRoutePoint->GetBouyPassingSide() == BOUY_NONE );
+        m_radioButtonPassingSB->SetValue( m_pRoutePoint->GetBouyPassingSide() == BOUY_SB );
+        m_radioButtonPassingP->SetValue( m_pRoutePoint->GetBouyPassingSide() == BOUY_P );
+        m_radioButtonPassingGate->SetValue( m_pRoutePoint->GetBouyPassingSide() == BOUY_GATE );
+        m_radioButtonPassingAhead->SetValue( m_pRoutePoint->GetBouyPassingSide() == BOUY_AHEAD );
+        m_radioButtonPassingRear->SetValue( m_pRoutePoint->GetBouyPassingSide() == BOUY_REAR );
+        
+        
         wxCommandEvent _dummy_event;
         OnRoutePointIsApproach( _dummy_event ); // invoke event with "NO EVEN" to update state of widgets...
         
@@ -2817,6 +2835,16 @@ bool MarkInfoImpl::SaveChanges()
 
         m_pRoutePoint->SetApproach( m_checkBoxApproach->GetValue()  );   
         m_pRoutePoint->SetApproachName( m_textApproachName->GetValue() );
+        
+        m_pRoutePoint->SetBouyPassingSide( 
+                           (m_radioButtonPassingNone->GetValue()) ? BOUY_NONE : 
+                           (m_radioButtonPassingSB->GetValue()) ? BOUY_SB : 
+                           (m_radioButtonPassingP->GetValue()) ? BOUY_P : 
+                           (m_radioButtonPassingGate->GetValue()) ? BOUY_GATE : 
+                           (m_radioButtonPassingAhead->GetValue()) ? BOUY_AHEAD : 
+                           (m_radioButtonPassingRear->GetValue()) ? BOUY_REAR : 
+                           BOUY_NONE   );
+        
         
         // Here is some logic....
         // If the Markname is completely numeric, and is part of a route,

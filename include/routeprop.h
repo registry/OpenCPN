@@ -309,7 +309,9 @@ class MarkInfoDef : public wxDialog
         wxRadioButton*          m_radioButtonPassingSB;
         wxRadioButton*          m_radioButtonPassingP;
         wxRadioButton*          m_radioButtonPassingGate;
-
+        wxRadioButton*          m_radioButtonPassingAhead;
+        wxRadioButton*          m_radioButtonPassingRear;
+        
         wxStaticBoxSizer*       sbSizerLinks;
         wxToggleButton*         m_toggleBtnEdit;
 		// Virtual event handlers, overide them in your derived class
