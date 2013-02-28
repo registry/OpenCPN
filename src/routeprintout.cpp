@@ -190,7 +190,7 @@ MyRoutePrintout::MyRoutePrintout( std::vector<bool> _toPrintOut,
         _table.StartFillWidths();
         _table << 23;
         _table << 140;
-        _table << 40;
+        _table << 25;
         _table << 15;
         _table.StartFillData();
         for (std::vector<RoutePoint* >::iterator p_iter=_approach.begin(); p_iter != _approach.end(); p_iter++) { 
@@ -215,14 +215,12 @@ MyRoutePrintout::MyRoutePrintout( std::vector<bool> _toPrintOut,
             string cell2( _point->GetDescription().mb_str() );
             _table << cell2;
             BouyPassingSide passing_side =  _point->GetBouyPassingSide();
-            cout << passing_side << " ";
             string cell3(  (passing_side == BOUY_SB) ? "Strb" : 
                            (passing_side == BOUY_P)? "Port" : 
                            (passing_side == BOUY_GATE)? "Gate" : 
                            (passing_side == BOUY_AHEAD)? "Ahead" : 
                            (passing_side == BOUY_REAR)? "Rear" : 
                            "None" );
-            cout << cell3 << endl;
             _table << cell3;
             string cell4( "   " );
             _table << cell4;
