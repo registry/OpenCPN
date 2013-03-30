@@ -2690,7 +2690,13 @@ Extended_Geometry *cm93chart::BuildGeom ( Object *pobject, wxFileOutputStream *p
                               if ( ncontours > m_ncontour_alloc - 1 )
                               {
                                     m_ncontour_alloc *= 2;
+                                    int * tmp = m_pcontour_array;
                                     m_pcontour_array = ( int * ) realloc ( m_pcontour_array, m_ncontour_alloc * sizeof ( int ) );
+                                    if (NULL == tmp)
+                                    {
+                                        free (tmp);
+                                        tmp = NULL;
+                                    }
                               }
                               m_pcontour_array[ncontours] = nRingVertex;               // store the vertex count
 
@@ -4295,7 +4301,7 @@ int cm93chart::loadsubcell ( int cellindex, wxChar sub_char )
             double dlon = m_dval / 3.;
             double lat, lon;
             Get_CM93_Cell_Origin ( cellindex, GetNativeScale(), &lat, &lon );
-            printf ( "\n   Attempting loadcell %d scale %c, sub_char %c at lat: %g/%g lon:%g/%g\n", cellindex, wxChar ( m_scalechar[0] ), sub_char, lat, lat + dlat, lon, lon+dlon );
+            printf ( "\n   Attempting loadcell %d scale %lc, sub_char %lc at lat: %g/%g lon:%g/%g\n", cellindex, wxChar ( m_scalechar[0] ), sub_char, lat, lat + dlat, lon, lon+dlon );
       }
 
       int jlat = ( int ) ( ( ( ilat - 30 ) / m_dval ) * m_dval ) + 30;     // normalize
@@ -4362,7 +4368,7 @@ int cm93chart::loadsubcell ( int cellindex, wxChar sub_char )
                         if ( sub_char == '0' )
                               printf ( "   Tried to load non-existent CM93 cell\n" );
                         else
-                              printf ( "   No sub_cells of scale(%c) found\n", sub_char );
+                              printf ( "   No sub_cells of scale(%lc) found\n", sub_char );
                   }
 
                   return 0;
@@ -4417,8 +4423,15 @@ wxPoint *cm93chart::GetDrawBuffer ( int nSize )
 //    Reallocate the cm93chart DrawBuffer if it is currently too small
       if ( nSize > m_nDrawBufferSize )
       {
+            wxPoint * tmp = m_pDrawBuffer;
             m_pDrawBuffer = ( wxPoint * ) realloc ( m_pDrawBuffer, sizeof ( wxPoint ) * ( nSize + 1 ) );
-            m_nDrawBufferSize = nSize + 1;
+            if (NULL == m_pDrawBuffer)
+            {
+                free (tmp);
+                tmp = NULL;
+            }
+            else
+                m_nDrawBufferSize = nSize + 1;
       }
       return m_pDrawBuffer;
 }
