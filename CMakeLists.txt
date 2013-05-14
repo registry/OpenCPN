@@ -185,6 +185,14 @@ IF(NOT WIN32)
   ADD_DEFINITIONS( " -g -fno-strict-aliasing")
 ENDIF(NOT WIN32)
 
+#Enable CrashReporting for Windows
+IF(WIN32)
+    ADD_DEFINITIONS(-DOCPN_USE_CRASHRPT)
+    INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/buildwin/crashrpt)
+    SET(EXTRA_LIBS ${EXTRA_LIBS} ${CMAKE_SOURCE_DIR}/buildwin/crashrpt/CrashRpt1401.lib)
+    SET(CMAKE_EXE_LINKER_FLAGS /DEBUG)
+ENDIF(WIN32)
+
 # Add some definitions to satisfy MS
 ADD_DEFINITIONS(-DUSE_GLU_TESS)
 IF(WIN32)
@@ -327,6 +335,48 @@ SET(HDRS
 		include/chartdbs.h
 		include/chartimg.h
 		include/chcanv.h
+		include/timers.h
+		include/emboss_data.h
+		include/AISTargetQueryDialog.h
+		include/AIS_Bitstring.h
+		include/AISTargetListDialog.h
+		include/OCPNListCtrl.h
+		include/AISTargetAlertDialog.h
+		include/AIS_Decoder.h
+		include/AIS_Target_Data.h
+		include/CM93DSlide.h
+		include/GoToPositionDialog.h
+		include/RolloverWin.h
+		include/S57QueryDialog.h
+		include/S57ObjectDesc.h
+		include/S57Light.h
+		include/s57RegistrarMgr.h
+		include/S57ClassRegistrar.h
+		include/MarkIcon.h
+		include/SendToGpsDlg.h
+		include/TCWin.h
+		include/glTextureDescriptor.h
+		include/tide_time.h
+		include/glChartCanvas.h
+		include/ChInfoWin.h
+		include/ocpCursor.h
+		include/Quilt.h
+		include/Hyperlink.h
+		include/NavObjectCollection.h
+		include/RoutePoint.h
+		include/Route.h
+		include/SelectItem.h
+		include/Select.h
+		include/FontMgr.h
+		include/FontDesc.h
+		include/vector2D.h
+		include/OCPNSoundData.h
+		include/OCPN_Sound.h
+		include/NMEALogWindow.h
+		include/WindowDestroyListener.h
+		include/TTYWindow.h
+		include/TTYScroll.h
+		include/Layer.h
 		include/concanv.h
 		include/cutil.h
 		include/georef.h
@@ -335,11 +385,19 @@ SET(HDRS
 		include/routemanagerdialog.h
 		include/routeprop.h
 		include/routeprintout.h
+		include/PositionParser.h
 		include/printtable.h
         include/imagepreview.h		
         include/urldownloader.h      
 		include/statwin.h
 		include/tcmgr.h
+		include/Station_Data.h
+		include/IDX_entry.h
+		include/TC_Error_Code.h
+		include/TCDataFactory.h
+		include/TCDS_Ascii_Harmonic.h
+		include/TCDS_Binary_Harmonic.h
+		include/TCDataSource.h
 		include/thumbwin.h
 		include/options.h
 		include/gshhs.h
@@ -360,6 +418,10 @@ SET(HDRS
 		include/compasswin.h
 		include/geodesic.h
 		include/datastream.h
+		include/OCPN_DataStreamEvent.h
+		include/ConnectionParams.h
+		include/OCP_DataStreamInput_Thread.h
+		include/dsPortType.h
         include/multiplexer.h
 )
 
@@ -372,6 +434,39 @@ SET(SRCS
 		src/chartdbs.cpp
 		src/chartimg.cpp
 		src/chcanv.cpp
+		src/ocpCursor.cpp
+		src/TCWin.cpp
+		src/S57QueryDialog.cpp
+		src/s57RegistrarMgr.cpp
+		src/GoToPositionDialog.cpp
+		src/CM93DSlide.cpp
+		src/RolloverWin.cpp
+		src/glChartCanvas.cpp
+		src/glTextureDescriptor.cpp
+		src/ChInfoWin.cpp
+		src/AISTargetQueryDialog.cpp
+		src/AIS_Bitstring.cpp
+		src/AISTargetListDialog.cpp
+		src/AISTargetAlertDialog.cpp
+		src/AIS_Decoder.cpp
+		src/AIS_Target_Data.cpp
+		src/OCPNListCtrl.cpp
+		src/Quilt.cpp
+		src/Hyperlink.cpp
+		src/NavObjectCollection.cpp
+		src/RoutePoint.cpp
+		src/Route.cpp
+		src/SelectItem.cpp
+		src/Select.cpp
+		src/FontMgr.cpp
+		src/FontDesc.cpp
+		src/OCPNSoundData.cpp
+		src/OCPN_Sound.cpp
+		src/NMEALogWindow.cpp
+		src/TTYWindow.cpp
+		src/TTYScroll.cpp
+		src/SendToGpsDlg.cpp
+		src/Layer.cpp
 		src/concanv.cpp
 		src/cutil.cpp
 		src/georef.cpp
@@ -380,11 +475,18 @@ SET(SRCS
 		src/routemanagerdialog.cpp
 		src/routeprop.cpp
 		src/routeprintout.cpp
+		src/PositionParser.cpp
 		src/printtable.cpp
         src/imagepreview.cpp
         src/urldownloader.cpp
 		src/statwin.cpp
 		src/tcmgr.cpp
+		src/Station_Data.cpp
+		src/IDX_entry.cpp
+		src/TCDataFactory.cpp
+		src/TCDS_Ascii_Harmonic.cpp
+		src/TCDS_Binary_Harmonic.cpp
+		src/TCDataSource.cpp
 		src/thumbwin.cpp
 		src/options.cpp
 		src/gshhs.cpp
@@ -404,6 +506,9 @@ SET(SRCS
 		src/compasswin.cpp
 		src/geodesic.cpp
 		src/datastream.cpp
+		src/OCPN_DataStreamEvent.cpp
+		src/ConnectionParams.cpp
+		src/OCP_DataStreamInput_Thread.cpp
         src/multiplexer.cpp
     )
 
@@ -985,6 +1090,13 @@ IF(WIN32 AND NOT UNIX)
 INSTALL(DIRECTORY wxWidgets/ DESTINATION "." )
 INSTALL(DIRECTORY buildwin/vc10/ DESTINATION ".\\\\vc10" )
 #INSTALL(DIRECTORY buildwin/NSIS_Unicode/Bitmaps/ DESTINATION ".\\\\NSISBmps" ) #Gunther
+
+INSTALL(FILES ${CMAKE_SOURCE_DIR}/buildwin/crashrpt/CrashRpt1401.dll DESTINATION ${PREFIX_PKGDATA} PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
+INSTALL(FILES ${CMAKE_SOURCE_DIR}/buildwin/crashrpt/CrashSender1401.exe DESTINATION ${PREFIX_PKGDATA} PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
+INSTALL(FILES ${CMAKE_SOURCE_DIR}/buildwin/crashrpt/crashrpt_lang.ini DESTINATION ${PREFIX_PKGDATA} PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
+INSTALL(FILES ${CMAKE_SOURCE_DIR}/buildwin/crashrpt/dbghelp.dll DESTINATION ${PREFIX_PKGDATA} PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
+INSTALL(FILES ${CMAKE_SOURCE_DIR}/buildwin/crashrpt/PrivacyPolicy.txt DESTINATION ${PREFIX_PKGDATA} PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
+
 ENDIF(WIN32 AND NOT UNIX)
 
 
@@ -1141,6 +1253,7 @@ INCLUDE(CPack)
 IF(APPLE)
 # -- Run the BundleUtilities cmake code
   SET(CPACK_BUNDLE_PLIST "${CMAKE_SOURCE_DIR}/buildosx/Info.plist")
+  SET(MACOSX_BUNDLE_BUNDLE_NAME "OpenCPN")
 
   SET(APPS "\${CMAKE_INSTALL_PREFIX}/bin/OpenCPN.app")
   SET(DIRS "")

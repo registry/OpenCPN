@@ -1,4 +1,4 @@
-/******************************************************************************
+/**************************************************************************
 *
 * Project:  OpenCPN
 * Purpose:  RouteProerties Support
@@ -21,9 +21,7 @@
 *   along with this program; if not, write to the                         *
 *   Free Software Foundation, Inc.,                                       *
 *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301,  USA.         *
-***************************************************************************
-*
-*/
+**************************************************************************/
 
 // For compilers that support precompilation, includes "wx/wx.h".
 #include "wx/wxprec.h"
@@ -48,6 +46,7 @@
 #include "routeprintout.h"
 #include "chcanv.h"
 #include "tcmgr.h"		// pjotrc 2011.03.02
+#include "PositionParser.h"
 
 extern double             gLat, gLon, gSog, gCog;
 extern double             g_PlanSpeed;
@@ -385,11 +384,14 @@ wxString OCPNTrackListCtrl::OnGetItemText( long item, long column ) const
         g_prev_item = item;
     }
 
-    if( ! g_this_point ) return wxEmptyString;
+    if( ! g_this_point )
+        return wxEmptyString;
 
-    switch( column ){
+    switch( column )
+    {
         case 0:
-            if( item == 0 ) ret = _T("---");
+            if( item == 0 )
+                ret = _T("---");
             else
                 ret.Printf( _T("%ld"), item );
             break;
@@ -398,22 +400,23 @@ wxString OCPNTrackListCtrl::OnGetItemText( long item, long column ) const
             ret = g_this_point->GetName();
             break;
 
-        case 2: {
+        case 2:
             double slat, slon;
-            if( item == 0 ) {
+            if( item == 0 )
+            {
                 slat = gLat;
                 slon = gLon;
-            } else {
+            }
+            else
+            {
                 slat = g_prev_point->m_lat;
                 slon = g_prev_point->m_lon;
             }
 
-            DistanceBearingMercator( g_this_point->m_lat, g_this_point->m_lon, slat, slon, &gt_brg,
-                    &gt_leg_dist );
+            DistanceBearingMercator( g_this_point->m_lat, g_this_point->m_lon, slat, slon, &gt_brg, &gt_leg_dist );
 
-            ret.Printf( _T("%6.2f nm"), gt_leg_dist );
+            ret.Printf( _T("%6.2f ") + getUsrDistanceUnit(), toUsrDistance( gt_leg_dist ) );
             break;
-        }
 
         case 3:
             ret.Printf( _T("%03.0f Deg. T"), gt_brg );
@@ -427,27 +430,30 @@ wxString OCPNTrackListCtrl::OnGetItemText( long item, long column ) const
             ret = toSDMM( 2, g_this_point->m_lon, 1 );
             break;
 
-        case 6: {
-            wxDateTime timestamp = g_this_point->m_CreateTime;
-            if( timestamp.IsValid() ) ret = ts2s( timestamp, m_tz_selection, m_LMT_Offset,
-                    TIMESTAMP_FORMAT );
-            else
-                ret = _T("----");
+        case 6:
+            {
+                wxDateTime timestamp = g_this_point->m_CreateTime;
+                if( timestamp.IsValid() )
+                    ret = ts2s( timestamp, m_tz_selection, m_LMT_Offset, TIMESTAMP_FORMAT );
+                else
+                    ret = _T("----");
+            }
             break;
-        }
-        case 7: {
+
+        case 7:
             if( ( item > 0 ) && g_this_point->m_CreateTime.IsValid()
-                    && g_prev_point->m_CreateTime.IsValid() ) {
+                    && g_prev_point->m_CreateTime.IsValid() )
+            {
                 double speed = 0.;
                 double seconds =
                         g_this_point->m_CreateTime.Subtract( g_prev_point->m_CreateTime ).GetSeconds().ToDouble();
 
-                if( seconds > 0. ) speed = gt_leg_dist / seconds * 3600;
+                if( seconds > 0. )
+                    speed = gt_leg_dist / seconds * 3600;
 
-                ret.Printf( _T("%5.2f"), speed );
+                ret.Printf( _T("%5.2f"), toUsrSpeed( speed ) );
             } else
                 ret = _("--");
-        }
             break;
 
         default:
@@ -1040,7 +1046,7 @@ void RouteProp::CreateControls()
     m_wpList->InsertColumn( 4, _("Latitude"), wxLIST_FORMAT_LEFT, 85 );
     m_wpList->InsertColumn( 5, _("Longitude"), wxLIST_FORMAT_LEFT, 90 );
     m_wpList->InsertColumn( 6, _("ETE/ETD"), wxLIST_FORMAT_LEFT, 135 );
-    m_wpList->InsertColumn( 7, _("Speed (Kts)"), wxLIST_FORMAT_CENTER, 72 );
+    m_wpList->InsertColumn( 7, _("Speed"), wxLIST_FORMAT_CENTER, 72 );
     m_wpList->InsertColumn( 8, _("Next tide event"), wxLIST_FORMAT_LEFT, 90 );
     m_wpList->InsertColumn( 9, _("Description"), wxLIST_FORMAT_LEFT, 90 );   // additional columt with WP description
     m_wpList->InsertColumn( 10, _("Course"), wxLIST_FORMAT_LEFT, 70 );       // additional columt with WP new course. Is it same like "bearing" of the next WP.
@@ -1057,7 +1063,7 @@ void RouteProp::CreateControls()
     m_wpTrackList->InsertColumn( 4, _("Latitude"), wxLIST_FORMAT_LEFT, 85 );
     m_wpTrackList->InsertColumn( 5, _("Longitude"), wxLIST_FORMAT_LEFT, 90 );
     m_wpTrackList->InsertColumn( 6, _("Timestamp"), wxLIST_FORMAT_LEFT, 135 );
-    m_wpTrackList->InsertColumn( 7, _("Speed (Kts)"), wxLIST_FORMAT_CENTER, 100 );
+    m_wpTrackList->InsertColumn( 7, _("Speed"), wxLIST_FORMAT_CENTER, 100 );
     m_wpTrackList->InsertColumn( 8, _("Next tide event"), wxLIST_FORMAT_LEFT, 100 );
     m_wpTrackList->InsertColumn( 9, _("Description"), wxLIST_FORMAT_CENTER, 100 );    // additional columt with WP description
     m_wpTrackList->InsertColumn( 10, _("Course"), wxLIST_FORMAT_CENTER, 70 );        // additional columt with WP new course. Is it same like "bearing" of the next WP.
@@ -1180,9 +1186,9 @@ bool RouteProp::ShowToolTips()
     return TRUE;
 }
 
-void RouteProp::SetDialogTitle( wxString title )
+void RouteProp::SetDialogTitle(const wxString & title)
 {
-    SetTitle( title );
+    SetTitle(title);
 }
 
 void RouteProp::SetRouteAndUpdate( Route *pR )
@@ -1222,13 +1228,13 @@ void RouteProp::SetRouteAndUpdate( Route *pR )
     // Reorganize dialog for route or track display
     if( m_pRoute ) {
         if( m_pRoute->m_bIsTrack ) {
-            m_PlanSpeedLabel->SetLabel( _("Avg. speed (Kts)") );
+            m_PlanSpeedLabel->SetLabel( _("Avg. speed") );
             m_PlanSpeedCtl->SetEditable( false );
             m_ExtendButton->SetLabel( _("Extend Track") );
             m_SplitButton->SetLabel( _("Split Track") );
 
         } else {
-            m_PlanSpeedLabel->SetLabel( _("Plan speed (Kts)") );
+            m_PlanSpeedLabel->SetLabel( _("Plan speed") );
             m_PlanSpeedCtl->SetEditable( true );
             m_ExtendButton->SetLabel( _("Extend Route") );
             m_SplitButton->SetLabel( _("Split Route") );
@@ -1353,7 +1359,7 @@ bool RouteProp::UpdateProperties()
                 m_avgspeed = 0;
             }
             wxString s;
-            s.Printf( _T("%5.2f"), m_avgspeed );
+            s.Printf( _T("%5.2f"), toUsrSpeed( m_avgspeed ) );
             m_PlanSpeedCtl->SetValue( s );
         } else {
             wxString s( _T("--") );
@@ -1362,7 +1368,7 @@ bool RouteProp::UpdateProperties()
 
         //  Total length
         wxString slen;
-        slen.Printf( wxT("%5.2f"), m_pRoute->m_route_length );
+        slen.Printf( wxT("%5.2f ") + getUsrDistanceUnit(), toUsrDistance( m_pRoute->m_route_length ) );
 
         m_TotalDistCtl->SetValue( slen );
 
@@ -1442,7 +1448,7 @@ bool RouteProp::UpdateProperties()
 
         //  Total length
         wxString slen;
-        slen.Printf( wxT("%5.2f"), m_pRoute->m_route_length );
+        slen.Printf( wxT("%5.2f ") + getUsrDistanceUnit(), toUsrDistance( m_pRoute->m_route_length ) );
 
         if( !m_pEnroutePoint ) m_TotalDistCtl->SetValue( slen );
         else
@@ -1548,7 +1554,7 @@ bool RouteProp::UpdateProperties()
 	    // end of calculation
 
 
-            t.Printf( _T("%6.2f NM"), leg_dist );
+            t.Printf( _T("%6.2f ") + getUsrDistanceUnit(), toUsrDistance( leg_dist ) );
             if( arrival ) m_wpList->SetItem( item_line_index, 2, t );
             if( !enroute ) m_wpList->SetItem( item_line_index, 2, nullify );
 	    prp->SetDistance(leg_dist); // save the course to the next waypoint for printing.
@@ -1666,7 +1672,7 @@ bool RouteProp::UpdateProperties()
 
             //Leg speed
             wxString s;
-            s.Printf( _T("%5.2f"), leg_speed );
+            s.Printf( _T("%5.2f"), toUsrSpeed( leg_speed ) );
             if( arrival ) m_wpList->SetItem( item_line_index, 7, s );
 
             if( enroute ) m_wpList->SetItem( item_line_index, 8, tide_form );
@@ -1785,7 +1791,7 @@ void RouteProp::OnPlanSpeedCtlUpdated( wxCommandEvent& event )
     double s;
     spd.ToDouble( &s );
     if( ( 0.1 < s ) && ( s < 1000.0 ) && !m_pRoute->m_bIsTrack ) {
-        m_planspeed = s;
+        m_planspeed = fromUsrSpeed( s );
 
         UpdateProperties();
     }
@@ -3181,93 +3187,3 @@ void LinkPropImpl::OnOkClick( wxCommandEvent& event )
         event.Skip();
 }
 
-bool PositionParser::FindSeparator( wxString src )
-{
-    int length = src.Length();
-    wxStringTokenizer t;
-
-    // Used when format is similar to "12 34.56 N 12 34.56 E"
-    wxString posPartOfSeparator = _T("");
-
-    // First the XML case:
-    // Generalized XML tag format, accepts anything like <XXX yyy="<lat>" zzz="<lon>" >
-    // GPX format <wpt lat="<lat>" lon="<lon>" /> tag among others.
-
-    wxRegEx regex;
-
-    int re_compile_flags = wxRE_ICASE;
-#ifdef wxHAS_REGEX_ADVANCED
-    re_compile_flags |= wxRE_ADVANCED;
-#endif
-
-    regex.Compile(
-            _T( "<[a-z,A-Z]*\\s*[a-z,A-Z]*=\"([0-9,.]*)\"\\s*[a-z,A-Z]*=\"([-,0-9,.]*)\"\\s*/*>" ),
-                  re_compile_flags );
-
-    if( regex.IsValid() ) {
-        if( regex.Matches( src ) ) {
-			int n = regex.GetMatchCount();
-            latitudeString = regex.GetMatch( src, 1 );
-            longitudeString = regex.GetMatch( src, 2 );
-            latitudeString.Trim( true );
-            latitudeString.Trim( false );
-            longitudeString.Trim( true );
-            longitudeString.Trim( false );
-            return true;
-        }
-    }
-
-    // Now try various separators.
-
-    separator = _T(", ");
-    t = wxStringTokenizer( src, separator );
-    if( t.CountTokens() == 2 ) goto found;
-
-    separator = _T(",");
-    t = wxStringTokenizer( src, separator );
-    if( t.CountTokens() == 2 ) goto found;
-
-    separator = _T(" ");
-    t = wxStringTokenizer( src, separator );
-    if( t.CountTokens() == 2 ) goto found;
-
-    separator = _T("\t");
-    t = wxStringTokenizer( src, separator );
-    if( t.CountTokens() == 2 ) goto found;
-
-    separator = _T("\n");
-    t = wxStringTokenizer( src, separator );
-    if( t.CountTokens() == 2 ) goto found;
-
-    separator = _T("N");
-    t = wxStringTokenizer( src, separator );
-    posPartOfSeparator = _T("N");
-    if( t.CountTokens() == 2 ) goto found;
-
-    separator = _T("S");
-    t = wxStringTokenizer( src, separator );
-    posPartOfSeparator = _T("S");
-    if( t.CountTokens() == 2 ) goto found;
-
-    // Give up.
-    return false;
-
-found: latitudeString = t.GetNextToken() << posPartOfSeparator;
-    latitudeString.Trim( true );
-    latitudeString.Trim( false );
-    longitudeString = t.GetNextToken();
-    longitudeString.Trim( true );
-    longitudeString.Trim( false );
-
-    return true;
-}
-
-PositionParser::PositionParser( wxString& src )
-{
-    parsedOk = false;
-    if( FindSeparator( src ) ) {
-        latitude = fromDMM( latitudeString );
-        longitude = fromDMM( longitudeString );
-        if( (latitude != 0.0) && (longitude != 0.0) ) parsedOk = true;
-    }
-}

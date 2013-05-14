@@ -1,4 +1,4 @@
-/******************************************************************************
+/***************************************************************************
  *
  * Project:  OpenCPN
  * Purpose:  OpenCP Route printout
@@ -21,10 +21,8 @@
  *   along with this program; if not, write to the                         *
  *   Free Software Foundation, Inc.,                                       *
  *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301,  USA.         *
- ***************************************************************************
- *
- *
- */
+ **************************************************************************/
+
 #include <iostream>
 #include <map>
 #include <vector>
@@ -135,7 +133,7 @@ public:
     void
     SetColorScheme( ColorScheme cs );
     void
-    SetDialogTitle( wxString title );
+    SetDialogTitle(const wxString & title);
     void
     OnRoutepropCancelClick( wxCommandEvent& event );
     void
