@@ -1,11 +1,11 @@
-/******************************************************************************
+/***************************************************************************
  *
  * Project:  OpenCPN
  * Purpose:  OpenCPN Toolbar
  * Author:   David Register
  *
  ***************************************************************************
- *   Copyright (C) 2010 by David S. Register   *
+ *   Copyright (C) 2010 by David S. Register                               *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -21,10 +21,7 @@
  *   along with this program; if not, write to the                         *
  *   Free Software Foundation, Inc.,                                       *
  *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301,  USA.         *
- ***************************************************************************
- *
- *
- */
+ **************************************************************************/
 
 #include "wx/wxprec.h"
 
@@ -40,6 +37,7 @@
 #include "toolbar.h"
 #include "chart1.h"
 #include "pluginmanager.h"
+#include "FontMgr.h"
 
 extern FontMgr*                   pFontMgr;
 extern ocpnFloatingToolbarDialog* g_FloatingToolbarDialog;
@@ -69,6 +67,7 @@ GrabberWin::GrabberWin( wxWindow *parent )
     Create( parent, -1 );
 
     SetSize( wxSize( m_pbitmap.GetWidth(), m_pbitmap.GetHeight() ) );
+    SetMinSize( wxSize( m_pbitmap.GetWidth(), m_pbitmap.GetHeight() ) );
 
     m_bLeftDown = false;
     m_bRightDown = false;
@@ -1244,8 +1243,6 @@ void ocpnToolBarSimple::OnToolTipTimerEvent( wxTimerEvent& event )
                 gFrame->Raise();
             }
         }
-
-        m_one_shot = 10;
     }
 }
 
@@ -1253,10 +1250,6 @@ int s_dragx, s_dragy;
 
 void ocpnToolBarSimple::OnMouseEvent( wxMouseEvent & event )
 {
-
-    if( event.Leaving() ) m_one_shot = 500;                   // inital value
-    if( event.Entering() ) m_one_shot = 500;
-
     wxCoord x, y;
     event.GetPosition( &x, &y );
     ocpnToolBarTool *tool = (ocpnToolBarTool *) FindToolForPosition( x, y );
@@ -1271,7 +1264,6 @@ void ocpnToolBarSimple::OnMouseEvent( wxMouseEvent & event )
 
     if( tool && tool->IsButton() && IsShown() ) {
 
-#ifndef __WXOSX__
         //    ToolTips
         if( NULL == m_pToolTipWin ) {
             m_pToolTipWin = new ToolTipWin( GetParent() );
@@ -1284,7 +1276,6 @@ void ocpnToolBarSimple::OnMouseEvent( wxMouseEvent & event )
         if( !m_pToolTipWin->IsShown() ) {
             m_tooltip_timer.Start( m_one_shot, wxTIMER_ONE_SHOT );
         }
-#endif
 
         //    Tool Rollover highlighting
         if( tool != m_last_ro_tool ) {
@@ -1875,11 +1866,11 @@ void ocpnToolBarSimple::OnMouseEnter( int id )
     (void) GetEventHandler()->ProcessEvent( event );
 }
 
-void ocpnToolBarSimple::SetToolNormalBitmapEx( wxToolBarToolBase *tool, wxString iconName )
+void ocpnToolBarSimple::SetToolNormalBitmapEx(wxToolBarToolBase *tool, const wxString & iconName)
 {
     if( tool ) {
         ocpnStyle::Style *style = g_StyleManager->GetCurrentStyle();
-        
+
         wxBitmap bmp = style->GetToolIcon( iconName, TOOLICON_NORMAL );
         tool->SetNormalBitmap( bmp );
         ocpnToolBarTool *otool = (ocpnToolBarTool *)tool;

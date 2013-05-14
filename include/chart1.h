@@ -1,4 +1,4 @@
-/******************************************************************************
+/***************************************************************************
  *
  * Project:  OpenCPN
  * Purpose:  OpenCPN Main wxWidgets Program
@@ -21,10 +21,7 @@
  *   along with this program; if not, write to the                         *
  *   Free Software Foundation, Inc.,                                       *
  *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301,  USA.         *
- ***************************************************************************
- *
- *
- */
+ **************************************************************************/
 
 #ifndef __CHART1_H__
 #define __CHART1_H__
@@ -32,6 +29,7 @@
 #include "wx/print.h"
 #include "wx/datetime.h"
 #include <wx/cmdline.h>
+#include <wx/snglinst.h>
 
 #ifdef __WXMSW__
 #include "wx/msw/private.h"
@@ -189,6 +187,8 @@ class MyApp: public wxApp
     void OnActivateApp(wxActivateEvent& event);
 
     void TrackOff(void);
+    
+    wxSingleInstanceChecker *m_checker;
 
     DECLARE_EVENT_TABLE()
 
@@ -319,7 +319,7 @@ class MyFrame: public wxFrame
     void UpdateGPSCompassStatusBox(bool b_force_new = false);
     bool UpdateChartDatabaseInplace(ArrayOfCDI &DirArray,
                                     bool b_force, bool b_prog,
-                                    wxString &ChartListFileName);
+                                    const wxString &ChartListFileName);
 
     bool                m_bdefer_resize;
     wxSize              m_defer_size;
@@ -341,13 +341,13 @@ class MyFrame: public wxFrame
     void SetChartUpdatePeriod(ViewPort &vp);
 
     void ApplyGlobalColorSchemetoStatusBar(void);
-    void PostProcessNNEA(bool pos_valid, wxString &sfixtime);
+    void PostProcessNNEA(bool pos_valid, const wxString &sfixtime);
 
     void ScrubGroupArray();
     wxString GetGroupName(int igroup);
     void LoadHarmonics();
 
-    bool EvalPriority( wxString message, wxString stream_name, int stream_priority );
+    bool EvalPriority(const wxString & message, DataStream *pDS );
 
     int                 m_StatusBarFieldCount;
 
@@ -387,17 +387,11 @@ class MyFrame: public wxFrame
 
     MsgPriorityHash     NMEA_Msg_Hash;
     wxString            m_VDO_accumulator;
+    
+    time_t              m_fixtime;
 
     DECLARE_EVENT_TABLE()
 };
-
-
-//--------------------------------------------------------------------
-//          Private Memory Management
-//--------------------------------------------------------------------
-
-//    Private malloc replacement
-void *x_malloc(size_t t);
 
 //--------------------------------------------------------------------
 //          Printing Support
