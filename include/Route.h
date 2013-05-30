@@ -89,6 +89,9 @@ public:
       double GetRouteArrivalRadius(void){ return m_ArrivalRadius;}
       void SetRouteArrivalRadius(double radius){m_ArrivalRadius = radius;}
 
+      wxString   GetRouteStart() { return m_RouteStartString; }
+      wxString   GetRouteEnd()   { return m_RouteEndString; }
+      
       int         m_ConfigRouteNum;
       bool        m_bRtIsSelected;
       bool        m_bRtIsActive;

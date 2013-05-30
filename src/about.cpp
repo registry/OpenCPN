@@ -38,7 +38,7 @@
 #include <wx/clipbrd.h>
 #include <wx/html/htmlwin.h>
 
-#include <version.h>
+// #include <wx/version.h>
 
 #include "about.h"
 #include "chart1.h"
