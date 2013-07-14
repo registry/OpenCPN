@@ -74,6 +74,7 @@
 #include "AIS_Target_Data.h"
 #include "AISTargetAlertDialog.h"
 #include "SendToGpsDlg.h"
+#include "compasswin.h"
 
 #ifdef USE_S57
 #include "cm93.h"                   // for chart outline draw
@@ -172,10 +173,10 @@ extern bool             bGPSValid;
 extern bool             g_bShowOutlines;
 extern bool             g_bShowDepthUnits;
 extern AIS_Decoder      *g_pAIS;
-extern FontMgr         *pFontMgr;
 
 extern MyFrame          *gFrame;
 extern StatWin          *stats;
+extern ocpnFloatingCompassWindow *g_FloatingCompassDialog;
 
 //    AIS Global configuration
 extern bool             g_bShowAIS;
@@ -257,6 +258,7 @@ extern wxAuiManager      *g_pauimgr;
 
 extern bool             g_bskew_comp;
 extern bool             g_bopengl;
+extern bool             g_bdisable_opengl;
 
 extern bool             g_bFullScreenQuilt;
 extern wxProgressDialog *s_ProgDialog;
@@ -972,20 +974,22 @@ ChartCanvas::ChartCanvas ( wxFrame *frame ) :
     m_bzooming_out = false;;
 
     EnableAutoPan(true);
-    
+
     undo = new Undo;
 
     VPoint.Invalidate();
 
-    m_glcc = new glChartCanvas(this);
+    if ( !g_bdisable_opengl )
+    {
+        m_glcc = new glChartCanvas(this);
 
-#if wxCHECK_VERSION(2, 9, 0)
-    m_pGLcontext = new wxGLContext(m_glcc);
-    m_glcc->SetContext(m_pGLcontext);
-#else
-    m_pGLcontext = m_glcc->GetContext();
-#endif
-
+    #if wxCHECK_VERSION(2, 9, 0)
+        m_pGLcontext = new wxGLContext(m_glcc);
+        m_glcc->SetContext(m_pGLcontext);
+    #else
+        m_pGLcontext = m_glcc->GetContext();
+    #endif
+    }
 
     singleClickEventIsValid = false;
 
@@ -1384,7 +1388,8 @@ ChartCanvas::~ChartCanvas()
     delete m_pos_image_user_grey_dusk;
     delete m_pos_image_user_grey_night;
     delete undo;
-    delete m_glcc;
+    if( !g_bdisable_opengl )
+        delete m_glcc;
 }
 
 int ChartCanvas::GetCanvasChartNativeScale()
@@ -1673,7 +1678,7 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
     case WXK_F12: {
         if( m_modkeys == wxMOD_ALT )
             m_nMeasureState = *(int *)(0);          // generate a fault for testing
-            
+
         parent_frame->ToggleChartOutlines();
         break;
     }
@@ -1932,6 +1937,18 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
 
             break;
 
+        case 9:                      // Ctrl I
+            if( g_FloatingCompassDialog ) {
+                if( g_FloatingCompassDialog->IsShown() ) {
+                    g_FloatingCompassDialog->Hide();
+                    gFrame->Raise();
+                } else {
+                    g_FloatingCompassDialog->Show();
+                }
+                Refresh();
+            }
+            break;
+
         default:
             return;
 
@@ -1978,7 +1995,7 @@ void ChartCanvas::Do_Pankeys( wxTimerEvent& event )
 
     if( !m_benable_autopan )
         return;
-    
+
     const int slowpan = 2, maxpan = 100;
     int repeat = 100;
 
@@ -3872,7 +3889,7 @@ void ChartCanvas::AISDrawTarget( AIS_Target_Data *td, ocpnDC& dc )
 
         //   If this is an AIS Class B target, so symbolize it differently
         if( td->Class == AIS_CLASS_B ) ais_quad_icon[3].y = 0;
-        if( td->Class == AIS_GPSG_BUDDY ) {
+        else if( td->Class == AIS_GPSG_BUDDY ) {
             ais_quad_icon[0].x = -5;
             ais_quad_icon[0].y = -12;
             ais_quad_icon[1].x = -3;
@@ -3882,10 +3899,20 @@ void ChartCanvas::AISDrawTarget( AIS_Target_Data *td, ocpnDC& dc )
             ais_quad_icon[3].x = 5;
             ais_quad_icon[3].y = -12;
         }
-        if( td->Class == AIS_DSC ) {
+        else if( td->Class == AIS_DSC ) {
             ais_quad_icon[0].y = 0;
             ais_quad_icon[1].y = 8;
             ais_quad_icon[2].y = 0;
+            ais_quad_icon[3].y = -8;
+        }
+        else if( td->Class == AIS_APRS ) {
+            ais_quad_icon[0].x = -8;
+            ais_quad_icon[0].y = -8;
+            ais_quad_icon[1].x = -8;
+            ais_quad_icon[1].y = 8;
+            ais_quad_icon[2].x = 8;
+            ais_quad_icon[2].y = 8;
+            ais_quad_icon[3].x = 8;
             ais_quad_icon[3].y = -8;
         }
 
@@ -4077,8 +4104,23 @@ void ChartCanvas::AISDrawTarget( AIS_Target_Data *td, ocpnDC& dc )
         }
 
         //        Actually Draw the target
+        if( td->Class == AIS_ARPA ) {
+            wxPen target_pen( GetGlobalColor( _T ( "UBLCK" ) ), 2 );
 
-        if( td->Class == AIS_ATON ) {                   // Aid to Navigation
+            dc.SetPen( target_pen );
+            dc.SetBrush( target_brush );
+
+            dc.StrokeCircle( TargetPoint.x, TargetPoint.y, 9 );
+            dc.StrokeCircle( TargetPoint.x, TargetPoint.y, 1 );
+            //        Draw the inactive cross-out line
+            if( !td->b_active ) {
+                dc.SetPen( wxPen( GetGlobalColor( _T ( "UBLCK" ) ), 2 ) );
+                dc.StrokeLine( TargetPoint.x - 14, TargetPoint.y, TargetPoint.x + 14, TargetPoint.y );
+                dc.CalcBoundingBox( TargetPoint.x - 14, TargetPoint.y );
+                dc.CalcBoundingBox( TargetPoint.x + 14, TargetPoint.y );
+                dc.SetPen( wxPen( GetGlobalColor( _T ( "UBLCK" ) ), 1 ) );
+            }
+        } else if( td->Class == AIS_ATON ) {                   // Aid to Navigation
             wxPen aton_pen;
             if( ( td->NavStatus == ATON_VIRTUAL_OFFPOSITION ) || ( td->NavStatus == ATON_REAL_OFFPOSITION ) )
                 aton_pen = wxPen( GetGlobalColor( _T ( "URED" ) ), 2 );
@@ -4275,8 +4317,8 @@ void ChartCanvas::AISDrawTarget( AIS_Target_Data *td, ocpnDC& dc )
                 tgt_name = tgt_name.substr( 0, tgt_name.find( _T ( "Unknown" ), 0) );
 
                 if ( tgt_name != wxEmptyString ) {
-                    dc.SetFont( *pFontMgr->GetFont( _( "AIS Target Name" ), 12 ) );
-                    dc.SetTextForeground( pFontMgr->GetFontColor( _T( "AIS Target Name" ) ) );
+                    dc.SetFont( *FontMgr::Get().GetFont( _( "AIS Target Name" ), 12 ) );
+                    dc.SetTextForeground( FontMgr::Get().GetFontColor( _T( "AIS Target Name" ) ) );
 
                     int w, h;
                     dc.GetTextExtent( tgt_name, &w, &h );
@@ -4823,8 +4865,8 @@ void ChartCanvas::EnableAutoPan(bool b_enable )
         m_pany = 0;
         m_panspeed = 0;
     }
-}  
-    
+}
+
 bool ChartCanvas::CheckEdgePan( int x, int y, bool bdragging )
 {
     bool bft = false;
@@ -6516,7 +6558,7 @@ void ChartCanvas::ShowObjectQueryWindow( int x, int y, float zlat, float zlon )
         if( !lightsVis ) gFrame->ToggleLights( true, true );
 
         wxString objText;
-        wxFont *dFont = pFontMgr->GetFont( _("ObjectQuery"), 12 );
+        wxFont *dFont = FontMgr::Get().GetFont( _("ObjectQuery"), 12 );
         wxString face = dFont->GetFaceName();
 
         if( NULL == g_pObjectQueryDialog ) {
@@ -6814,7 +6856,7 @@ void pupHandler_PasteTrack() {
         newPoint->m_GPXTrkSegNo = 1;
 
         wxDateTime now = wxDateTime::Now();
-        newPoint->m_CreateTime = curPoint->m_CreateTime;
+        newPoint->SetCreateTime(curPoint->GetCreateTime());
 
         newTrack->AddPoint( newPoint );
 
@@ -7772,7 +7814,7 @@ wxString ChartCanvas::FormatDistanceAdaptive( double distance ) {
 
 void RenderExtraRouteLegInfo( ocpnDC &dc, wxPoint ref_point, wxString s )
 {
-    wxFont *dFont = pFontMgr->GetFont( _("RouteLegInfoRollover"), 12 );
+    wxFont *dFont = FontMgr::Get().GetFont( _("RouteLegInfoRollover"), 12 );
     dc.SetFont( *dFont );
 
     int w, h;
@@ -7849,7 +7891,7 @@ void ChartCanvas::RenderRouteLegs( ocpnDC &dc )
         routeInfo << wxString::Format( wxString( "%03d° ", wxConvUTF8 ), (int) brg )
         << _T(" ") << FormatDistanceAdaptive( dist );
 
-        wxFont *dFont = pFontMgr->GetFont( _("RouteLegInfoRollover"), 12 );
+        wxFont *dFont = FontMgr::Get().GetFont( _("RouteLegInfoRollover"), 12 );
         dc.SetFont( *dFont );
 
         int w, h;
@@ -7896,7 +7938,8 @@ void ChartCanvas::OnPaint( wxPaintEvent& event )
 
     wxPaintDC dc( this );
 
-    m_glcc->Show( g_bopengl );
+    if( !g_bdisable_opengl )
+        m_glcc->Show( g_bopengl );
 
     if( g_bopengl ) {
         if( !s_in_update ) {          // no recursion allowed, seen on lo-spec Mac
@@ -9224,8 +9267,8 @@ void ChartCanvas::DrawAllTidesInBBox( ocpnDC& dc, LLBBox& BBox, bool bRebuildSel
     wxBrush *brc_1 = wxTheBrushList->FindOrCreateBrush( GetGlobalColor( _T ( "BLUE2" ) ), wxSOLID );
     wxBrush *brc_2 = wxTheBrushList->FindOrCreateBrush( GetGlobalColor( _T ( "YELO1" ) ), wxSOLID );
 
-    wxFont *dFont = pFontMgr->GetFont( _("ExtendedTideIcon"), 12 );
-    dc.SetTextForeground( pFontMgr->GetFontColor( _T("ExtendedTideIcon") ) );
+    wxFont *dFont = FontMgr::Get().GetFont( _("ExtendedTideIcon"), 12 );
+    dc.SetTextForeground( FontMgr::Get().GetFontColor( _T("ExtendedTideIcon") ) );
     int font_size = wxMax(8, dFont->GetPointSize());
     wxFont *plabelFont = wxTheFontList->FindOrCreateFont( font_size, dFont->GetFamily(),
                          dFont->GetStyle(), dFont->GetWeight() );

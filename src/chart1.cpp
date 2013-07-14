@@ -286,8 +286,6 @@ int                       g_pNavAidRadarRingsStepUnits;
 bool                      g_bWayPointPreventDragging;
 bool                      g_bConfirmObjectDelete;
 
-FontMgr                   *pFontMgr;
-
 ColorScheme               global_color_scheme;
 int                       Usercolortable_index;
 wxArrayPtrVoid            *UserColorTableArray;
@@ -423,6 +421,8 @@ bool                      g_bQuiltStart;
 
 bool                      g_bportable;
 
+bool                      g_bdisable_opengl;
+
 ChartGroupArray           *g_pGroupArray;
 int                       g_GroupIndex;
 
@@ -493,6 +493,7 @@ bool                      g_bShowAreaNotices;
 bool                      g_bDrawAISSize;
 bool                      g_bShowAISName;
 int                       g_Show_Target_Name_Scale;
+bool                      g_bWplIsAprsPosition;
 
 wxToolBarToolBase         *m_pAISTool;
 
@@ -756,12 +757,15 @@ void MyApp::OnInitCmdLine( wxCmdLineParser& parser )
     parser.AddSwitch( _T("unit_test_1") );
 
     parser.AddSwitch( _T("p") );
+
+    parser.AddSwitch( _T("no_opengl") );
 }
 
 bool MyApp::OnCmdLineParsed( wxCmdLineParser& parser )
 {
     g_unit_test_1 = parser.Found( _T("unit_test_1") );
     g_bportable = parser.Found( _T("p") );
+    g_bdisable_opengl = parser.Found( _T("no_opengl") );
 
     return true;
 }
@@ -1031,9 +1035,6 @@ bool MyApp::OnInit()
     wxFont temp_font( 10, wxDEFAULT, wxNORMAL, wxNORMAL, FALSE, wxString( _T("") ),
             wxFONTENCODING_SYSTEM );
     temp_font.SetDefaultEncoding( wxFONTENCODING_SYSTEM );
-
-//  Init my private font manager
-    pFontMgr = new FontMgr();
 
 //      Establish a "home" location
     wxStandardPathsBase& std_path = wxApp::GetTraits()->GetStandardPaths();
@@ -2020,10 +2021,11 @@ if( 0 == g_memCacheLimit )
 //        gFrame->MemFootTimer.Start(1000, wxTIMER_CONTINUOUS);
 
     // Import Layer-wise any .gpx files from /Layers directory
-    wxString layerdir = g_PrivateDataDir;  //g_SData_Locn;
-    wxChar sep = wxFileName::GetPathSeparator();
-    if( layerdir.Last() != sep ) layerdir.Append( sep );
+    wxString layerdir = g_PrivateDataDir; 
+    appendOSDirSlash( &layerdir );
     layerdir.Append( _T("layers") );
+
+#if 0    
     wxArrayString file_array;
     g_LayerIdx = 0;
 
@@ -2049,6 +2051,15 @@ if( 0 == g_memCacheLimit )
             }
         }
     }
+#endif
+
+    if( wxDir::Exists( layerdir ) ) {
+        wxString laymsg;
+        laymsg.Printf( wxT("Getting .gpx layer files from: %s"), layerdir.c_str() );
+        wxLogMessage( laymsg );
+        
+        pConfig->LoadLayers(layerdir);
+    }
 
     cc1->ReloadVP();                  // once more, and good to go
 
@@ -2068,12 +2079,16 @@ if( 0 == g_memCacheLimit )
     //  We need a deferred resize to get glDrawPixels() to work right.
     //  So we set a trigger to generate a resize after 5 seconds....
     //  See the "UniChrome" hack elsewhere
-    glChartCanvas *pgl = (glChartCanvas *) cc1->GetglCanvas();
-    if( pgl && ( pgl->GetRendererString().Find( _T("UniChrome") ) != wxNOT_FOUND ) ) {
-        gFrame->m_defer_size = gFrame->GetSize();
-        gFrame->SetSize( gFrame->m_defer_size.x - 10, gFrame->m_defer_size.y );
-        g_pauimgr->Update();
-        gFrame->m_bdefer_resize = true;
+    if ( !g_bdisable_opengl )
+    {
+        glChartCanvas *pgl = (glChartCanvas *) cc1->GetglCanvas();
+        if( pgl && ( pgl->GetRendererString().Find( _T("UniChrome") ) != wxNOT_FOUND ) )
+        {
+            gFrame->m_defer_size = gFrame->GetSize();
+            gFrame->SetSize( gFrame->m_defer_size.x - 10, gFrame->m_defer_size.y );
+            g_pauimgr->Update();
+            gFrame->m_bdefer_resize = true;
+        }
     }
     return TRUE;
 }
@@ -2143,8 +2158,6 @@ int MyApp::OnExit()
     delete phost_name;
     delete pInit_Chart_Dir;
     delete pWorldMapLocation;
-
-    delete pFontMgr;
 
     delete g_pRouteMan;
     delete pWayPointMan;
@@ -3024,7 +3037,7 @@ void MyFrame::OnCloseWindow( wxCloseEvent& event )
     pConfig->UpdateSettings();
     pConfig->UpdateNavObj();
 
-    pConfig->m_pNavObjectChangesSet->Clear();
+//    pConfig->m_pNavObjectChangesSet->Clear();
     delete pConfig->m_pNavObjectChangesSet;
 
     //Remove any leftover Routes and Waypoints from config file as they were saved to navobj before
@@ -3155,7 +3168,7 @@ void MyFrame::DoSetSize( void )
         font_size = wxMax(10, font_size);             // beats me...
 #endif
 
-        wxFont* templateFont = pFontMgr->GetFont( _("StatusBar"), 12 );
+        wxFont* templateFont = FontMgr::Get().GetFont( _("StatusBar"), 12 );
         font_size += templateFont->GetPointSize() - 10;
 
         font_size = wxMin( font_size, 12 );
@@ -4924,7 +4937,7 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
 
 //      Update the Toolbar Status windows and lower status bar the first time watchdog times out
     if( ( gGPS_Watchdog == 0 ) || ( gSAT_Watchdog == 0 ) ) {
-        wxString sogcog( _T("SOG --- ") + getUsrSpeedUnit() + _T(" COG ---°") );
+        wxString sogcog( _T("SOG --- ") + getUsrSpeedUnit() + _T(" COG ---\u00B0") );
         if( GetStatusBar() ) SetStatusText( sogcog, STAT_FIELD_SOGCOG );
 
         gCog = 0.0;                                 // say speed is zero to kill ownship predictor
@@ -6970,7 +6983,7 @@ void MyFrame::PostProcessNNEA( bool pos_valid, const wxString &sfixtime )
             sogcog.Printf( _T("SOG %2.2f ") + getUsrSpeedUnit() + _T("  "), toUsrSpeed( gSog ) );
 
         wxString cogs;
-        if( wxIsNaN(gCog) ) cogs.Printf( wxString( "COG ---°", wxConvUTF8 ) );
+        if( wxIsNaN(gCog) ) cogs.Printf( wxString( "COG ---\u00B0", wxConvUTF8 ) );
         else
             cogs.Printf( wxString("COG %2.0f°", wxConvUTF8 ), gCog );
 

@@ -73,7 +73,6 @@ extern bool             g_bskew_comp;
 extern bool             g_bopengl;
 extern bool             g_bsmoothpanzoom;
 
-extern FontMgr          *pFontMgr;
 extern wxString         *pInit_Chart_Dir;
 extern wxArrayOfConnPrm *g_pConnectionParams;
 extern Multiplexer      *g_pMUX;
@@ -113,6 +112,7 @@ extern bool             g_bShowAreaNotices;
 extern bool             g_bDrawAISSize;
 extern bool             g_bShowAISName;
 extern int              g_Show_Target_Name_Scale;
+extern bool             g_bWplIsAprsPosition;
 
 extern int              g_iNavAidRadarRingsNumberVisible;
 extern float            g_fNavAidRadarRingsStep;
@@ -175,6 +175,7 @@ extern s52plib          *ps52plib;
 
 extern wxString         g_locale;
 extern bool             g_bportable;
+extern bool             g_bdisable_opengl;
 extern wxString         *pHome_Locn;
 
 extern ChartGroupArray  *g_pGroupArray;
@@ -1368,6 +1369,7 @@ void options::CreatePanel_Display( size_t parent, int border_size, int group_ite
     //  OpenGL Render checkbox
     pOpenGL = new wxCheckBox( itemPanelUI, ID_OPENGLBOX, _("Use Accelerated Graphics (OpenGL)") );
     itemStaticBoxSizerCDO->Add( pOpenGL, 1, wxALL, border_size );
+    pOpenGL->Enable(!g_bdisable_opengl);
 
     //  Smooth Pan/Zoom checkbox
     pSmoothPanZoom = new wxCheckBox( itemPanelUI, ID_SMOOTHPANZOOMBOX,
@@ -1507,6 +1509,12 @@ void options::CreatePanel_AIS( size_t parent, int border_size, int group_item_sp
     m_pText_Show_Target_Name_Scale = new wxTextCtrl( panelAIS, -1 );
     pDisplayGrid->Add( m_pText_Show_Target_Name_Scale, 1, wxALL | wxALIGN_RIGHT, group_item_spacing );
 
+    m_pCheck_Wpl_Aprs = new wxCheckBox( panelAIS, -1, _("Treat WPL sentences as APRS position reports") );
+    pDisplayGrid->Add( m_pCheck_Wpl_Aprs, 1, wxALL, group_item_spacing );
+
+    wxStaticText *pStatic_Dummy7 = new wxStaticText( panelAIS, -1, _T("") );
+    pDisplayGrid->Add( pStatic_Dummy7, 1, wxALL | wxALL, group_item_spacing );
+
     wxStaticText *pStatic_Dummy5a = new wxStaticText( panelAIS, -1, _T("") );
     pDisplayGrid->Add( pStatic_Dummy5a, 1, wxALL | wxALL, group_item_spacing );
 
@@ -1601,12 +1609,12 @@ void options::CreatePanel_UI( size_t parent, int border_size, int group_item_spa
 
     m_itemFontElementListBox = new wxChoice( itemPanelFont, ID_CHOICE_FONTELEMENT );
 
-    int nFonts = pFontMgr->GetNumFonts();
+    int nFonts = FontMgr::Get().GetNumFonts();
     for( int it = 0; it < nFonts; it++ ) {
-        wxString *t = pFontMgr->GetDialogString( it );
+        const wxString  & t = FontMgr::Get().GetDialogString( it );
 
-        if( pFontMgr->GetConfigString( it )->StartsWith( g_locale ) ) {
-            m_itemFontElementListBox->Append( *t );
+        if( FontMgr::Get().GetConfigString(it).StartsWith( g_locale ) ) {
+            m_itemFontElementListBox->Append(t);
         }
     }
 
@@ -2011,6 +2019,8 @@ void options::SetInitialSettings()
 
     s.Printf( _T("%d"), g_Show_Target_Name_Scale );
     m_pText_Show_Target_Name_Scale->SetValue( s );
+
+    m_pCheck_Wpl_Aprs->SetValue( g_bWplIsAprsPosition );
 
     //      Alerts
     m_pCheck_AlertDialog->SetValue( g_bAIS_CPA_Alert );
@@ -2539,6 +2549,8 @@ void options::OnApplyClick( wxCommandEvent& event )
     m_pText_Show_Target_Name_Scale->GetValue().ToLong( &ais_name_scale );
     g_Show_Target_Name_Scale = (int)wxMax( 5000, ais_name_scale );
 
+    g_bWplIsAprsPosition = m_pCheck_Wpl_Aprs->GetValue();
+
     //      Alert
     g_bAIS_CPA_Alert = m_pCheck_AlertDialog->GetValue();
     g_bAIS_CPA_Alert_Audio = m_pCheck_AlertAudio->GetValue();
@@ -2855,8 +2867,8 @@ void options::OnChooseFont( wxCommandEvent& event )
     wxFont *psfont;
     wxFontData font_data;
 
-    wxFont *pif = pFontMgr->GetFont( sel_text_element );
-    wxColour init_color = pFontMgr->GetFontColor( sel_text_element );
+    wxFont *pif = FontMgr::Get().GetFont( sel_text_element );
+    wxColour init_color = FontMgr::Get().GetFontColor( sel_text_element );
 
     wxFontData init_font_data;
     if( pif ) init_font_data.SetInitialFont( *pif );
@@ -2873,7 +2885,7 @@ void options::OnChooseFont( wxCommandEvent& event )
         wxFont font = font_data.GetChosenFont();
         psfont = new wxFont( font );
         wxColor color = font_data.GetColour();
-        pFontMgr->SetFont( sel_text_element, psfont, color );
+        FontMgr::Get().SetFont( sel_text_element, psfont, color );
 
         pParent->UpdateAllFonts();
     }
