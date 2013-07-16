@@ -174,8 +174,10 @@ RoutePoint * GPXLoadWaypoint1( pugi::xml_node &wpt_node,
 
     // Create waypoint
 
-    if( b_layer )
-        GuidString = _T("LayGUID");
+    if( b_layer ) {
+        if( GuidString.IsEmpty() )
+            GuidString = _T("LayGUID");
+    }
 
     pWP = new RoutePoint( rlat, rlon, SymString, NameString, GuidString, false ); // do not add to global WP list yet...
     pWP->m_MarkDescription = DescString;
@@ -263,7 +265,7 @@ Track *GPXLoadTrack1( pugi::xml_node &trk_node, bool b_fullviz,
                 }
             
             else
-            if( ChildName.EndsWith( _T ( "RouteExtension" ) ) ) //Parse GPXX color
+            if( ChildName.EndsWith( _T ( "TrackExtension" ) ) ) //Parse GPXX color
             {
                 for( pugi::xml_node gpxx_child = tschild.first_child(); gpxx_child; gpxx_child = gpxx_child.next_sibling() ) {
                     wxString gpxx_name = wxString::FromUTF8( gpxx_child.name() );
