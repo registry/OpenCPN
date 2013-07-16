@@ -242,6 +242,7 @@ public:
       void SendResizeEventToAllPlugIns(int x, int y);
       void SetColorSchemeForAllPlugIns(ColorScheme cs);
       void NotifyAuiPlugIns(void);
+      bool CallLateInit(void);
 
       wxArrayString GetPlugInChartClassNameArray(void);
 
@@ -284,6 +285,8 @@ public:
       ~PluginListPanel();
 
       void SelectPlugin( PluginPanel *pi );
+      void UpdateSelections();
+      
 
 private:
       ArrayOfPlugIns     *m_pPluginArray;
@@ -302,6 +305,7 @@ public:
       void OnPluginPreferences( wxCommandEvent& event );
       void OnPluginEnable( wxCommandEvent& event );
       void SetEnabled( bool enabled );
+      bool GetSelected(){ return m_bSelected; }
 
 private:
       PluginListPanel *m_PluginListPanel;

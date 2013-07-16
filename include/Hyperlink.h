@@ -33,8 +33,7 @@ class Hyperlink // toh, 2009.02.14
       public:
             wxString DescrText;
             wxString Link;
-            wxString Type;
-            wxImage  Image;
+            wxString LType;
 };
 
 WX_DECLARE_LIST(Hyperlink, HyperlinkList);// establish class as list member

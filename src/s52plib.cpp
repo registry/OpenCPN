@@ -61,7 +61,6 @@
 extern s52plib *ps52plib;
 extern bool g_b_useStencil;
 extern wxString g_csv_locn;
-extern FontMgr *pFontMgr;
 extern double g_GLMinLineWidth;
 
 void DrawAALine( wxDC *pDC, int x0, int y0, int x1, int y1, wxColour clrLine, int dash, int space );
@@ -131,6 +130,7 @@ s52plib::s52plib( const wxString& PLib, bool b_forceLegacy )
     //        Set up some default flags
     m_bDeClutterText = false;
     m_bShowAtonText = true;
+    m_bShowNationalTexts = false;
 
     HPGL = new RenderFromHPGL( this );
 
@@ -241,18 +241,18 @@ LUPrec *s52plib::FindBestLUP( wxArrayPtrVoid *nameMatch, char *objAtt,
 
             wxString LATTC = LUPCandidate->ATTCArray->Item( iLUPAtt );
             wxString LATTValue( LATTC.Mid( 6 ) );
-            
+
             //  Verify that attribute names and values will convert with UTF8
             char *slatv = NULL;
             wxCharBuffer vbuffer=LATTValue.ToUTF8();
             if(vbuffer.data())
                 slatv = vbuffer.data();
-            
+
             char *slatc = NULL;
             wxCharBuffer buffer=LATTC.ToUTF8();
             if(buffer.data())
                 slatc = buffer.data();
- 
+
             if( slatv && slatc ){
                 while( *currATT != '\0' ) {
                     if( 0 == strncmp( slatc, currATT, 6 ) ) {
@@ -419,7 +419,7 @@ Rules *s52plib::StringToRules( const wxString& str_in )
     wxCharBuffer buffer=str_in.ToUTF8();
     if(!buffer.data())
         return NULL;
-        
+
     size_t len = strlen( buffer.data() );
     char *str0 = (char *) calloc( len + 1, 1 );
     strncpy( str0, buffer.data(), len );
@@ -599,18 +599,19 @@ int s52plib::_LUP2rules( LUPrec *LUP, S57Obj *pObj )
 int CompareLUPObjects( LUPrec *item1, LUPrec *item2 )
 {
     // sort the items by their name...
-#if wxCHECK_VERSION(2, 9, 0)
-    int ir = wxStricmp ( item1->OBCL, item2->OBCL );
-#else
     int ir = strcmp( item1->OBCL, item2->OBCL );
-#endif
-    if( ir != 0 ) return ir;
+
+    if( ir != 0 )
+        return ir;
     int c1 = 0;
     int c2 = 0;
-    if( item1->ATTCArray ) c1 = item1->ATTCArray->Count();
-    if( item2->ATTCArray ) c2 = item2->ATTCArray->Count();
+    if( item1->ATTCArray )
+        c1 = item1->ATTCArray->Count();
+    if( item2->ATTCArray )
+        c2 = item2->ATTCArray->Count();
 
-    if( c1 != c2 ) return c2 - c1;
+    if( c1 != c2 )
+        return c2 - c1;
     return item1->nSequence - item2->nSequence;
 }
 
@@ -1088,7 +1089,7 @@ char *_getParamVal( ObjRazRules *rzRules, char *str, char *buf, int bsz )
     int len = 0;
     char *ret_ptr = str;
     char *tmp = buf;
-    
+
     if(!buf)
         return NULL;
 
@@ -1112,7 +1113,7 @@ char *_getParamVal( ObjRazRules *rzRules, char *str, char *buf, int bsz )
             ++len;
         }
         *tmp = '\0';
-        
+
         ret_ptr++; // skip ',' or ')'
     }
     if( len < 6 )
@@ -1128,7 +1129,7 @@ char *_getParamVal( ObjRazRules *rzRules, char *str, char *buf, int bsz )
     wxCharBuffer buffer=value.ToUTF8();
     if(!buffer.data())
         return ret_ptr;
-        
+
     if( value.IsEmpty() ) {
         if( defval )
             _getParamVal( rzRules, buf + 7, buf, bsz - 7 ); // default value --recursion
@@ -1182,10 +1183,13 @@ char *_getParamVal( ObjRazRules *rzRules, char *str, char *buf, int bsz )
 
             value = result;
         }
-        
+
         wxCharBuffer buffer=value.ToUTF8();
-        if(buffer.data())
-            strncpy( buf, buffer.data(), wxMin(strlen(buffer.data()), bsz-1) );
+        if(buffer.data()){
+            unsigned int len = wxMin(strlen(buffer.data()), bsz-1);
+            strncpy( buf, buffer.data(), len );
+            buf[len] = 0;
+        }
         else
             *buf = 0;
     }
@@ -1228,17 +1232,35 @@ S52_TextC *S52_PL_parseTX( ObjRazRules *rzRules, Rules *rules, char *cmd )
     S52_TextC *text = NULL;
     char *str = NULL;
     char val[MAXL] = { '\0' }; // value of arg
+    char strnobjnm[7] = { "NOBJNM" };
+    char valn[MAXL] = { '\0' }; // value of arg
 
     str = (char*) rules->INSTstr;
 
+    if( ps52plib->m_bShowNationalTexts && NULL != strstr( str, "OBJNAM" ) ) // in case user wants the national text shown and the rule contains OBJNAM, try to get the value
+    {
+        _getParamVal( rzRules, strnobjnm, valn, MAXL );
+        if( !strcmp( strnobjnm, valn ) )
+            valn[0] = '\0'; //NOBJNM is not defined
+        else
+            valn[MAXL - 1] = '\0'; // make sure the string terminates
+    }
+
     str = _getParamVal( rzRules, str, val, MAXL ); // get ATTRIB list
+
     if( NULL == str ) return 0; // abort this command word if mandatory param absent
 
     val[MAXL - 1] = '\0'; // make sure the string terminates
 
     text = new S52_TextC;
     str = _parseTEXT( rzRules, text, str );
-    if( NULL != text ) text->frmtd = wxString( val, wxConvUTF8 );
+    if( NULL != text )
+    {
+        if ( valn[0] != '\0' )
+            text->frmtd = wxString( valn, wxConvUTF8 );
+        else
+            text->frmtd = wxString( val, wxConvUTF8 );
+    }
 
     return text;
 }
@@ -1505,7 +1527,9 @@ bool s52plib::RenderText( wxDC *pdc, S52_TextC *ptext, int x, int y, wxRect *pRe
              pdc->DrawText( ptext->frmtd, xp + 1, yp );
              pdc->DrawText( ptext->frmtd, xp - 1, yp );
              */
-            wxColour wcolor( ptext->pcol->R, ptext->pcol->G, ptext->pcol->B );
+             wxColour wcolor = FontMgr::Get().GetFontColor(_("ChartTexts"));
+            if( wcolor == *wxBLACK )
+                wcolor = wxColour( ptext->pcol->R, ptext->pcol->G, ptext->pcol->B );
             pdc->SetTextForeground( wcolor );
 
             pdc->DrawText( ptext->frmtd, xp, yp );
@@ -1634,7 +1658,7 @@ int s52plib::RenderT_All( ObjRazRules *rzRules, Rules *rules, ViewPort *vp, bool
                     else
                         fontweight = wxFONTWEIGHT_BOLD;
 
-                wxFont* templateFont = pFontMgr->GetFont( _("ChartTexts"), 24 );
+                wxFont* templateFont = FontMgr::Get().GetFont( _("ChartTexts"), 24 );
 
                 // NOAA ENC fles requests font size up to 20 points, which looks very
                 // disproportioned. Let's scale those sizes down to more reasonable values.
@@ -2231,15 +2255,31 @@ int s52plib::RenderLS( ObjRazRules *rzRules, Rules *rules, ViewPort *vp )
     char *str = (char*) rules->INSTstr;
     c = getColor( str + 7 ); // Colour
     w = atoi( str + 5 ); // Width
+    wxPen *pdotpen = NULL;
 
     if( m_pdc ) //DC mode
     {
         wxColour color( c->R, c->G, c->B );
-        int style = wxSOLID; // Style default
-        if( !strncmp( str, "DASH", 4 ) ) style = wxSHORT_DASH;
 
-        wxPen *pthispen = wxThePenList->FindOrCreatePen( color, w, style );
-        m_pdc->SetPen( *pthispen );
+        if( !strncmp( str, "DOTT", 4 ) ) {
+            wxDash dash1[2];
+            dash1[0] = 1;
+            dash1[1] = 2; 
+            
+            pdotpen = new wxPen(*wxBLACK_PEN);
+            pdotpen->SetStyle(wxUSER_DASH);
+            pdotpen->SetDashes( 2, dash1 );
+            pdotpen->SetWidth( w );
+            pdotpen->SetColour( color );
+            m_pdc->SetPen( *pdotpen );
+        }        
+        else {
+            int style = wxSOLID; // Style default
+            if( !strncmp( str, "DASH", 4 ) )
+                style = wxSHORT_DASH;
+            wxPen *pthispen = wxThePenList->FindOrCreatePen( color, w, style );
+            m_pdc->SetPen( *pthispen );
+        }
     } else // OpenGL mode
     {
         glPushAttrib( GL_COLOR_BUFFER_BIT | GL_LINE_BIT | GL_HINT_BIT | GL_ENABLE_BIT ); //Save state
@@ -2263,7 +2303,11 @@ int s52plib::RenderLS( ObjRazRules *rzRules, Rules *rules, ViewPort *vp )
             glLineStipple( 1, 0x3F3F );
             glEnable( GL_LINE_STIPPLE );
         }
-
+        else if( !strncmp( str, "DOTT", 4 ) ) {
+            glLineStipple( 1, 0x3333 );
+            glEnable( GL_LINE_STIPPLE );
+        }
+        
     }
 
     //    Get a true pixel clipping/bounding box from the vp
@@ -2544,6 +2588,11 @@ int s52plib::RenderLS( ObjRazRules *rzRules, Rules *rules, ViewPort *vp )
 
     if( !m_pdc ) glPopAttrib();
 
+    if(pdotpen) {
+        pdotpen->SetDashes( 1, NULL );
+        delete pdotpen;
+    }
+    
     return 1;
 }
 
@@ -2758,6 +2807,17 @@ void s52plib::draw_lc_poly( wxDC *pdc, wxColor &color, int width, wxPoint *ptp, 
 {
     wxPoint r;
 
+    //  We calculate the winding direction of the poly
+    //  in order to know which side to draw symbol on
+    double dfSum = 0.0;
+    
+    for( int iseg = 0; iseg < npt - 1; iseg++ ) {
+        dfSum += ptp[iseg].x * ptp[iseg+1].y - ptp[iseg].y * ptp[iseg+1].x;
+    }
+    dfSum += ptp[npt-1].x * ptp[0].y - ptp[npt-1].y * ptp[0].x;
+    
+    bool cw = dfSum < 0.;
+    
     //    Get a true pixel clipping/bounding box from the vp
     wxPoint pbb = vp->GetPixFromLL( vp->clat, vp->clon );
     int xmin_ = pbb.x - vp->rv_rect.width / 2;
@@ -2771,41 +2831,57 @@ void s52plib::draw_lc_poly( wxDC *pdc, wxColor &color, int width, wxPoint *ptp, 
         wxPen *pthispen = wxThePenList->FindOrCreatePen( color, width, wxSOLID );
         m_pdc->SetPen( *pthispen );
 
-        for( int iseg = 0; iseg < npt - 1; iseg++ ) {
+        int start_seg = 0;
+        int end_seg = npt - 1;
+        int inc = 1;
+        
+        if( cw ){
+            start_seg = npt - 1;
+            end_seg = 0;
+            inc = -1;
+        }
+        
+        float dx, dy, seg_len, theta, cth, sth, tdeg;
+        
+        bool done = false;
+        int iseg = start_seg;
+        while( !done ){
+            
             // Do not bother with segments that are invisible
 
             x0 = ptp[iseg].x;
             y0 = ptp[iseg].y;
-            x1 = ptp[iseg + 1].x;
-            y1 = ptp[iseg + 1].y;
+            x1 = ptp[iseg + inc].x;
+            y1 = ptp[iseg + inc].y;
 
             ClipResult res = cohen_sutherland_line_clip_i( &x0, &y0, &x1, &y1, xmin_, xmax_, ymin_,
                     ymax_ );
 
-            if( res == Invisible ) continue;
+            if( res == Invisible )
+                goto next_seg_dc;
 
-            float dx = ptp[iseg + 1].x - ptp[iseg].x;
-            float dy = ptp[iseg + 1].y - ptp[iseg].y;
-            float seg_len = sqrt( dx * dx + dy * dy );
-            float theta = atan2( dy, dx );
-            float cth = cos( theta );
-            float sth = sin( theta );
-            float tdeg = theta * 180. / PI;
-
+            dx = ptp[iseg + inc].x - ptp[iseg].x;
+            dy = ptp[iseg + inc].y - ptp[iseg].y;
+            seg_len = sqrt( dx * dx + dy * dy );
+            theta = atan2( dy, dx );
+            cth = cos( theta );
+            sth = sin( theta );
+            tdeg = theta * 180. / PI;
+            
             if( seg_len >= 1.0 ) {
                 if( seg_len <= sym_len * sym_factor ) {
+                    int xst1 = ptp[iseg].x;
+                    int yst1 = ptp[iseg].y;
+                    float xst2, yst2;
                     if( seg_len >= sym_len ) {
-                        int xst1 = ptp[iseg].x;
-                        float xst2 = xst1 + ( sym_len * cth );
-
-                        int yst1 = ptp[iseg].y;
-                        float yst2 = yst1 + ( sym_len * sth );
-
-                        pdc->DrawLine( xst1, yst1, (wxCoord) floor( xst2 ),
-                                (wxCoord) floor( yst2 ) );
+                        xst2 = xst1 + ( sym_len * cth );
+                        yst2 = yst1 + ( sym_len * sth );
                     } else {
-                        pdc->DrawLines( 2, &ptp[iseg] );
+                        xst2 = ptp[iseg + inc].x;
+                        yst2 = ptp[iseg + inc].y;
                     }
+                    
+                    pdc->DrawLine( xst1, yst1, (wxCoord) floor( xst2 ), (wxCoord) floor( yst2 ) );
                 }
 
                 else {
@@ -2822,17 +2898,22 @@ void s52plib::draw_lc_poly( wxDC *pdc, wxColor &color, int width, wxPoint *ptp, 
                                 draw_rule->pos.line.pivot_y.LIRW );
 
                         HPGL->SetTargetDC( pdc );
-                        HPGL->Render( str, col, r, pivot, (double) tdeg );
+                        HPGL->Render( str, col, r, pivot, tdeg );
 
                         xs += sym_len * cth * sym_factor;
                         ys += sym_len * sth * sym_factor;
                         s += sym_len * sym_factor;
                     }
 
-                    pdc->DrawLine( (int) xs, (int) ys, ptp[iseg + 1].x, ptp[iseg + 1].y );
+                    pdc->DrawLine( (int) xs, (int) ys, ptp[iseg + inc].x, ptp[iseg + inc].y );
                 }
             }
-        } // for
+next_seg_dc:            
+            iseg += inc;
+            if(iseg == end_seg)
+                done = true;
+            
+        } // while
     } // if pdc
     else // opengl
     {
@@ -2840,26 +2921,41 @@ void s52plib::draw_lc_poly( wxDC *pdc, wxColor &color, int width, wxPoint *ptp, 
         glColor4ub( color.Red(), color.Green(), color.Blue(), color.Alpha() );
         glLineWidth( wxMax(g_GLMinLineWidth, (float)width * 0.7) );
 
-        for( int iseg = 0; iseg < npt - 1; iseg++ ) {
-            // Do not bother with segments that are invisible
+        int start_seg = 0;
+        int end_seg = npt - 1;
+        int inc = 1;
+        
+        if( cw ){
+            start_seg = npt - 1;
+            end_seg = 0;
+            inc = -1;
+        }
+        
+        float dx, dy, seg_len, theta, cth, sth, tdeg;
+        
+        bool done = false;
+        int iseg = start_seg;
+        while( !done ){
+           // Do not bother with segments that are invisible
 
             x0 = ptp[iseg].x;
             y0 = ptp[iseg].y;
-            x1 = ptp[iseg + 1].x;
-            y1 = ptp[iseg + 1].y;
+            x1 = ptp[iseg + inc].x;
+            y1 = ptp[iseg + inc].y;
 
             ClipResult res = cohen_sutherland_line_clip_i( &x0, &y0, &x1, &y1, xmin_, xmax_, ymin_,
                     ymax_ );
 
-            if( res == Invisible ) continue;
+            if( res == Invisible )
+                goto next_seg;
 
-            float dx = ptp[iseg + 1].x - ptp[iseg].x;
-            float dy = ptp[iseg + 1].y - ptp[iseg].y;
-            float seg_len = sqrt( dx * dx + dy * dy );
-            float theta = atan2( dy, dx );
-            float cth = cos( theta );
-            float sth = sin( theta );
-            float tdeg = theta * 180. / PI;
+            dx = ptp[iseg + inc].x - ptp[iseg].x;
+            dy = ptp[iseg + inc].y - ptp[iseg].y;
+            seg_len = sqrt( dx * dx + dy * dy );
+            theta = atan2( dy, dx );
+            cth = cos( theta );
+            sth = sin( theta );
+            tdeg = theta * 180. / PI;
 
             if( seg_len >= 1.0 ) {
                 if( seg_len <= sym_len * sym_factor ) {
@@ -2870,8 +2966,8 @@ void s52plib::draw_lc_poly( wxDC *pdc, wxColor &color, int width, wxPoint *ptp, 
                         xst2 = xst1 + ( sym_len * cth );
                         yst2 = yst1 + ( sym_len * sth );
                     } else {
-                        xst2 = ptp[iseg + 1].x;
-                        yst2 = ptp[iseg + 1].y;
+                        xst2 = ptp[iseg + inc].x;
+                        yst2 = ptp[iseg + inc].y;
                     }
 
                     glPushAttrib( GL_COLOR_BUFFER_BIT | GL_LINE_BIT | GL_HINT_BIT ); //Save state
@@ -2928,13 +3024,17 @@ void s52plib::draw_lc_poly( wxDC *pdc, wxColor &color, int width, wxPoint *ptp, 
                     {
                         glBegin( GL_LINES );
                         glVertex2i( xs, ys );
-                        glVertex2i( ptp[iseg + 1].x, ptp[iseg + 1].y );
+                        glVertex2i( ptp[iseg + inc].x, ptp[iseg + inc].y );
                         glEnd();
                     }
                     glPopAttrib();
                 }
             }
-        } // for
+next_seg:            
+            iseg += inc;
+            if(iseg == end_seg)
+                done = true;
+        } // while
 
     } //opengl
 }
@@ -3453,7 +3553,7 @@ int s52plib::DoRenderObject( wxDC *pdcin, ObjRazRules *rzRules, ViewPort *vp )
     if( !ObjectRenderCheckPos( rzRules, vp ) ) return 0;
 
     if( !ObjectRenderCheckCat( rzRules, vp ) ) {
-#if 0        
+#if 0
         //  This is an "out-of-spec" optimization
         //    Conditional symbology for rocks and wrecks is expensive
         //    because we have to find the DEPARE or DRGARE that it is in,
@@ -3461,7 +3561,7 @@ int s52plib::DoRenderObject( wxDC *pdcin, ObjRazRules *rzRules, ViewPort *vp )
         //    and then potentially move the hazard to DISPLAYBASE category.
         //
         //    Lets only consider and allow this case for large scale chart views....
-        
+
         if( ( !strncmp( rzRules->LUP->OBCL, "UWTROC", 6 ) )
                 || ( !strncmp( rzRules->LUP->OBCL, "WRECKS", 6 ) ) ) {
             if( vp->chart_scale > 20000. ) return 0;
@@ -5378,14 +5478,14 @@ int s52plib::RenderAreaToGL( const wxGLContext &glcc, ObjRazRules *rzRules, View
     while( rules != NULL ) {
         switch( rules->ruleType ){
             case RUL_ARE_CO:
-                if( rzRules->obj->bCS_Added  && !ObjectRenderCheckCat( rzRules, vp ) ) 
-                    break; 
+                if( rzRules->obj->bCS_Added  && !ObjectRenderCheckCat( rzRules, vp ) )
+                    break;
                 RenderToGLAC( rzRules, rules, vp );
                 break; // AC
-                
+
             case RUL_ARE_PA:
-                if( rzRules->obj->bCS_Added  && !ObjectRenderCheckCat( rzRules, vp ) ) 
-                        break; 
+                if( rzRules->obj->bCS_Added  && !ObjectRenderCheckCat( rzRules, vp ) )
+                        break;
                 RenderToGLAP( rzRules, rules, vp );
                 break; // AP
 
@@ -5893,7 +5993,7 @@ bool s52plib::ObjectRenderCheckCat( ObjRazRules *rzRules, ViewPort *vp )
 
     //      Do Object Type Filtering
     DisCat obj_cat = rzRules->obj->m_DisplayCat;
-    
+
     if( m_nDisplayCategory == MARINERS_STANDARD ) {
         if( -1 == rzRules->obj->iOBJL ) UpdateOBJLArray( rzRules->obj );
 

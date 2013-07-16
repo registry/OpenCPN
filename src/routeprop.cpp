@@ -45,8 +45,9 @@
 #include "routemanagerdialog.h"
 #include "routeprintout.h"
 #include "chcanv.h"
-#include "tcmgr.h"		// pjotrc 2011.03.02
+#include "tcmgr.h"        // pjotrc 2011.03.02
 #include "PositionParser.h"
+#include "pluginmanager.h"
 
 extern double             gLat, gLon, gSog, gCog;
 extern double             g_PlanSpeed;
@@ -63,6 +64,7 @@ extern Routeman           *g_pRouteMan;
 extern RouteManagerDialog *pRouteManagerDialog;
 extern Track              *g_pActiveTrack;
 extern RouteList          *pRouteList;
+extern PlugInManager      *g_pi_manager;
 
 extern MyFrame            *gFrame;
 
@@ -79,18 +81,18 @@ extern RoutePrintSelection * pRoutePrintSelection;
 * Helper stuff for calculating Route Plans
 */
 
-#define	pi	    (4.*atan(1.0))
-#define	tpi	    (2.*pi)
-#define	twopi	(2.*pi)
-#define	degs	(180./pi)
-#define	rads	(pi/180.)
+#define    pi        (4.*atan(1.0))
+#define    tpi        (2.*pi)
+#define    twopi    (2.*pi)
+#define    degs    (180./pi)
+#define    rads    (pi/180.)
 
-#define	MOTWILIGHT	1	// in some languages there may be a distinction between morning/evening
-#define	SUNRISE	    2
-#define	DAY		    3
-#define	SUNSET	    4
-#define	EVTWILIGHT	5
-#define	NIGHT		6
+#define    MOTWILIGHT    1    // in some languages there may be a distinction between morning/evening
+#define    SUNRISE        2
+#define    DAY            3
+#define    SUNSET        4
+#define    EVTWILIGHT    5
+#define    NIGHT        6
 
 char daylight_status[][20] = {
     "   ( - )",
@@ -111,10 +113,10 @@ Bit      Meaning
 3       rising transition
 */
 
-#define	LW	1
-#define	HW	2
-#define	FALLING	4
-#define	RISING	8
+#define    LW    1
+#define    HW    2
+#define    FALLING    4
+#define    RISING    8
 
 char tide_status[][8] = {
     " LW ",
@@ -192,7 +194,7 @@ double getDaylightEvent( double glat, double glong, int riset, double altitude, 
         utnew = FNrange( utold - ( GHA + g + riset * correction ) );
         utold = tmp;
     }
-    return ( utnew * degs / 15. );	// returns decimal hours UTC
+    return ( utnew * degs / 15. );    // returns decimal hours UTC
 }
 
 static double getLMT( double ut, double lon )
@@ -261,12 +263,12 @@ int getDaylightStatus( double lat, double lon, wxDateTime utcDateTime )
     }
 }
 
-#define UTCINPUT    0
-#define	LTINPUT     1	// i.e. this PC local time
-#define	LMTINPUT    2	// i.e. the remote location LMT time
-#define INPUT_FORMAT      1
-#define DISPLAY_FORMAT    2
-#define     TIMESTAMP_FORMAT  3
+#define    UTCINPUT         0
+#define    LTINPUT          1    // i.e. this PC local time
+#define    LMTINPUT         2    // i.e. the remote location LMT time
+#define    INPUT_FORMAT     1
+#define    DISPLAY_FORMAT   2
+#define    TIMESTAMP_FORMAT 3
 
 wxString ts2s(wxDateTime ts, int tz_selection, long LMT_offset, int format)
 {
@@ -432,7 +434,7 @@ wxString OCPNTrackListCtrl::OnGetItemText( long item, long column ) const
 
         case 6:
             {
-                wxDateTime timestamp = g_this_point->m_CreateTime;
+                wxDateTime timestamp = g_this_point->GetCreateTime();
                 if( timestamp.IsValid() )
                     ret = ts2s( timestamp, m_tz_selection, m_LMT_Offset, TIMESTAMP_FORMAT );
                 else
@@ -441,12 +443,12 @@ wxString OCPNTrackListCtrl::OnGetItemText( long item, long column ) const
             break;
 
         case 7:
-            if( ( item > 0 ) && g_this_point->m_CreateTime.IsValid()
-                    && g_prev_point->m_CreateTime.IsValid() )
+            if( ( item > 0 ) && g_this_point->GetCreateTime().IsValid()
+                    && g_prev_point->GetCreateTime().IsValid() )
             {
                 double speed = 0.;
                 double seconds =
-                        g_this_point->m_CreateTime.Subtract( g_prev_point->m_CreateTime ).GetSeconds().ToDouble();
+                        g_this_point->GetCreateTime().Subtract( g_prev_point->GetCreateTime() ).GetSeconds().ToDouble();
 
                 if( seconds > 0. )
                     speed = gt_leg_dist / seconds * 3600;
@@ -642,7 +644,7 @@ void RouteProp::OnRoutepropExtendClick( wxCommandEvent& event )
 
         if( IsThisTrackExtendable() ) {
             int begin = 1;
-            if( pLastPoint->m_CreateTime == m_pExtendPoint->m_CreateTime ) begin = 2;
+            if( pLastPoint->GetCreateTime() == m_pExtendPoint->GetCreateTime() ) begin = 2;
             pSelect->DeleteAllSelectableTrackSegments( m_pExtendRoute );
             m_pExtendRoute->CloneTrack( m_pRoute, begin, m_pRoute->GetnPoints(), _("_plus") );
             pSelect->AddAllSelectableTrackSegments( m_pExtendRoute );
@@ -787,16 +789,16 @@ bool RouteProp::IsThisTrackExtendable()
     if( m_pRoute == g_pActiveTrack || m_pRoute->m_bIsInLayer ) return false;
 
     RoutePoint *pLastPoint = m_pRoute->GetPoint( 1 );
-    if( !pLastPoint->m_CreateTime.IsValid() ) return false;
+    if( !pLastPoint->GetCreateTime().IsValid() ) return false;
 
     wxRouteListNode *route_node = pRouteList->GetFirst();
     while( route_node ) {
         Route *proute = route_node->GetData();
         if( proute->m_bIsTrack && proute->IsVisible() && ( proute->m_GUID != m_pRoute->m_GUID ) ) {
             RoutePoint *track_node = proute->GetLastPoint();
-            if( track_node->m_CreateTime.IsValid() ) {
-                if( track_node->m_CreateTime <= pLastPoint->m_CreateTime ) if( !m_pExtendPoint
-                        || track_node->m_CreateTime > m_pExtendPoint->m_CreateTime ) {
+            if( track_node->GetCreateTime().IsValid() ) {
+                if( track_node->GetCreateTime() <= pLastPoint->GetCreateTime() )
+                    if( !m_pExtendPoint || track_node->GetCreateTime() > m_pExtendPoint->GetCreateTime() ) {
                     m_pExtendPoint = track_node;
                     m_pExtendRoute = proute;
                 }
@@ -820,7 +822,7 @@ RouteProp::~RouteProp()
     delete m_RouteDestCtl;
 
     delete m_StartTimeCtl;
-    //	delete pDispTz;
+    //    delete pDispTz;
 
     delete m_wpList;
 
@@ -1350,9 +1352,9 @@ bool RouteProp::UpdateProperties()
         RoutePoint *first_point = m_pRoute->GetPoint( 1 );
         double total_seconds = 0.;
 
-        if( last_point->m_CreateTime.IsValid() && first_point->m_CreateTime.IsValid() ) {
+        if( last_point->GetCreateTime().IsValid() && first_point->GetCreateTime().IsValid() ) {
             total_seconds =
-                    last_point->m_CreateTime.Subtract( first_point->m_CreateTime ).GetSeconds().ToDouble();
+                    last_point->GetCreateTime().Subtract( first_point->GetCreateTime() ).GetSeconds().ToDouble();
             if( total_seconds != 0. ) {
                 m_avgspeed = m_pRoute->m_route_length / total_seconds * 3600;
             } else {
@@ -1504,7 +1506,7 @@ bool RouteProp::UpdateProperties()
 
             //  Mark Name
             if( arrival ) m_wpList->SetItem( item_line_index, 1, prp->GetName() );
-	    // Store Dewcription
+        // Store Dewcription
             if( arrival ) m_wpList->SetItem( item_line_index, 9, prp->GetDescription() );
 
             //  Distance
@@ -1537,42 +1539,42 @@ bool RouteProp::UpdateProperties()
 
             DistanceBearingMercator( prp->m_lat, prp->m_lon, slat, slon, &brg, &leg_dist );
 
-	    // calculation of course at current WayPoint.
-	    double course=10, tmp_leg_dist=23;
-	    wxRoutePointListNode *next_node = node->GetNext();
-	    RoutePoint * _next_prp = (next_node)? next_node->GetData(): NULL;
-	    if (_next_prp )
-	    {
-		DistanceBearingMercator( _next_prp->m_lat, _next_prp->m_lon, prp->m_lat, prp->m_lon, &course, &tmp_leg_dist );
-	    }else
-	    {
-	      course = 0.0;
-	      tmp_leg_dist = 0.0;
-	    }
+        // calculation of course at current WayPoint.
+        double course=10, tmp_leg_dist=23;
+        wxRoutePointListNode *next_node = node->GetNext();
+        RoutePoint * _next_prp = (next_node)? next_node->GetData(): NULL;
+        if (_next_prp )
+        {
+        DistanceBearingMercator( _next_prp->m_lat, _next_prp->m_lon, prp->m_lat, prp->m_lon, &course, &tmp_leg_dist );
+        }else
+        {
+          course = 0.0;
+          tmp_leg_dist = 0.0;
+        }
 
-	    prp->SetCourse(course); // save the course to the next waypoint for printing.
-	    // end of calculation
+        prp->SetCourse(course); // save the course to the next waypoint for printing.
+        // end of calculation
 
 
             t.Printf( _T("%6.2f ") + getUsrDistanceUnit(), toUsrDistance( leg_dist ) );
             if( arrival ) m_wpList->SetItem( item_line_index, 2, t );
             if( !enroute ) m_wpList->SetItem( item_line_index, 2, nullify );
-	    prp->SetDistance(leg_dist); // save the course to the next waypoint for printing.
+        prp->SetDistance(leg_dist); // save the course to the next waypoint for printing.
 
             //  Bearing
             t.Printf( _T("%03.0f Deg. T"), brg );
             if( arrival ) m_wpList->SetItem( item_line_index, 3, t );
             if( !enroute ) m_wpList->SetItem( item_line_index, 3, nullify );
 
-	    // Course (bearing of next )
-	    if (_next_prp)
-	    {
-		t.Printf( _T("%03.0f Deg. T"), course );
-		if( arrival ) m_wpList->SetItem( item_line_index, 10, t );
-	    }else
-	    {
-	      m_wpList->SetItem( item_line_index, 10, nullify );
-	    }
+        // Course (bearing of next )
+        if (_next_prp)
+        {
+        t.Printf( _T("%03.0f Deg. T"), course );
+        if( arrival ) m_wpList->SetItem( item_line_index, 10, t );
+        }else
+        {
+          m_wpList->SetItem( item_line_index, 10, nullify );
+        }
 
             //  Lat/Lon
             wxString tlat = toSDMM( 1, prp->m_lat, prp->m_bIsInTrack );  // low precision for routes
@@ -1762,7 +1764,7 @@ bool RouteProp::SaveChanges( void )
 
     //  Save the current planning speed
     g_PlanSpeed = m_planspeed;
-    g_StartTime = m_starttime;	// both always UTC
+    g_StartTime = m_starttime;    // both always UTC
     g_StartTimeTZ = pDispTz->GetSelection();
     m_StartTimeCtl->Clear();
 
@@ -1779,6 +1781,15 @@ bool RouteProp::SaveChanges( void )
 
         pConfig->UpdateRoute( m_pRoute );
         pConfig->UpdateSettings();
+    }
+
+    if( m_pRoute->IsActive() || ((Track*) m_pRoute)->IsRunning() )
+    {
+        wxJSONValue v;
+        v[_T("Name")] =  m_pRoute->m_RouteNameString;
+        v[_T("GUID")] =  m_pRoute->m_GUID;
+        wxString msg_id( _T("OCPN_TRK_ACTIVATED") );
+        g_pi_manager->SendJSONMessageToAllPlugins( msg_id, v );
     }
 
     return true;
@@ -1818,7 +1829,7 @@ void RouteProp::OnStartTimeCtlUpdated( wxCommandEvent& event )
     } else {
         m_pEnroutePoint = NULL;
         m_bStartNow = false;
-        if( !d.ParseDateTime( stime ) )		// only specific times accepted
+        if( !d.ParseDateTime( stime ) )        // only specific times accepted
         d = wxInvalidDateTime;
 
         m_starttime = d;
@@ -1894,10 +1905,18 @@ void RouteProp::OnRoutepropOkClick( wxCommandEvent& event )
     m_pEnroutePoint = NULL;
     m_bStartNow = false;
 
+    if( pRouteManagerDialog && pRouteManagerDialog->IsShown() ) {
+        if( !m_pRoute->m_bIsTrack )
+            pRouteManagerDialog->UpdateRouteListCtrl();
+        else
+            pRouteManagerDialog->UpdateTrkListCtrl();
+    }
+    
     Hide();
     cc1->Refresh( false );
 
     event.Skip();
+    
 }
 
 void RouteProp::OnEvtColDragEnd( wxListEvent& event )
@@ -2509,7 +2528,7 @@ void MarkInfoImpl::SetRoutePoint( RoutePoint *pRP )
                 Hyperlink* h = new Hyperlink();
                 h->DescrText = link->DescrText;
                 h->Link = link->Link;
-                h->Type = link->Type;
+                h->LType = link->LType;
 
                 m_pMyLinkList->Append( h );
 
@@ -2628,7 +2647,7 @@ void MarkInfoImpl::OnAddLink( wxCommandEvent& event )
         Hyperlink* h = new Hyperlink();
         h->DescrText = m_pLinkProp->m_textCtrlLinkDescription->GetValue();
         h->Link = m_pLinkProp->m_textCtrlLinkUrl->GetValue();
-        h->Type = wxEmptyString;
+        h->LType = wxEmptyString;
         m_pRoutePoint->m_HyperlinkList->Append( h );
     }
 
@@ -2736,6 +2755,10 @@ void MarkInfoImpl::OnMarkInfoOKClick( wxCommandEvent& event )
         delete m_pMyLinkList;
         m_pMyLinkList = NULL;
     }
+    
+    if( pRouteManagerDialog && pRouteManagerDialog->IsShown() )
+        pRouteManagerDialog->UpdateWptListCtrl();
+    
     event.Skip();
 }
 
@@ -2758,7 +2781,7 @@ void MarkInfoImpl::OnMarkInfoCancelClick( wxCommandEvent& event )
                 Hyperlink* h = new Hyperlink();
                 h->DescrText = link->DescrText;
                 h->Link = link->Link;
-                h->Type = link->Type;
+                h->LType = link->LType;
 
                 m_pRoutePoint->m_HyperlinkList->Append( h );
 

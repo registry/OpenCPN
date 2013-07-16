@@ -208,7 +208,7 @@ int M_COVR_Desc:: ReadWKB ( wxFFileInputStream &ifs )
       return length;
 }
 
-wxRegion M_COVR_Desc::GetRegion ( const ViewPort &vp, wxPoint *pwp )
+OCPNRegion M_COVR_Desc::GetRegion ( const ViewPort &vp, wxPoint *pwp )
 {
       float_2Dpt *p = pvertices;
 
@@ -242,7 +242,7 @@ wxRegion M_COVR_Desc::GetRegion ( const ViewPort &vp, wxPoint *pwp )
             p++;
       }
 
-      return wxRegion ( m_nvertices, pwp );
+      return OCPNRegion ( m_nvertices, pwp );
 }
 
 //----------------------------------------------------------------------------
@@ -4139,7 +4139,7 @@ void cm93chart::ProcessMCOVRObjects ( int cell_index, char subcell )
                                                 tmp_transform_x = *pf;
                                           else if ( sattr.IsSameAs ( _T ( "_wgsoy" ) ) )
                                                 tmp_transform_y = *pf;
-#endif                                          
+#endif
                                     }
 
 
@@ -5072,18 +5072,18 @@ wxPoint GetPixFromLLVP ( double lat, double lon, const ViewPort& VPoint )
 //extern void catch_signals(int signo);
 
 
-void cm93compchart::GetValidCanvasRegion(const ViewPort& VPoint, wxRegion *pValidRegion)
+void cm93compchart::GetValidCanvasRegion(const ViewPort& VPoint, OCPNRegion *pValidRegion)
 {
-      wxRegion screen_region(0, 0, VPoint.pix_width, VPoint.pix_height);
-      wxRegion ret = GetValidScreenCanvasRegion ( VPoint, screen_region );
+      OCPNRegion screen_region(0, 0, VPoint.pix_width, VPoint.pix_height);
+      OCPNRegion ret = GetValidScreenCanvasRegion ( VPoint, screen_region );
       *pValidRegion = ret;
 }
 
 
 
-wxRegion cm93compchart::GetValidScreenCanvasRegion ( const ViewPort& VPoint, const wxRegion &ScreenRegion )
+OCPNRegion cm93compchart::GetValidScreenCanvasRegion ( const ViewPort& VPoint, const OCPNRegion &ScreenRegion )
 {
-      wxRegion ret_region;
+      OCPNRegion ret_region;
 
       ViewPort vp_positive = VPoint;
       SetVPPositive ( &vp_positive );
@@ -5110,7 +5110,7 @@ wxRegion cm93compchart::GetValidScreenCanvasRegion ( const ViewPort& VPoint, con
 
                   wxPoint *DrawBuf = m_pcm93chart_current->GetDrawBuffer ( pmcd->m_nvertices );
 
-                  wxRegion rgn_covr = vp_positive.GetVPRegionIntersect ( ScreenRegion, pmcd->m_nvertices, ( float * ) pmcd->pvertices, chart_native_scale, DrawBuf );
+                  OCPNRegion rgn_covr = vp_positive.GetVPRegionIntersect ( ScreenRegion, pmcd->m_nvertices, ( float * ) pmcd->pvertices, chart_native_scale, DrawBuf );
 
                   ret_region.Union( rgn_covr );
 
@@ -5118,13 +5118,13 @@ wxRegion cm93compchart::GetValidScreenCanvasRegion ( const ViewPort& VPoint, con
 
       }
       else
-            ret_region.Union(wxRegion( 0, 0, 1,1 ));
+            ret_region.Union(OCPNRegion( 0, 0, 1,1 ));
 
       return ret_region;
 
 }
 
-bool cm93compchart::RenderRegionViewOnGL(const wxGLContext &glc, const ViewPort& VPoint, const wxRegion &Region)
+bool cm93compchart::RenderRegionViewOnGL(const wxGLContext &glc, const ViewPort& VPoint, const OCPNRegion &Region)
 {
       SetVPParms ( VPoint );
 
@@ -5135,7 +5135,7 @@ bool cm93compchart::RenderRegionViewOnGL(const wxGLContext &glc, const ViewPort&
 
 }
 
-bool cm93compchart::DoRenderRegionViewOnGL (const wxGLContext &glc, const ViewPort& VPoint, const wxRegion &Region )
+bool cm93compchart::DoRenderRegionViewOnGL (const wxGLContext &glc, const ViewPort& VPoint, const OCPNRegion &Region )
 {
 //      g_bDebugCM93 = true;
 
@@ -5149,13 +5149,13 @@ bool cm93compchart::DoRenderRegionViewOnGL (const wxGLContext &glc, const ViewPo
 
       if ( g_bDebugCM93 ) {
             printf ( "\nOn DoRenderRegionViewOnGL Ref scale is %d, %c %g\n", m_cmscale, ( char ) ( 'A' + m_cmscale -1 ), VPoint.view_scale_ppm );
-            wxRegionIterator upd ( Region );
-            while ( upd )
+            OCPNRegionIterator upd ( Region );
+            while ( upd.HaveRects() )
             {
                   wxRect rect = upd.GetRect();
                   rect.Offset ( -VPoint.rv_rect.x, -VPoint.rv_rect.y );
                   printf ( "   Region Rect:  %d %d %d %d\n", rect.x, rect.y, rect.width, rect.height );
-                  upd ++ ;
+                  upd.NextRect();
             }
       }
 
@@ -5172,20 +5172,20 @@ bool cm93compchart::DoRenderRegionViewOnGL (const wxGLContext &glc, const ViewPo
             //    Check the current chart scale to see if it covers the requested region totally
             if ( VPoint.b_quilt )
             {
-                  wxRegion vpr_empty = Region;
+                  OCPNRegion vpr_empty = Region;
 
-                  wxRegion chart_region =  GetValidScreenCanvasRegion ( vp_positive, Region );
+                  OCPNRegion chart_region =  GetValidScreenCanvasRegion ( vp_positive, Region );
 
                   if ( g_bDebugCM93 )
                   {
                         printf ( "On DoRenderRegionViewOnGL : Intersecting Ref region rectangles\n" );
-                        wxRegionIterator upd ( chart_region );
-                        while ( upd )
+                        OCPNRegionIterator upd ( chart_region );
+                        while ( upd.HaveRects() )
                         {
                               wxRect rect = upd.GetRect();
                               rect.Offset ( -VPoint.rv_rect.x, -VPoint.rv_rect.y );
                               printf ( "   Region Rect:  %d %d %d %d\n", rect.x, rect.y, rect.width, rect.height );
-                              upd ++ ;
+                              upd.NextRect();
                         }
                   }
 
@@ -5195,13 +5195,13 @@ bool cm93compchart::DoRenderRegionViewOnGL (const wxGLContext &glc, const ViewPo
                   if ( g_bDebugCM93 )
                   {
                         printf ( "On DoRenderRegionViewOnGL : Region rectangles to fill with smaller scale\n" );
-                        wxRegionIterator upd ( vpr_empty );
-                        while ( upd )
+                        OCPNRegionIterator upd ( vpr_empty );
+                        while ( upd.HaveRects() )
                         {
                               wxRect rect = upd.GetRect();
                               rect.Offset ( -VPoint.rv_rect.x, -VPoint.rv_rect.y );
                               printf ( "   Region Rect:  %d %d %d %d\n", rect.x, rect.y, rect.width, rect.height );
-                              upd ++ ;
+                              upd.NextRect();
                         }
                   }
 
@@ -5227,7 +5227,7 @@ bool cm93compchart::DoRenderRegionViewOnGL (const wxGLContext &glc, const ViewPo
                                           printf ( "  In DRRVOD,  add quilt patch at %d, %c\n", m_cmscale, ( char ) ( 'A' + m_cmscale -1 ) );
 
 
-                                    wxRegion sscale_region = GetValidScreenCanvasRegion ( vp_positive, Region );
+                                    OCPNRegion sscale_region = GetValidScreenCanvasRegion ( vp_positive, Region );
 
                                     //    Only need to render that part of the vp that is not yet full
                                     sscale_region.Intersect ( vpr_empty );
@@ -5235,13 +5235,13 @@ bool cm93compchart::DoRenderRegionViewOnGL (const wxGLContext &glc, const ViewPo
                                     if ( g_bDebugCM93 )
                                     {
                                           printf ( "On DoRenderRegionViewOnGL : sscale_region rectangles\n" );
-                                          wxRegionIterator upd ( sscale_region );
-                                          while ( upd )
+                                          OCPNRegionIterator upd ( sscale_region );
+                                          while ( upd.HaveRects() )
                                           {
                                                 wxRect rect = upd.GetRect();
                                                 rect.Offset ( -VPoint.rv_rect.x, -VPoint.rv_rect.y );
                                                 printf ( "   Region Rect:  %d %d %d %d\n", rect.x, rect.y, rect.width, rect.height );
-                                                upd ++ ;
+                                                upd.NextRect();;
                                           }
                                     }
 
@@ -5261,13 +5261,13 @@ bool cm93compchart::DoRenderRegionViewOnGL (const wxGLContext &glc, const ViewPo
                         if ( g_bDebugCM93 )
                         {
                               printf ( "On DoRenderRegionViewOnGL : Final (chart_region) rectangles\n" );
-                              wxRegionIterator upd ( chart_region );
-                              while ( upd )
+                              OCPNRegionIterator upd ( chart_region );
+                              while ( upd.HaveRects() )
                               {
                                     wxRect rect = upd.GetRect();
                                     rect.Offset ( -VPoint.rv_rect.x, -VPoint.rv_rect.y );
                                     printf ( "   Region Rect:  %d %d %d %d\n", rect.x, rect.y, rect.width, rect.height );
-                                    upd ++ ;
+                                    upd.NextRect();
                               }
                         }
 
@@ -5390,7 +5390,7 @@ bool cm93compchart::DoRenderRegionViewOnGL (const wxGLContext &glc, const ViewPo
 
 
 
-bool cm93compchart::RenderRegionViewOnDC ( wxMemoryDC& dc, const ViewPort& VPoint, const wxRegion &Region )
+bool cm93compchart::RenderRegionViewOnDC ( wxMemoryDC& dc, const ViewPort& VPoint, const OCPNRegion &Region )
 {
       SetVPParms ( VPoint );
 
@@ -5402,7 +5402,7 @@ bool cm93compchart::RenderRegionViewOnDC ( wxMemoryDC& dc, const ViewPort& VPoin
 
 bool cm93compchart::RenderViewOnDC ( wxMemoryDC& dc, const ViewPort& VPoint )
 {
-      const wxRegion vpr ( 0,0,VPoint.pix_width, VPoint.pix_height );
+      const OCPNRegion vpr ( 0,0,VPoint.pix_width, VPoint.pix_height );
 
       SetVPParms ( VPoint );
 
@@ -5411,7 +5411,7 @@ bool cm93compchart::RenderViewOnDC ( wxMemoryDC& dc, const ViewPort& VPoint )
 }
 
 int s_dc1;
-bool cm93compchart::DoRenderRegionViewOnDC ( wxMemoryDC& dc, const ViewPort& VPoint, const wxRegion &Region )
+bool cm93compchart::DoRenderRegionViewOnDC ( wxMemoryDC& dc, const ViewPort& VPoint, const OCPNRegion &Region )
 {
 //      g_bDebugCM93 = true;
 
@@ -5426,12 +5426,12 @@ bool cm93compchart::DoRenderRegionViewOnDC ( wxMemoryDC& dc, const ViewPort& VPo
       if ( g_bDebugCM93 )
       {
             printf ( "\nOn DoRenderRegionViewOnDC Ref scale is %d, %c\n", m_cmscale, ( char ) ( 'A' + m_cmscale -1 ) );
-            wxRegionIterator upd ( Region );
-            while ( upd )
+            OCPNRegionIterator upd ( Region );
+            while ( upd.HaveRects() )
             {
                   wxRect rect = upd.GetRect();
                   printf ( "   Region Rect:  %d %d %d %d\n", rect.x, rect.y, rect.width, rect.height );
-                  upd ++ ;
+                  upd.NextRect();;
             }
       }
 
@@ -5448,19 +5448,19 @@ bool cm93compchart::DoRenderRegionViewOnDC ( wxMemoryDC& dc, const ViewPort& VPo
             //    Check the current chart scale to see if it covers the requested region totally
             if ( VPoint.b_quilt )
             {
-                  wxRegion vpr_empty = Region;
+                  OCPNRegion vpr_empty = Region;
 
-                  wxRegion chart_region = GetValidScreenCanvasRegion ( vp_positive, Region );
+                  OCPNRegion chart_region = GetValidScreenCanvasRegion ( vp_positive, Region );
 
                   if ( g_bDebugCM93 )
                   {
                         printf ( "On DoRenderRegionViewOnDC : Intersecting Ref region rectangles\n" );
-                        wxRegionIterator upd ( chart_region );
-                        while ( upd )
+                        OCPNRegionIterator upd ( chart_region );
+                        while ( upd.HaveRects() )
                         {
                               wxRect rect = upd.GetRect();
                               printf ( "   Region Rect:  %d %d %d %d\n", rect.x, rect.y, rect.width, rect.height );
-                              upd ++ ;
+                              upd.NextRect();
                         }
                   }
 
@@ -5525,18 +5525,18 @@ bool cm93compchart::DoRenderRegionViewOnDC ( wxMemoryDC& dc, const ViewPort& VPo
 
                                     m_pcm93chart_current->RenderRegionViewOnDC ( build_dc, vp_positive, Region );
 
-                                    wxRegion sscale_region = GetValidScreenCanvasRegion ( vp_positive, Region );
+                                    OCPNRegion sscale_region = GetValidScreenCanvasRegion ( vp_positive, Region );
 
                                     //    Only need to render that part of the vp that is not yet full
                                     sscale_region.Intersect ( vpr_empty );
 
                                     //    Blit the smaller scale chart patch onto the target DC
-                                    wxRegionIterator upd ( sscale_region );
-                                    while ( upd )
+                                    OCPNRegionIterator upd ( sscale_region );
+                                    while ( upd.HaveRects() )
                                     {
                                           wxRect rect = upd.GetRect();
                                           dumm_dc.Blit ( rect.x, rect.y, rect.width, rect.height, &build_dc, rect.x, rect.y );
-                                          upd ++ ;
+                                          upd.NextRect();
                                     }
                                     build_dc.SelectObject ( wxNullBitmap );          // safely unmap the bmp
 
@@ -5548,12 +5548,12 @@ bool cm93compchart::DoRenderRegionViewOnDC ( wxMemoryDC& dc, const ViewPort& VPo
                         }     // while
 
                         //    Finally, Blit the target scale chart as saved on temp_dc to quilt dc
-                        wxRegionIterator updt ( chart_region );
-                        while ( updt )
+                        OCPNRegionIterator updt ( chart_region );
+                        while ( updt.HaveRects() )
                         {
                               wxRect rect = updt.GetRect();
                               dumm_dc.Blit ( rect.x, rect.y, rect.width, rect.height, &temp_dc, rect.x, rect.y );
-                              updt ++ ;
+                              updt.NextRect();
                         }
                         temp_dc.SelectObject ( wxNullBitmap );          // safely unmap the base chart bmp
 
@@ -5716,14 +5716,14 @@ bool cm93compchart::DoRenderRegionViewOnDC ( wxMemoryDC& dc, const ViewPort& VPo
 
 void cm93compchart::UpdateRenderRegions ( const ViewPort& VPoint )
 {
-      wxRegion full_screen_region(0,0,VPoint.rv_rect.width, VPoint.rv_rect.height);
+      OCPNRegion full_screen_region(0,0,VPoint.rv_rect.width, VPoint.rv_rect.height);
 
       ViewPort vp_positive = VPoint;
 
       SetVPPositive ( &vp_positive );
-      
+
       SetVPParms ( VPoint );
-      
+
       if ( m_pcm93chart_current )
       {
             m_pcm93chart_current->SetVPParms ( vp_positive );
@@ -5738,9 +5738,9 @@ void cm93compchart::UpdateRenderRegions ( const ViewPort& VPoint )
                               m_pcm93chart_array[i]->m_render_region.Clear();
                   }
 
-                  wxRegion vpr_empty = full_screen_region;
+                  OCPNRegion vpr_empty = full_screen_region;
 
-                  wxRegion chart_region = GetValidScreenCanvasRegion ( vp_positive, full_screen_region );
+                  OCPNRegion chart_region = GetValidScreenCanvasRegion ( vp_positive, full_screen_region );
                   m_pcm93chart_current->m_render_region = chart_region;       // update
 
                   if ( !chart_region.IsEmpty() )
@@ -5763,7 +5763,7 @@ void cm93compchart::UpdateRenderRegions ( const ViewPort& VPoint )
 
                               if ( m_pcm93chart_current )
                               {
-                                    wxRegion sscale_region = GetValidScreenCanvasRegion ( vp_positive, full_screen_region );
+                                    OCPNRegion sscale_region = GetValidScreenCanvasRegion ( vp_positive, full_screen_region );
                                     sscale_region.Intersect ( vpr_empty );
                                     m_pcm93chart_current->m_render_region = sscale_region;
 
@@ -5895,13 +5895,13 @@ bool cm93compchart::RenderNextSmallerCellOutlines ( ocpnDC &dc, ViewPort& vp )
 
                                           for ( int ip = 0 ; ip < mcd->m_nvertices ; ip++ ,  p++)
                                           {
-                                              
+
                                               pwp[ip] = vp_positive.GetPixFromLL( p->y, p->x );
 
                                               //    Outlines stored in MCDs are not adjusted for offsets
                                               pwp[ip].x -= mcd->user_xoff * vp.view_scale_ppm;
                                               pwp[ip].y -= mcd->user_yoff * vp.view_scale_ppm;
-                                              
+
                                           }
 
                                           //    Scrub the points
@@ -6116,13 +6116,13 @@ InitReturn cm93compchart::CreateHeaderData()
 
       //        Read the root directory, getting subdirectories to build a small scale coverage region
       wxRect extent_rect;
- 
+
       wxDir dirt(m_prefixComposite);
       wxString candidate;
       wxRegEx test(_T("[0-9]+"));
-      
+
       bool b_cont = dirt.GetFirst(&candidate);
-      
+
       while(b_cont) {
           if(test.Matches(candidate)&& (candidate.Len() == 8)) {
               wxString dir = m_prefixComposite;
@@ -6134,7 +6134,7 @@ InitReturn cm93compchart::CreateHeaderData()
                   if( num_name.ToLong( &number ) ) {
                       int ilat = number / 10000;
                       int ilon = number % 10000;
-                      
+
                       int lat_base = ( ilat - 270 ) / 3.;
                       int lon_base = ilon / 3.;
                       extent_rect.Union(wxRect(lon_base, lat_base, 20, 20));
@@ -6635,7 +6635,7 @@ void CM93OffsetDialog::UpdateMCOVRList ( const ViewPort &vpt )
                               if ( cell_array.Item ( icell ) == mcd->m_cell_index )
                               {
                                     wxPoint *pwp = pchart->GetDrawBuffer ( mcd->m_nvertices );
-                                    wxRegion rgn = mcd->GetRegion ( vp_positive, pwp );
+                                    OCPNRegion rgn = mcd->GetRegion ( vp_positive, pwp );
 
 //                                    if(_OUT != vp_positive.GetBBox().Intersect(mcd->m_covr_bbox))
                                     if ( rgn.Contains ( 0, 0, vpt.pix_width, vpt.pix_height ) != wxOutRegion )

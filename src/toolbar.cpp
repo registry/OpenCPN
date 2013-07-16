@@ -39,7 +39,6 @@
 #include "pluginmanager.h"
 #include "FontMgr.h"
 
-extern FontMgr*                   pFontMgr;
 extern ocpnFloatingToolbarDialog* g_FloatingToolbarDialog;
 extern bool                       g_bTransparentToolbar;
 extern ChartCanvas*               cc1;
@@ -679,7 +678,7 @@ ToolTipWin::~ToolTipWin()
 void ToolTipWin::SetColorScheme( ColorScheme cs )
 {
     m_back_color = GetGlobalColor( _T ( "UIBCK" ) );
-    m_text_color = GetGlobalColor( _T ( "UITX1" ) );
+    m_text_color = FontMgr::Get().GetFontColor( _("ToolTips") );
 }
 
 void ToolTipWin::SetBitmap()
@@ -688,7 +687,7 @@ void ToolTipWin::SetBitmap()
 
     wxClientDC cdc( GetParent() );
 
-    wxFont *plabelFont = pFontMgr->GetFont( _("ToolTips") );
+    wxFont *plabelFont = FontMgr::Get().GetFont( _("ToolTips") );
     cdc.GetTextExtent( m_string, &w, &h, NULL, NULL, plabelFont );
 
     m_size.x = w + 8;
@@ -778,7 +777,7 @@ public:
     {
         return toolname;
     }
-    
+
     void SetIconName(wxString name)
     {
         iconName = name;
@@ -787,7 +786,7 @@ public:
     {
         return iconName;
     }
-    
+
     wxCoord m_x;
     wxCoord m_y;
     wxCoord m_width;
@@ -1236,7 +1235,7 @@ void ocpnToolBarSimple::OnToolTipTimerEvent( wxTimerEvent& event )
                         m_last_ro_tool->m_y - 30;
 
                 m_pToolTipWin->Move(0,0);       // workaround for gtk autocentre dialog behavior
-                
+
                 m_pToolTipWin->SetPosition( ClientToScreen( pos_in_toolbar ) );
                 m_pToolTipWin->SetBitmap();
                 m_pToolTipWin->Show();
@@ -1442,9 +1441,9 @@ void ocpnToolBarSimple::DrawTool( wxDC& dc, wxToolBarToolBase *toolBase )
             if( tool->IsEnabled() ) {
                 if( tool->IsToggled() )
                     bmp = m_style->GetToolIcon( tool->GetToolname(), TOOLICON_TOGGLED, tool->rollover );
-                else 
+                else
                     bmp = m_style->GetToolIcon( tool->GetIconName(), TOOLICON_NORMAL, tool->rollover );
-                
+
                 tool->SetNormalBitmap( bmp );
                 tool->bitmapOK = true;
             } else {

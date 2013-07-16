@@ -42,6 +42,9 @@
 #if wxCHECK_VERSION(2,9,4) /* does this work in 2.8 too.. do we need a test? */
 #include <wx/renderer.h>
 #endif
+#ifdef __WXGTK__
+#include <wx/colordlg.h>
+#endif
 
 #include "dychart.h"
 #include "chart1.h"
@@ -73,7 +76,6 @@ extern bool             g_bskew_comp;
 extern bool             g_bopengl;
 extern bool             g_bsmoothpanzoom;
 
-extern FontMgr          *pFontMgr;
 extern wxString         *pInit_Chart_Dir;
 extern wxArrayOfConnPrm *g_pConnectionParams;
 extern Multiplexer      *g_pMUX;
@@ -113,6 +115,7 @@ extern bool             g_bShowAreaNotices;
 extern bool             g_bDrawAISSize;
 extern bool             g_bShowAISName;
 extern int              g_Show_Target_Name_Scale;
+extern bool             g_bWplIsAprsPosition;
 
 extern int              g_iNavAidRadarRingsNumberVisible;
 extern float            g_fNavAidRadarRingsStep;
@@ -175,6 +178,7 @@ extern s52plib          *ps52plib;
 
 extern wxString         g_locale;
 extern bool             g_bportable;
+extern bool             g_bdisable_opengl;
 extern wxString         *pHome_Locn;
 
 extern ChartGroupArray  *g_pGroupArray;
@@ -238,6 +242,9 @@ BEGIN_EVENT_TABLE( options, wxDialog )
     EVT_BUTTON( xID_OK, options::OnXidOkClick )
     EVT_BUTTON( wxID_CANCEL, options::OnCancelClick )
     EVT_BUTTON( ID_BUTTONFONTCHOOSE, options::OnChooseFont )
+#ifdef __WXGTK__
+    EVT_BUTTON( ID_BUTTONFONTCOLOR, options::OnChooseFontColor )
+#endif
     EVT_RADIOBOX(ID_RADARDISTUNIT, options::OnDisplayCategoryRadioButton )
     EVT_BUTTON( ID_CLEARLIST, options::OnButtonClearClick )
     EVT_BUTTON( ID_SELECTLIST, options::OnButtonSelectClick )
@@ -1112,6 +1119,10 @@ void options::CreatePanel_VectorCharts( size_t parent, int border_size, int grou
     pCheck_DECLTEXT->SetValue( FALSE );
     catSizer->Add( pCheck_DECLTEXT, 1, wxALL | wxEXPAND, group_item_spacing );
 
+    pCheck_NATIONALTEXT = new wxCheckBox( ps57Ctl, ID_NATIONALTEXTCHECKBOX, _("National text on chart") );
+    pCheck_NATIONALTEXT->SetValue( FALSE );
+    catSizer->Add( pCheck_NATIONALTEXT, 1, wxALL | wxEXPAND, group_item_spacing );
+
     wxBoxSizer* styleSizer = new wxBoxSizer( wxVERTICAL );
     vectorPanel->Add( styleSizer, 1, wxALL | wxEXPAND, 0 );
 
@@ -1368,6 +1379,7 @@ void options::CreatePanel_Display( size_t parent, int border_size, int group_ite
     //  OpenGL Render checkbox
     pOpenGL = new wxCheckBox( itemPanelUI, ID_OPENGLBOX, _("Use Accelerated Graphics (OpenGL)") );
     itemStaticBoxSizerCDO->Add( pOpenGL, 1, wxALL, border_size );
+    pOpenGL->Enable(!g_bdisable_opengl);
 
     //  Smooth Pan/Zoom checkbox
     pSmoothPanZoom = new wxCheckBox( itemPanelUI, ID_SMOOTHPANZOOMBOX,
@@ -1507,6 +1519,12 @@ void options::CreatePanel_AIS( size_t parent, int border_size, int group_item_sp
     m_pText_Show_Target_Name_Scale = new wxTextCtrl( panelAIS, -1 );
     pDisplayGrid->Add( m_pText_Show_Target_Name_Scale, 1, wxALL | wxALIGN_RIGHT, group_item_spacing );
 
+    m_pCheck_Wpl_Aprs = new wxCheckBox( panelAIS, -1, _("Treat WPL sentences as APRS position reports") );
+    pDisplayGrid->Add( m_pCheck_Wpl_Aprs, 1, wxALL, group_item_spacing );
+
+    wxStaticText *pStatic_Dummy7 = new wxStaticText( panelAIS, -1, _T("") );
+    pDisplayGrid->Add( pStatic_Dummy7, 1, wxALL | wxALL, group_item_spacing );
+
     wxStaticText *pStatic_Dummy5a = new wxStaticText( panelAIS, -1, _T("") );
     pDisplayGrid->Add( pStatic_Dummy5a, 1, wxALL | wxALL, group_item_spacing );
 
@@ -1601,12 +1619,12 @@ void options::CreatePanel_UI( size_t parent, int border_size, int group_item_spa
 
     m_itemFontElementListBox = new wxChoice( itemPanelFont, ID_CHOICE_FONTELEMENT );
 
-    int nFonts = pFontMgr->GetNumFonts();
+    int nFonts = FontMgr::Get().GetNumFonts();
     for( int it = 0; it < nFonts; it++ ) {
-        wxString *t = pFontMgr->GetDialogString( it );
+        const wxString  & t = FontMgr::Get().GetDialogString( it );
 
-        if( pFontMgr->GetConfigString( it )->StartsWith( g_locale ) ) {
-            m_itemFontElementListBox->Append( *t );
+        if( FontMgr::Get().GetConfigString(it).StartsWith( g_locale ) ) {
+            m_itemFontElementListBox->Append(t);
         }
     }
 
@@ -1617,7 +1635,11 @@ void options::CreatePanel_UI( size_t parent, int border_size, int group_item_spa
     wxButton* itemFontChooseButton = new wxButton( itemPanelFont, ID_BUTTONFONTCHOOSE,
             _("Choose Font..."), wxDefaultPosition, wxDefaultSize, 0 );
     itemFontStaticBoxSizer->Add( itemFontChooseButton, 0, wxALL, border_size );
-
+#ifdef __WXGTK__
+    wxButton* itemFontColorButton = new wxButton( itemPanelFont, ID_BUTTONFONTCOLOR,
+            _("Choose Font Color..."), wxDefaultPosition, wxDefaultSize, 0 );
+    itemFontStaticBoxSizer->Add( itemFontColorButton, 0, wxALL, border_size );
+#endif
     wxStaticBox* itemStyleStaticBox = new wxStaticBox( itemPanelFont, wxID_ANY,
             _("Toolbar and Window Style") );
     wxStaticBoxSizer* itemStyleStaticBoxSizer = new wxStaticBoxSizer( itemStyleStaticBox,
@@ -1835,6 +1857,9 @@ void options::CreateControls()
     pSettingsCB1 = pDebugShowStat;
 
     SetColorScheme( (ColorScheme) 0 );
+    
+    //  Update the PlugIn page to reflect the state of individual selections
+    m_pPlugInCtrl->UpdateSelections();
 
     if( height < 768 ) {
         SetSizeHints( width-200, height-200, -1, -1 );
@@ -2012,6 +2037,8 @@ void options::SetInitialSettings()
     s.Printf( _T("%d"), g_Show_Target_Name_Scale );
     m_pText_Show_Target_Name_Scale->SetValue( s );
 
+    m_pCheck_Wpl_Aprs->SetValue( g_bWplIsAprsPosition );
+
     //      Alerts
     m_pCheck_AlertDialog->SetValue( g_bAIS_CPA_Alert );
     m_pCheck_AlertAudio->SetValue( g_bAIS_CPA_Alert_Audio );
@@ -2090,6 +2117,7 @@ void options::SetInitialSettings()
         pCheck_LDISTEXT->SetValue( ps52plib->m_bShowLdisText );
         pCheck_XLSECTTEXT->SetValue( ps52plib->m_bExtendLightSectors );
         pCheck_DECLTEXT->SetValue( ps52plib->m_bDeClutterText );
+        pCheck_NATIONALTEXT->SetValue( ps52plib->m_bShowNationalTexts );
 
         // Chart Display Style
         if( ps52plib->m_nSymbolStyle == PAPER_CHART ) pPointStyle->SetSelection( 0 );
@@ -2539,6 +2567,8 @@ void options::OnApplyClick( wxCommandEvent& event )
     m_pText_Show_Target_Name_Scale->GetValue().ToLong( &ais_name_scale );
     g_Show_Target_Name_Scale = (int)wxMax( 5000, ais_name_scale );
 
+    g_bWplIsAprsPosition = m_pCheck_Wpl_Aprs->GetValue();
+
     //      Alert
     g_bAIS_CPA_Alert = m_pCheck_AlertDialog->GetValue();
     g_bAIS_CPA_Alert_Audio = m_pCheck_AlertAudio->GetValue();
@@ -2667,6 +2697,7 @@ void options::OnApplyClick( wxCommandEvent& event )
         ps52plib->m_bShowLdisText = pCheck_LDISTEXT->GetValue();
         ps52plib->m_bExtendLightSectors = pCheck_XLSECTTEXT->GetValue();
         ps52plib->m_bDeClutterText = pCheck_DECLTEXT->GetValue();
+        ps52plib->m_bShowNationalTexts = pCheck_NATIONALTEXT->GetValue();
 
         if( 0 == pPointStyle->GetSelection() ) ps52plib->m_nSymbolStyle = PAPER_CHART;
         else
@@ -2855,8 +2886,8 @@ void options::OnChooseFont( wxCommandEvent& event )
     wxFont *psfont;
     wxFontData font_data;
 
-    wxFont *pif = pFontMgr->GetFont( sel_text_element );
-    wxColour init_color = pFontMgr->GetFontColor( sel_text_element );
+    wxFont *pif = FontMgr::Get().GetFont( sel_text_element );
+    wxColour init_color = FontMgr::Get().GetFontColor( sel_text_element );
 
     wxFontData init_font_data;
     if( pif ) init_font_data.SetInitialFont( *pif );
@@ -2873,13 +2904,42 @@ void options::OnChooseFont( wxCommandEvent& event )
         wxFont font = font_data.GetChosenFont();
         psfont = new wxFont( font );
         wxColor color = font_data.GetColour();
-        pFontMgr->SetFont( sel_text_element, psfont, color );
+        FontMgr::Get().SetFont( sel_text_element, psfont, color );
 
         pParent->UpdateAllFonts();
     }
 
     event.Skip();
 }
+
+#ifdef __WXGTK__
+void options::OnChooseFontColor( wxCommandEvent& event )
+{
+    wxString sel_text_element = m_itemFontElementListBox->GetStringSelection();
+
+    wxColourData colour_data;
+
+    wxFont *pif = FontMgr::Get().GetFont( sel_text_element );
+    wxColour init_color = FontMgr::Get().GetFontColor( sel_text_element );
+
+    wxColourData init_colour_data;
+    init_colour_data.SetColour( init_color );
+
+    wxColourDialog dg( pParent, &init_colour_data );
+
+    int retval = dg.ShowModal();
+    if( wxID_CANCEL != retval ) {
+        colour_data = dg.GetColourData();
+
+        wxColor color = colour_data.GetColour();
+        FontMgr::Get().SetFont( sel_text_element, pif, color );
+
+        pParent->UpdateAllFonts();
+    }
+
+    event.Skip();
+}
+#endif
 
 void options::OnChartsPageChange( wxListbookEvent& event )
 {
@@ -3089,8 +3149,9 @@ void options::OnButtonTestSound( wxCommandEvent& event )
     AIS_Sound.Create( g_sAIS_Alert_Sound_File );
 
     if( AIS_Sound.IsOk() ) {
+        
+#ifndef __WXMSW__
         AIS_Sound.Play();
-
         int t = 0;
         while( AIS_Sound.IsPlaying() && (t < 10) ) {
             wxSleep(1);
@@ -3098,6 +3159,10 @@ void options::OnButtonTestSound( wxCommandEvent& event )
         }
         if( AIS_Sound.IsPlaying() )
             AIS_Sound.Stop();
+ 
+#else
+        AIS_Sound.Play(wxSOUND_SYNC);
+#endif
     }
 
 }
