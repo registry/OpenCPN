@@ -180,10 +180,16 @@ INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/src)
 #ADD_DEFINITIONS( "-Wall -ansi -pedantic -Wno-variadic-macros" )
 #TODO: Should we use  -fno-stack-protector
 #  IF NOT DEBUGGING CFLAGS="-O2 -march=native"
-IF(NOT WIN32)
+IF(NOT WIN32 AND NOT APPLE )
   ADD_DEFINITIONS( "-Wall -Wno-unused -fexceptions -rdynamic" )
   ADD_DEFINITIONS( " -g -fno-strict-aliasing")
-ENDIF(NOT WIN32)
+ENDIF(NOT WIN32 AND NOT APPLE)
+
+IF( APPLE )
+  ADD_DEFINITIONS( "-Wall -Wno-unused -fexceptions -Wno-overloaded-virtual" )
+  ADD_DEFINITIONS( " -g -fno-strict-aliasing")
+  ADD_DEFINITIONS( " -Wno-deprecated -Wno-deprecated-declarations" )
+ENDIF(APPLE)
 
 #Enable CrashReporting for Windows
 IF(WIN32)
@@ -295,8 +301,8 @@ SET(SRC_NMEA0183
 		src/nmea0183/gsv.cpp
 		src/nmea0183/GPwpl.cpp
 		src/nmea0183/GPwpl.hpp
-                src/nmea0183/apb.cpp
-                src/nmea0183/apb.hpp
+        src/nmea0183/apb.cpp
+        src/nmea0183/apb.hpp
 	)
 ADD_LIBRARY(NMEA0183 ${SRC_NMEA0183})
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/src/nmea0183)
@@ -326,8 +332,8 @@ INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/src/nmea0183)
 
 
 SET(HDRS
-        include/ocpn_types.h
-        include/ocpndc.h
+                include/ocpn_types.h
+                include/ocpndc.h
 		include/chart1.h
 		include/bbox.h
 		include/ocpn_pixel.h
@@ -422,14 +428,15 @@ SET(HDRS
 		include/dsPortType.h
                 include/multiplexer.h
                 include/OCPNRegion.h
-
+                include/TrackPropDlg.h
+                include/LinkPropDlg.h
 )
 
 SET(SRCS
 		src/chart1.cpp
 		src/bbox.cpp
 		src/ocpn_pixel.cpp
-        src/ocpndc.cpp
+                src/ocpndc.cpp
 		src/chartdb.cpp
 		src/chartdbs.cpp
 		src/chartimg.cpp
@@ -510,6 +517,8 @@ SET(SRCS
                 src/multiplexer.cpp
                 src/pugixml.cpp
                 src/OCPNRegion.cpp
+                src/TrackPropDlg.cpp
+                src/LinkPropDlg.cpp
     )
 
 IF(wx_Version MATCHES "2.9")
@@ -639,9 +648,9 @@ IF (USE_GARMINHOST)
                   src/garmin/jeeps/gpscom.c
                   src/garmin/jeeps/gpsmath.c
                   src/garmin/jeeps/gpsmem.c
-	              src/garmin/jeeps/gpsprot.c
+	          src/garmin/jeeps/gpsprot.c
                   src/garmin/jeeps/gpsread.c
-	              src/garmin/jeeps/gpsdevice.c
+	          src/garmin/jeeps/gpsdevice.c
                   src/garmin/jeeps/gpsdevice_ser.c
                   src/garmin/jeeps/gpsdevice_usb.c
                   src/garmin/jeeps/gpsrqst.c
@@ -772,11 +781,11 @@ IF(APPLE)
   SET(CMAKE_C_FLAGS_RELEASE "-O3 -arch ${ARCH}")
   SET(CMAKE_C_FLAGS_RELWITHDEBINFO "-g -O3 -arch ${ARCH}")
 
-  SET(CMAKE_CXX_FLAGS "-O2 -arch ${ARCH} -Wno-deprecated -Wno-deprecated-declarations")
-  SET(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -arch ${ARCH} -Wno-deprecated -Wno-deprecated-declarations")
-  SET(CMAKE_CXX_FLAGS_MINSIZEREL "-O2 -arch ${ARCH} -Wno-deprecated -Wno-deprecated-declarations")
-  SET(CMAKE_CXX_FLAGS_RELEASE "-O3 -arch ${ARCH} -Wno-deprecated -Wno-deprecated-declarations")
-  SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g -O3 -arch ${ARCH} -Wno-deprecated -Wno-deprecated-declarations")
+  SET(CMAKE_CXX_FLAGS "-O2 -arch ${ARCH}")
+  SET(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -arch ${ARCH}")
+  SET(CMAKE_CXX_FLAGS_MINSIZEREL "-O2 -arch ${ARCH}")
+  SET(CMAKE_CXX_FLAGS_RELEASE "-O3 -arch ${ARCH}")
+  SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g -O3 -arch ${ARCH}")
 
   SET(CMAKE_EXE_LINKER_FLAGS "-O2 -arch ${ARCH}")
   SET(CMAKE_SHARED_LINKER_FLAGS "-O2 -arch ${ARCH}")
