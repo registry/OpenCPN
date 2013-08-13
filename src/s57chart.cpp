@@ -6732,7 +6732,7 @@ void s57_DrawExtendedLightSectors( ocpnDC& dc, ViewPort& viewport, std::vector<s
             narc++;
             step = ( angle2 - angle1 ) / (double)narc;
 
-            if( angle2 - angle1 < 15 && sectorlegs[i].fillSector ) {
+            if( sectorlegs[i].isleading/* && (angle2 - angle1 < 15) */ ) {
                 wxPoint yellowCone[3];
                 yellowCone[0] = lightPos;
                 yellowCone[1] = end1;
@@ -6798,6 +6798,8 @@ bool s57_CheckExtendedLightSectors( int mx, int my, ViewPort& viewport, std::vec
     ChartBase *targetchart = cc1->GetChartAtCursor();
     s57chart *chart = dynamic_cast<s57chart*>( targetchart );
 
+    bool bhas_red_green = false;
+    
     if( chart ) {
         sectorlegs.clear();
 
@@ -6865,15 +6867,17 @@ bool s57_CheckExtendedLightSectors( int mx, int my, ViewPort& viewport, std::vec
                             if( curAttrName == _T("SECTR2") ) value.ToDouble( &sectr2 );
                             if( curAttrName == _T("VALNMR") ) value.ToDouble( &valnmr );
                             if( curAttrName == _T("COLOUR") ) {
-                                sector.fillSector = true;
                                 color = wxColor( 255, 255, 0, yOpacity );
+                                sector.iswhite = true;
                                 if( value == _T("red(3)") ) {
                                     color = wxColor( 255, 0, 0, opacity );
-                                    sector.fillSector = false;
+                                    sector.iswhite = false;
+                                    bhas_red_green = true;
                                 }
                                 if( value == _T("green(4)") ) {
                                     color = wxColor( 0, 255, 0, opacity );
-                                    sector.fillSector = false;
+                                    sector.iswhite = false;
+                                    bhas_red_green = true;
                                 }
                             }
                             if( curAttrName == _T("EXCLIT") ) {
@@ -6885,6 +6889,10 @@ bool s57_CheckExtendedLightSectors( int mx, int my, ViewPort& viewport, std::vec
                         free(curr_att0);
 
                         if( ( sectr1 >= 0 ) && ( sectr2 >= 0 ) ) {
+                            if( sectr1 > sectr2 ) {             // normalize
+                                sectr2 += 360.0;
+                            }
+                            
                             sector.pos.m_x = light->m_lon;
                             sector.pos.m_y = light->m_lat;
 
@@ -6892,12 +6900,19 @@ bool s57_CheckExtendedLightSectors( int mx, int my, ViewPort& viewport, std::vec
                             sector.sector1 = sectr1;
                             sector.sector2 = sectr2;
                             sector.color = color;
+                            sector.isleading = false;           // tentative judgment, check below
 
                             bool newsector = true;
                             for( unsigned int i=0; i<sectorlegs.size(); i++ ) {
                                 if( sectorlegs[i].pos == sector.pos &&
                                     sectorlegs[i].sector1 == sector.sector1 &&
-                                    sectorlegs[i].sector2 == sector.sector2 ) newsector = false;
+                                    sectorlegs[i].sector2 == sector.sector2 ) {
+                                        newsector = false;
+                                        //  In the case of duplicate sectors, choose the instance with largest range.
+                                        //  This applies to the case where day and night VALNMR are different, and so
+                                        //  makes the vector result independent of the order of day/night light features.
+                                        sectorlegs[i].range = wxMax(sectorlegs[i].range, sector.range);
+                                }
                             }
                             if(!bviz)
                                 newsector = false;
@@ -6915,5 +6930,50 @@ bool s57_CheckExtendedLightSectors( int mx, int my, ViewPort& viewport, std::vec
         rule_list->Clear();
         delete rule_list;
     }
+
+#if 0    
+    //  Work with the sector legs vector to identify  and mark "Leading Lights"
+    int ns = sectorlegs.size();
+    if( sectorlegs.size() > 0 ) {
+        for( unsigned int i=0; i<sectorlegs.size(); i++ ) {
+            if( fabs( sectorlegs[i].sector1 - sectorlegs[i].sector2 ) < 0.5 )
+                continue;
+            
+            if(((sectorlegs[i].sector2 - sectorlegs[i].sector1) < 15)  && sectorlegs[i].iswhite ) {
+                //      Check to see if this sector has a visible range greater than any other white light
+                
+                if( sectorlegs.size() > 1 ) {
+                    bool bleading = true;
+                    for( unsigned int j=0; j<sectorlegs.size(); j++ ) {
+                        if(i == j)
+                            continue;
+                        if((sectorlegs[j].iswhite) && (sectorlegs[i].range <= sectorlegs[j].range) ){
+                            if((sectorlegs[j].sector2 - sectorlegs[j].sector1) >= 15){  // test sector should not be a leading light
+                                bleading = false;    // cannot be a sector, since its range is <= another white light
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if(bleading)
+                        sectorlegs[i].isleading = true;
+                }
+            }
+            else
+                sectorlegs[i].isleading = false;
+                
+        }
+    }
+#endif    
+
+//  Work with the sector legs vector to identify  and mark "Leading Lights"
+    for( unsigned int i=0; i<sectorlegs.size(); i++ ) {
+ 
+        if(((sectorlegs[i].sector2 - sectorlegs[i].sector1) < 15)  && sectorlegs[i].iswhite && bhas_red_green) {
+            sectorlegs[i].isleading = true;
+        }
+    }
+            
+    
     return newSectorsNeedDrawing;
 }
