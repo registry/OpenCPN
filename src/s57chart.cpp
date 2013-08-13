@@ -6799,6 +6799,13 @@ bool s57_CheckExtendedLightSectors( int mx, int my, ViewPort& viewport, std::vec
     s57chart *chart = dynamic_cast<s57chart*>( targetchart );
 
     bool bhas_red_green = false;
+    bool bleading_attribute = false;
+    
+    int opacity = 100;
+    if( cc1->GetColorScheme() == GLOBAL_COLOR_SCHEME_DUSK ) opacity = 50;
+    if( cc1->GetColorScheme() == GLOBAL_COLOR_SCHEME_NIGHT) opacity = 20;
+    
+    int yOpacity = (float)opacity*1.3; // Matched perception of white/yellow with red/green
     
     if( chart ) {
         sectorlegs.clear();
@@ -6824,7 +6831,6 @@ bool s57_CheckExtendedLightSectors( int mx, int my, ViewPort& viewport, std::vec
                 wxPoint2DDouble objPos( light->m_lat, light->m_lon );
                 if( lightPosD.m_x == 0 && lightPosD.m_y == 0.0 )
                     lightPosD = objPos;
-                
                 if( lightPosD == objPos ) {
                     char *curr_att0 = NULL;
                     wxCharBuffer buffer=light->attList->ToUTF8();
@@ -6853,11 +6859,6 @@ bool s57_CheckExtendedLightSectors( int mx, int my, ViewPort& viewport, std::vec
                             if( *curr_att == '\037' ) curr_att++;
 
                             wxString value = chart->GetObjectAttributeValueAsString( light, attrCounter, curAttrName );
-                            int opacity = 100;
-                            if( cc1->GetColorScheme() == GLOBAL_COLOR_SCHEME_DUSK ) opacity = 50;
-                            if( cc1->GetColorScheme() == GLOBAL_COLOR_SCHEME_NIGHT) opacity = 20;
-
-                            int yOpacity = (float)opacity*1.3; // Matched perception with red/green
 
                             if( curAttrName == _T("LITVIS") ){
                                 if(value.StartsWith(_T("obsc")) )
@@ -6867,8 +6868,6 @@ bool s57_CheckExtendedLightSectors( int mx, int my, ViewPort& viewport, std::vec
                             if( curAttrName == _T("SECTR2") ) value.ToDouble( &sectr2 );
                             if( curAttrName == _T("VALNMR") ) value.ToDouble( &valnmr );
                             if( curAttrName == _T("COLOUR") ) {
-                                color = wxColor( 255, 255, 0, yOpacity );
-                                sector.iswhite = true;
                                 if( value == _T("red(3)") ) {
                                     color = wxColor( 255, 0, 0, opacity );
                                     sector.iswhite = false;
@@ -6883,6 +6882,12 @@ bool s57_CheckExtendedLightSectors( int mx, int my, ViewPort& viewport, std::vec
                             if( curAttrName == _T("EXCLIT") ) {
                                 if( value.Find( _T("(3)") ) ) valnmr = 1.0;  // Fog lights.
                             }
+                            if( curAttrName == _T("CATLIT") ){
+                                if( value.Upper().StartsWith( _T("DIRECT")) ||
+                                    value.Upper().StartsWith(_T("LEAD")) )
+                                    bleading_attribute = true;
+                            }
+                                
                             attrCounter++;
                         }
 
@@ -6899,6 +6904,11 @@ bool s57_CheckExtendedLightSectors( int mx, int my, ViewPort& viewport, std::vec
                             sector.range = (valnmr > 0.0) ? valnmr : 2.5; // Short default range.
                             sector.sector1 = sectr1;
                             sector.sector2 = sectr2;
+                            
+                            if(!color.IsOk()){
+                                color = wxColor( 255, 255, 0, yOpacity );
+                                sector.iswhite = true;
+                            }
                             sector.color = color;
                             sector.isleading = false;           // tentative judgment, check below
 
@@ -6969,8 +6979,11 @@ bool s57_CheckExtendedLightSectors( int mx, int my, ViewPort& viewport, std::vec
 //  Work with the sector legs vector to identify  and mark "Leading Lights"
     for( unsigned int i=0; i<sectorlegs.size(); i++ ) {
  
-        if(((sectorlegs[i].sector2 - sectorlegs[i].sector1) < 15)  && sectorlegs[i].iswhite && bhas_red_green) {
-            sectorlegs[i].isleading = true;
+        if(((sectorlegs[i].sector2 - sectorlegs[i].sector1) < 15) || bleading_attribute ) {
+            if( sectorlegs[i].iswhite && bhas_red_green )
+                sectorlegs[i].isleading = true;
+            if( bleading_attribute )
+                sectorlegs[i].isleading = true;
         }
     }
             
