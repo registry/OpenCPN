@@ -2587,7 +2587,8 @@ bool ChartCanvas::DoZoomCanvasIn( double factor )
         int new_db_index = m_pQuilt->AdjustRefOnZoomIn( proposed_scale_onscreen );
         if( new_db_index >= 0 ) pc = ChartData->OpenChartFromDB( new_db_index, FULL_INIT );
 
-        pCurrentStack->SetCurrentEntryFromdbIndex( new_db_index ); // highlite the correct bar entry
+        if(pCurrentStack)
+            pCurrentStack->SetCurrentEntryFromdbIndex( new_db_index ); // highlite the correct bar entry
     }
 
     if( pc ) {
@@ -2634,26 +2635,30 @@ bool ChartCanvas::DoZoomCanvasOut( double zoom_factor )
         double new_scale_ppm = target_scale_ppm;
         proposed_scale_onscreen = GetCanvasScaleFactor() / new_scale_ppm;
 
+        if( ChartData && pc ) {
         //      If Current_Ch is not on the screen, unbound the zoomout
-        LLBBox viewbox = VPoint.GetBBox();
-        wxBoundingBox chart_box;
-        int current_index = ChartData->FinddbIndex( pc->GetFullPath() );
-        ChartData->GetDBBoundingBox( current_index, &chart_box );
-        if( ( viewbox.Intersect( chart_box ) == _OUT ) ) {
-            proposed_scale_onscreen = wxMin(proposed_scale_onscreen,
+            LLBBox viewbox = VPoint.GetBBox();
+            wxBoundingBox chart_box;
+            int current_index = ChartData->FinddbIndex( pc->GetFullPath() );
+            ChartData->GetDBBoundingBox( current_index, &chart_box );
+            if( ( viewbox.Intersect( chart_box ) == _OUT ) ) {
+                proposed_scale_onscreen = wxMin(proposed_scale_onscreen,
                                             GetCanvasScaleFactor() / m_absolute_min_scale_ppm);
-        }
-        else {
-        //  Clamp the minimum scale zoom-out to the value specified by the chart
-            double max_allowed_scale = 4.0 * ( pc->GetNormalScaleMax( GetCanvasScaleFactor(), GetCanvasWidth() ) );
-            proposed_scale_onscreen = wxMin( proposed_scale_onscreen, max_allowed_scale );
+            }
+            else {
+            //  Clamp the minimum scale zoom-out to the value specified by the chart
+                double max_allowed_scale = 4.0 * ( pc->GetNormalScaleMax( GetCanvasScaleFactor(), GetCanvasWidth() ) );
+                proposed_scale_onscreen = wxMin( proposed_scale_onscreen, max_allowed_scale );
+            }
         }
 
      } else {
         int new_db_index = m_pQuilt->AdjustRefOnZoomOut( proposed_scale_onscreen );
         if( new_db_index >= 0 ) pc = ChartData->OpenChartFromDB( new_db_index, FULL_INIT );
 
-        pCurrentStack->SetCurrentEntryFromdbIndex( new_db_index ); // highlite the correct bar entry
+        if(pCurrentStack)
+            pCurrentStack->SetCurrentEntryFromdbIndex( new_db_index ); // highlite the correct bar entry
+            
         b_smallest = m_pQuilt->IsChartSmallestScale( new_db_index );
 
         double target_scale_ppm = GetVPScale() / zoom_factor;
@@ -5576,9 +5581,15 @@ void ChartCanvas::MouseEvent( wxMouseEvent& event )
                 if( m_pEditRouteArray ) {
                     for( unsigned int ir = 0; ir < m_pEditRouteArray->GetCount(); ir++ ) {
                         Route *pr = (Route *) m_pEditRouteArray->Item( ir );
-                        wxRect route_rect;
-                        pr->CalculateDCRect( m_dc_route, &route_rect, VPoint );
-                        pre_rect.Union( route_rect );
+                        //      Need to validate route pointer
+                        //      Route may be gone due to drgging close to ownship with
+                        //      "Delete On Arrival" state set, as in the case of
+                        //      navigating to an isolated waypoint on a temporary route
+                        if( g_pRouteMan->IsRouteValid(pr) ) {
+                            wxRect route_rect;
+                            pr->CalculateDCRect( m_dc_route, &route_rect, VPoint );
+                            pre_rect.Union( route_rect );
+                        }
                     }
                 }
 
@@ -5607,9 +5618,11 @@ void ChartCanvas::MouseEvent( wxMouseEvent& event )
                 if( m_pEditRouteArray ) {
                     for( unsigned int ir = 0; ir < m_pEditRouteArray->GetCount(); ir++ ) {
                         Route *pr = (Route *) m_pEditRouteArray->Item( ir );
-                        wxRect route_rect;
-                        pr->CalculateDCRect( m_dc_route, &route_rect, VPoint );
-                        post_rect.Union( route_rect );
+                        if( g_pRouteMan->IsRouteValid(pr) ) {
+                            wxRect route_rect;
+                            pr->CalculateDCRect( m_dc_route, &route_rect, VPoint );
+                            post_rect.Union( route_rect );
+                        }
                     }
                 }
 
@@ -5707,11 +5720,13 @@ void ChartCanvas::MouseEvent( wxMouseEvent& event )
                 if( m_pEditRouteArray ) {
                     for( unsigned int ir = 0; ir < m_pEditRouteArray->GetCount(); ir++ ) {
                         Route *pr = (Route *) m_pEditRouteArray->Item( ir );
-                        pr->CalculateBBox();
-                        pr->UpdateSegmentDistances();
-                        pr->m_bIsBeingEdited = false;
+                        if( g_pRouteMan->IsRouteValid(pr) ) {
+                            pr->CalculateBBox();
+                            pr->UpdateSegmentDistances();
+                            pr->m_bIsBeingEdited = false;
 
-                        pConfig->UpdateRoute( pr );
+                            pConfig->UpdateRoute( pr );
+                        }
                     }
                 }
 
@@ -5720,12 +5735,14 @@ void ChartCanvas::MouseEvent( wxMouseEvent& event )
                     if( m_pEditRouteArray ) {
                         for( unsigned int ir = 0; ir < m_pEditRouteArray->GetCount(); ir++ ) {
                             Route *pr = (Route *) m_pEditRouteArray->Item( ir );
-                            if( !pr->IsTrack() && pRoutePropDialog->m_pRoute == pr ) {
-                                pRoutePropDialog->SetRouteAndUpdate( pr );
-                                pRoutePropDialog->UpdateProperties();
-                            } else if ( ( NULL != pTrackPropDialog ) && ( pTrackPropDialog->IsShown() ) && pTrackPropDialog->m_pRoute == pr ) {
-                                pTrackPropDialog->SetTrackAndUpdate( pr );
-                                pTrackPropDialog->UpdateProperties();
+                            if( g_pRouteMan->IsRouteValid(pr) ) {
+                                if( !pr->IsTrack() && pRoutePropDialog->m_pRoute == pr ) {
+                                    pRoutePropDialog->SetRouteAndUpdate( pr );
+                                    pRoutePropDialog->UpdateProperties();
+                                } else if ( ( NULL != pTrackPropDialog ) && ( pTrackPropDialog->IsShown() ) && pTrackPropDialog->m_pRoute == pr ) {
+                                    pTrackPropDialog->SetTrackAndUpdate( pr );
+                                    pTrackPropDialog->UpdateProperties();
+                                }
                             }
                         }
                     }
