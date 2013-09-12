@@ -45,7 +45,7 @@
 #include <wx/intl.h>
 #include <wx/listctrl.h>
 #include <wx/aui/aui.h>
-#include <version.h> //Gunther
+#include <wx/version.h> //Gunther
 #include <wx/dialog.h>
 #include <wx/progdlg.h>
 

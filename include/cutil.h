@@ -65,7 +65,7 @@ typedef struct {
 
 inline int roundint (double x)
 {
-    int tmp = static_cast<int> (x);
+    int tmp = (int)(x);
     tmp += (x-tmp>=.5) - (x-tmp<=-.5);
     return tmp;
 }
