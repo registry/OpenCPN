@@ -115,6 +115,8 @@ public:
       bool        m_bDataValid;
 
 private:
+      void DoAdvance(void);
+    
       MyApp       *m_pparent_app;
       Route       *pActiveRoute;
       RoutePoint  *pActivePoint;
@@ -143,6 +145,10 @@ private:
       wxBrush     *m_pRoutePointBrush;
 
       NMEA0183    m_NMEA0183;                         // For autopilot output
+      
+      double      m_arrival_min;
+      int         m_arrival_test;
+      
 
 };
 
@@ -167,7 +173,7 @@ public:
       bool SharedWptsExist();
       void DeleteAllWaypoints(bool b_delete_used);
       RoutePoint *FindRoutePointByGUID(const wxString &guid);
-      void DestroyWaypoint(RoutePoint *pRp);
+      void DestroyWaypoint(RoutePoint *pRp, bool b_update_changeset = true);
       void ClearRoutePointFonts(void);
       void ProcessIcons( ocpnStyle::Style* style );
 

@@ -126,8 +126,9 @@ static bool s_ProgressCallBack( void )
 
 S57Obj::S57Obj()
 {
-    attList = NULL;
+    att_array = NULL;
     attVal = NULL;
+    n_attr = 0;
 
     pPolyTessGeo = NULL;
     pPolyTrapGeo = NULL;
@@ -175,7 +176,7 @@ S57Obj::~S57Obj()
             }
             delete attVal;
         }
-        if( attList ) delete attList;
+        free( att_array );
 
         if( pPolyTessGeo ) delete pPolyTessGeo;
 
@@ -197,8 +198,10 @@ S57Obj::~S57Obj()
 
 S57Obj::S57Obj( char *first_line, wxInputStream *pfpx, double dummy, double dummy2 )
 {
-    attList = NULL;
+    att_array = NULL;
     attVal = NULL;
+    n_attr = 0;
+    
     pPolyTessGeo = NULL;
     pPolyTrapGeo = NULL;
     bCS_Added = 0;
@@ -246,7 +249,6 @@ S57Obj::S57Obj( char *first_line, wxInputStream *pfpx, double dummy, double dumm
     {
 
         if( !strncmp( buf, "OGRF", 4 ) ) {
-            attList = new wxString();
             attVal = new wxArrayOfS57attVal();
 
             FEIndex = atoi( buf + 19 );
@@ -422,9 +424,12 @@ S57Obj::S57Obj( char *first_line, wxInputStream *pfpx, double dummy, double dumm
                     }
 
                     if( strlen( szAtt ) ) {
-                        attList->Append( wxString( szAtt, wxConvUTF8 ) );
-                        attList->Append( '\037' );
-
+                        wxASSERT( strlen(szAtt) == 6);
+                        att_array = (char *)realloc(att_array, 6*(n_attr + 1));
+                        
+                        strncpy(att_array + (6 * sizeof(char) * n_attr), szAtt, 6);
+                        n_attr++;
+                        
                         attVal->Add( pattValTmp );
                     } else
                         delete pattValTmp;
@@ -434,6 +439,7 @@ S57Obj::S57Obj( char *first_line, wxInputStream *pfpx, double dummy, double dumm
 
             //              Develop Geometry
 
+            
             switch( prim ){
                 case 1: {
                     if( !bMulti ) {
@@ -864,66 +870,56 @@ int S57Obj::my_bufgetl( char *ib_read, char *ib_end, char *buf, int buf_len_max 
     return nLineLen;
 }
 
+int S57Obj::GetAttributeIndex( const char *AttrSeek ) {
+    char *patl = att_array;
+    
+    for(int i=0 ; i < n_attr ; i++) {
+        if(!strncmp(patl, AttrSeek, 6)){
+            return i;
+            break;
+        }
+        
+        patl += 6;
+    }
+    
+    return -1;
+}
+    
+    
 wxString S57Obj::GetAttrValueAsString( char *AttrName )
 {
     wxString str;
-    char *tattList = NULL;
     
-    wxCharBuffer buffer=attList->ToUTF8();
-    if(buffer.data()) {
-        size_t len = strlen( buffer.data() );
-        tattList = (char *) calloc( len + 1, 1 );
-        strncpy( tattList, buffer.data(), len );
-    }
-    else
-        return str;
-
-    char *patl = tattList;
-    char *patr;
-    int idx = 0;
-    while( *patl ) {
-        patr = patl;
-        while( *patr != '\037' )
-            patr++;
-
-        if( !strncmp( patl, AttrName, 6 ) ) break;
-
-        patl = patr + 1;
-        idx++;
-    }
-
-    if( !*patl ) {
-        free( tattList );
-        return str;
-    }
+    int idx = GetAttributeIndex(AttrName);
+    
+    if(idx >= 0) {
 
 //      using idx to get the attribute value
 
-    S57attVal *v = attVal->Item( idx );
+        S57attVal *v = attVal->Item( idx );
 
-    switch( v->valType ){
-        case OGR_STR: {
-            char *val = (char *) ( v->value );
-            str.Append( wxString( val, wxConvUTF8 ) );
-            break;
-        }
-        case OGR_REAL: {
-            double dval = *(double*) ( v->value );
-            str.Printf( _T("%g"), dval );
-            break;
-        }
-        case OGR_INT: {
-            int ival = *( (int *) v->value );
-            str.Printf( _T("%d"), ival );
-            break;
-        }
-        default: {
-            str.Printf( _T("Unknown attribute type") );
-            break;
+        switch( v->valType ){
+            case OGR_STR: {
+                char *val = (char *) ( v->value );
+                str.Append( wxString( val, wxConvUTF8 ) );
+                break;
+            }
+            case OGR_REAL: {
+                double dval = *(double*) ( v->value );
+                str.Printf( _T("%g"), dval );
+                break;
+            }
+            case OGR_INT: {
+                int ival = *( (int *) v->value );
+                str.Printf( _T("%d"), ival );
+                break;
+            }
+            default: {
+                str.Printf( _T("Unknown attribute type") );
+                break;
+            }
         }
     }
-
-    free( tattList );
     return str;
 }
 
@@ -1037,6 +1033,10 @@ s57chart::s57chart()
 
     ref_lat = 0.0;
     ref_lon = 0.0;
+    
+    m_b2pointLUPS = false;
+    m_b2lineLUPS = false;
+    
 }
 
 s57chart::~s57chart()
@@ -1082,7 +1082,7 @@ s57chart::~s57chart()
 
 }
 
-void s57chart::GetValidCanvasRegion( const ViewPort& VPoint, wxRegion *pValidRegion )
+void s57chart::GetValidCanvasRegion( const ViewPort& VPoint, OCPNRegion *pValidRegion )
 {
     int rxl, rxr;
     int ryb, ryt;
@@ -1198,7 +1198,8 @@ void s57chart::FreeObjectsAndRules()
             top = razRules[i][j];
             while( top != NULL ) {
                 top->obj->nRef--;
-                if( 0 == top->obj->nRef ) delete top->obj;
+                if( 0 == top->obj->nRef )
+                    delete top->obj;
 
                 if( top->child ) {
                     ObjRazRules *ctop = top->child;
@@ -1278,17 +1279,15 @@ double s57chart::GetNormalScaleMax( double canvas_scale_factor, int canvas_width
 
 void s57chart::GetPointPix( ObjRazRules *rzRules, float north, float east, wxPoint *r )
 {
-    r->x = (int) round(((east - m_easting_vp_center) * m_view_scale_ppm) + m_pixx_vp_center);
-    r->y = (int) round(m_pixy_vp_center - ((north - m_northing_vp_center) * m_view_scale_ppm));
+    r->x = roundint(((east - m_easting_vp_center) * m_view_scale_ppm) + m_pixx_vp_center);
+    r->y = roundint(m_pixy_vp_center - ((north - m_northing_vp_center) * m_view_scale_ppm));
 }
 
 void s57chart::GetPointPix( ObjRazRules *rzRules, wxPoint2DDouble *en, wxPoint *r, int nPoints )
 {
     for( int i = 0; i < nPoints; i++ ) {
-        r[i].x =
-                (int) round(((en[i].m_x - m_easting_vp_center) * m_view_scale_ppm) + m_pixx_vp_center);
-        r[i].y =
-                (int) round(m_pixy_vp_center - ((en[i].m_y - m_northing_vp_center) * m_view_scale_ppm));
+        r[i].x =  roundint(((en[i].m_x - m_easting_vp_center) * m_view_scale_ppm) + m_pixx_vp_center);
+        r[i].y =  roundint(m_pixy_vp_center - ((en[i].m_y - m_northing_vp_center) * m_view_scale_ppm));
     }
 }
 
@@ -1501,19 +1500,19 @@ void s57chart::SetLinePriorities( void )
 }
 
 bool s57chart::RenderRegionViewOnGL( const wxGLContext &glc, const ViewPort& VPoint,
-        const wxRegion &Region )
+        const OCPNRegion &Region )
 {
     return DoRenderRegionViewOnGL( glc, VPoint, Region, false );
 }
 
 bool s57chart::RenderOverlayRegionViewOnGL( const wxGLContext &glc, const ViewPort& VPoint,
-        const wxRegion &Region )
+        const OCPNRegion &Region )
 {
     return DoRenderRegionViewOnGL( glc, VPoint, Region, true );
 }
 
 bool s57chart::DoRenderRegionViewOnGL( const wxGLContext &glc, const ViewPort& VPoint,
-        const wxRegion &Region, bool b_overlay )
+        const OCPNRegion &Region, bool b_overlay )
 {
 //     CALLGRIND_START_INSTRUMENTATION
 //      g_bDebugS57 = true;
@@ -1529,7 +1528,7 @@ bool s57chart::DoRenderRegionViewOnGL( const wxGLContext &glc, const ViewPort& V
     if( Region != m_last_Region ) force_new_view = true;
 
     ps52plib->PrepareForRender();
-
+    
     if( m_plib_state_hash != ps52plib->GetStateHash() ) {
         m_bLinePrioritySet = false;                     // need to reset line priorities
         UpdateLUPs( this );                               // and update the LUPs
@@ -1551,10 +1550,10 @@ bool s57chart::DoRenderRegionViewOnGL( const wxGLContext &glc, const ViewPort& V
 
     //    How many rectangles in the Region?
     int n_rect = 0;
-    wxRegionIterator clipit( Region );
-    while( clipit ) {
+    OCPNRegionIterator clipit( Region );
+    while( clipit.HaveRects() ) {
         wxRect rect = clipit.GetRect();
-        clipit++;
+        clipit.NextRect();
         n_rect++;
     }
     /*
@@ -1562,7 +1561,7 @@ bool s57chart::DoRenderRegionViewOnGL( const wxGLContext &glc, const ViewPort& V
      {
      printf("S57 n_rect: %d\n", n_rect);
 
-     wxRegionIterator upd ( Region );
+     OCPNRegionIterator upd ( Region );
      while ( upd )
      {
      wxRect rect = upd.GetRect();
@@ -1597,8 +1596,8 @@ bool s57chart::DoRenderRegionViewOnGL( const wxGLContext &glc, const ViewPort& V
     //    as is the case for CM93 charts with non-rectilinear borders
     //    However, most (all?) pan operations on "normal" charts will be small rect count
     if( n_rect < 4 ) {
-        wxRegionIterator upd( Region ); // get the Region rect list
-        while( upd ) {
+        OCPNRegionIterator upd( Region ); // get the Region rect list
+        while( upd.HaveRects() ) {
             wxRect rect = upd.GetRect();
 
             //  Build synthetic ViewPort on this rectangle
@@ -1628,7 +1627,7 @@ bool s57chart::DoRenderRegionViewOnGL( const wxGLContext &glc, const ViewPort& V
             SetClipRegionGL( glc, temp_vp, rect, !b_overlay );
             DoRenderRectOnGL( glc, temp_vp, rect );
 
-            upd++;
+            upd.NextRect();
         }
     } else {
         wxRect rect = Region.GetBox();
@@ -1672,7 +1671,7 @@ bool s57chart::DoRenderRegionViewOnGL( const wxGLContext &glc, const ViewPort& V
 }
 
 void s57chart::SetClipRegionGL( const wxGLContext &glc, const ViewPort& VPoint,
-        const wxRegion &Region, bool b_render_nodta )
+        const OCPNRegion &Region, bool b_render_nodta )
 {
     if( g_b_useStencil ) {
         //    Create a stencil buffer for clipping to the region
@@ -1711,8 +1710,8 @@ void s57chart::SetClipRegionGL( const wxGLContext &glc, const ViewPort& VPoint,
         glColorMask( GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE );   // disable color buffer
     }
 
-    wxRegionIterator upd( Region ); // get the Region rect list
-    while( upd ) {
+    OCPNRegionIterator upd( Region ); // get the Region rect list
+    while( upd.HaveRects() ) {
         wxRect rect = upd.GetRect();
 
         if( g_b_useStencil ) {
@@ -1742,7 +1741,7 @@ void s57chart::SetClipRegionGL( const wxGLContext &glc, const ViewPort& VPoint,
 
         }
 
-        upd++;
+        upd.NextRect();
 
     }
 
@@ -1916,19 +1915,19 @@ bool s57chart::DoRenderRectOnGL( const wxGLContext &glc, const ViewPort& VPoint,
 }
 
 bool s57chart::RenderRegionViewOnDC( wxMemoryDC& dc, const ViewPort& VPoint,
-        const wxRegion &Region )
+        const OCPNRegion &Region )
 {
     return DoRenderRegionViewOnDC( dc, VPoint, Region, false );
 }
 
 bool s57chart::RenderOverlayRegionViewOnDC( wxMemoryDC& dc, const ViewPort& VPoint,
-        const wxRegion &Region )
+        const OCPNRegion &Region )
 {
     return DoRenderRegionViewOnDC( dc, VPoint, Region, true );
 }
 
 bool s57chart::DoRenderRegionViewOnDC( wxMemoryDC& dc, const ViewPort& VPoint,
-        const wxRegion &Region, bool b_overlay )
+        const OCPNRegion &Region, bool b_overlay )
 {
     SetVPParms( VPoint );
 
@@ -1978,11 +1977,11 @@ bool s57chart::DoRenderRegionViewOnDC( wxMemoryDC& dc, const ViewPort& VPoint,
         pDIB->SelectIntoDC( dc_org );
 
         //    Decompose the region into rectangles, and fetch them into the target dc
-        wxRegionIterator upd( Region ); // get the requested rect list
-        while( upd ) {
+        OCPNRegionIterator upd( Region ); // get the requested rect list
+        while( upd.HaveRects() ) {
             wxRect rect = upd.GetRect();
             dc_clone.Blit( rect.x, rect.y, rect.width, rect.height, &dc_org, rect.x, rect.y );
-            upd++;
+            upd.NextRect();
         }
 
         dc_clone.SelectObject( wxNullBitmap );
@@ -2127,8 +2126,8 @@ bool s57chart::DoRenderViewOnDC( wxMemoryDC& dc, const ViewPort& VPoint, RenderT
 
     //      Using regions, calculate re-usable area of pDIB
 
-    wxRegion rgn_last( 0, 0, VPoint.pix_width, VPoint.pix_height );
-    wxRegion rgn_new( rul.x, rul.y, rlr.x - rul.x, rlr.y - rul.y );
+    OCPNRegion rgn_last( 0, 0, VPoint.pix_width, VPoint.pix_height );
+    OCPNRegion rgn_new( rul.x, rul.y, rlr.x - rul.x, rlr.y - rul.y );
     rgn_last.Intersect( rgn_new );            // intersection is reusable portion
 
     if( bNewVP && ( NULL != pDIB ) && !rgn_last.IsEmpty() ) {
@@ -2174,12 +2173,12 @@ bool s57chart::DoRenderViewOnDC( wxMemoryDC& dc, const ViewPort& VPoint, RenderT
 
         pDIB->SelectIntoDC( dc );
 
-        wxRegion rgn_delta( 0, 0, VPoint.pix_width, VPoint.pix_height );
-        wxRegion rgn_reused( desx, desy, wu, hu );
+        OCPNRegion rgn_delta( 0, 0, VPoint.pix_width, VPoint.pix_height );
+        OCPNRegion rgn_reused( desx, desy, wu, hu );
         rgn_delta.Subtract( rgn_reused );
 
-        wxRegionIterator upd( rgn_delta ); // get the update rect list
-        while( upd ) {
+        OCPNRegionIterator upd( rgn_delta ); // get the update rect list
+        while( upd.HaveRects() ) {
             wxRect rect = upd.GetRect();
 
 //      Build temp ViewPort on this region
@@ -2213,7 +2212,7 @@ bool s57chart::DoRenderViewOnDC( wxMemoryDC& dc, const ViewPort& VPoint, RenderT
 
             DCRenderRect( dc, temp_vp, &rect );
 
-            upd++;
+            upd.NextRect();
         }
 
         dc.SelectObject( wxNullBitmap );
@@ -2414,7 +2413,7 @@ bool s57chart::IsCellOverlayType( char *pFullPath )
     wxFileName fn( wxString( pFullPath, wxConvUTF8 ) );
     //      Get the "Usage" character
     wxString cname = fn.GetName();
-    return ( cname[2] == 'L' );
+    return ( (cname[2] == 'L') || (cname[2] == 'A'));
 }
 
 InitReturn s57chart::Init( const wxString& name, ChartInitFlag flags )
@@ -3337,33 +3336,15 @@ ListOfS57Obj *s57chart::GetAssociatedObjects( S57Obj *obj )
 
     switch( obj->Primitive_type ){
         case GEO_POINT:
+            //  n.b.  This logic not perfectly right for LINE and AREA features
+            //  It uses the object reference point for testing, instead of the decomposed
+            //  line or boundary geometry.  Thus, it may fail on some intersecting relationships.
+            //  Judged acceptable, in favor of performance implications.
+            //  DSR
+        case GEO_LINE:
+        case GEO_AREA:
             ObjRazRules *top;
             disPrioIdx = 1;         // PRIO_GROUP1:S57 group 1 filled areas
-
-            /*
-             for(j=0 ; j<LUPNAME_NUM ; j++)
-             {
-             top = razRules[disPrioIdx][j];
-             while ( top != NULL)
-             {
-             //                              if(!strncmp(top->obj->FeatureName, "DEPARE", 6) || !strncmp(top->obj->FeatureName, "DRGARE", 6))
-             if(top->obj->bIsAssociable)
-             {
-             if(top->obj->BBObj.PointInBox( lon, lat, 0.0))
-             {
-             if(IsPointInObjArea(lat, lon, 0.0, top->obj))
-             {
-             pobj_list->Append(top->obj);
-             break;
-             }
-             }
-             }
-
-             ObjRazRules *nxx  = top->next;
-             top = nxx;
-             }
-             }
-             */
 
             gotit = false;
             top = razRules[disPrioIdx][3];     // PLAIN_BOUNDARIES
@@ -3399,12 +3380,6 @@ ListOfS57Obj *s57chart::GetAssociatedObjects( S57Obj *obj )
                 }
             }
 
-            break;
-
-        case GEO_LINE:
-            break;
-
-        case GEO_AREA:
             break;
 
         default:
@@ -4689,10 +4664,10 @@ void s57chart::UpdateLUPs( s57chart *pOwner )
     ObjRazRules *top;
     ObjRazRules *nxx;
     LUPrec *LUP;
-
     for( int i = 0; i < PRIO_NUM; ++i ) {
         //  SIMPLIFIED is set, PAPER_CHART is bare
         if( ( razRules[i][0] ) && ( NULL == razRules[i][1] ) ) {
+            m_b2pointLUPS = true;
             top = razRules[i][0];
 
             while( top != NULL ) {
@@ -4714,6 +4689,7 @@ void s57chart::UpdateLUPs( s57chart *pOwner )
 
         //  PAPER_CHART is set, SIMPLIFIED is bare
         if( ( razRules[i][1] ) && ( NULL == razRules[i][0] ) ) {
+            m_b2pointLUPS = true;
             top = razRules[i][1];
 
             while( top != NULL ) {
@@ -4733,6 +4709,7 @@ void s57chart::UpdateLUPs( s57chart *pOwner )
 
         //  PLAIN_BOUNDARIES is set, SYMBOLIZED_BOUNDARIES is bare
         if( ( razRules[i][3] ) && ( NULL == razRules[i][4] ) ) {
+            m_b2lineLUPS = true;
             top = razRules[i][3];
 
             while( top != NULL ) {
@@ -4751,6 +4728,7 @@ void s57chart::UpdateLUPs( s57chart *pOwner )
 
         //  SYMBOLIZED_BOUNDARIES is set, PLAIN_BOUNDARIES is bare
         if( ( razRules[i][4] ) && ( NULL == razRules[i][3] ) ) {
+            m_b2lineLUPS = true;
             top = razRules[i][4];
 
             while( top != NULL ) {
@@ -4821,25 +4799,48 @@ void s57chart::CreateSENCRecord( OGRFeature *pFeature, FILE * fpOut, int mode, S
         if( pFeature->IsFieldSet( iField ) ) {
             if( ( iField == 1 ) || ( iField > 7 ) ) {
                 OGRFieldDefn *poFDefn = pFeature->GetDefnRef()->GetFieldDefn( iField );
-
                 const char *pType = OGRFieldDefn::GetFieldTypeName( poFDefn->GetType() );
+                const char *pAttrName = poFDefn->GetNameRef();
+                const char *pAttrVal = pFeature->GetFieldAsString( iField );
+                
+                if(strlen( pAttrVal ) ) {
+                    snprintf( line, MAX_HDR_LINE - 2, "  %s (%c) = ", pAttrName, *pType);
+                    wxString AttrStringPrefix = wxString( line, wxConvUTF8 );
+                    
+                    wxString wxAttrValue;
+                    
+                    if( (0 == strncmp("NOBJNM",pAttrName, 6) ) ||
+                        (0 == strncmp("NINFOM",pAttrName, 6) ) ||
+                        (0 == strncmp("NTXTDS",pAttrName, 6) ) )
+                    {
+                        if( poReader->GetNall() == 2) {     // ENC is using UCS-2 / UTF-16 encoding
+                            wxMBConvUTF16 conv;
+                            wxString att_conv(pAttrVal, conv);
+                            wxAttrValue = att_conv;
+                        }
+                    }
+                    
+                    if( wxAttrValue.IsEmpty()) {
+        // Attempt different conversions to accomodate different language encodings in
+        // the original ENC files.
 
-                snprintf( line, MAX_HDR_LINE - 2, "  %s (%c) = %s", poFDefn->GetNameRef(), *pType,
-                        pFeature->GetFieldAsString( iField ) );
+                        wxAttrValue = wxString( pAttrVal, wxConvUTF8 );
 
-				// Attempt different conversions to accomodate different language encodings in
-				// theoriginal files.
-
-				wxString wxAttrValue( line, wxConvUTF8 );
-
-				if( wxAttrValue.Length() < strlen(line) )
-					wxAttrValue = wxString( line, wxConvISO8859_1 );
-
-				if( wxAttrValue.Length() < strlen(line) )
-					wxLogError( _T("Warning: CreateSENCRecord(): Failed to convert string value to wxString.") );
-
-                sheader += wxAttrValue;
-                sheader += '\n';
+                        if( 0 ==wxAttrValue.Length() ) {
+                            wxMBConvUTF16 conv;
+                            wxString att_conv(pAttrVal, conv);
+                            wxAttrValue = att_conv;
+                            
+                            if( 0 ==wxAttrValue.Length() ) {
+                                wxLogError( _T("Warning: CreateSENCRecord(): Failed to convert string value to wxString.") );
+                            }
+                        }
+                    }
+                
+                    sheader += AttrStringPrefix;
+                    sheader += wxAttrValue;
+                    sheader += '\n';
+                }
             }
         }
     }
@@ -4864,8 +4865,9 @@ void s57chart::CreateSENCRecord( OGRFeature *pFeature, FILE * fpOut, int mode, S
         sprintf( line, "  %s %g %g\n", pGeo->getGeometryName(), ref_lat, ref_lon );
         sheader += wxString( line, wxConvUTF8 );
     }
-    fprintf( fpOut, "HDRLEN=%lu\n", (unsigned long) sheader.Len() );
-    fwrite( sheader.mb_str( wxConvUTF8 ), 1, sheader.Len(), fpOut );
+    wxCharBuffer buffer=sheader.ToUTF8();
+    fprintf( fpOut, "HDRLEN=%lu\n", (unsigned long) strlen(buffer) );
+    fwrite( buffer.data(), 1, strlen(buffer), fpOut );
 
     if( ( pGeo != NULL ) /*&& (mode == 1)*/) {
         int wkb_len = pGeo->WkbSize();
@@ -6240,16 +6242,8 @@ wxString s57chart::CreateObjDescriptions( ListOfObjRazRules* rule_list )
         }
 
         //    Get the Attributes and values, making sure they can be converted from UTF8
-        char *curr_att0 = NULL;
-        wxCharBuffer buffer = current->obj->attList->ToUTF8();
-        if(buffer.data()) {
-            size_t len = strlen( buffer.data() );
-            curr_att0 = (char *) calloc( len + 1, 1 );
-            strncpy( curr_att0, buffer.data(), len );
-        }
-        
-        if(curr_att0) {
-            char *curr_att = curr_att0;
+        if(current->obj->att_array) {
+            char *curr_att = current->obj->att_array;
 
             attrCounter = 0;
 
@@ -6259,17 +6253,11 @@ wxString s57chart::CreateObjDescriptions( ListOfObjRazRules* rule_list )
 
             bool inDepthRange = false;
 
-            while( *curr_att ) {
+            while( attrCounter < current->obj->n_attr ) {
                 //    Attribute name
-                curAttrName.Clear();
+                curAttrName = wxString(curr_att, wxConvUTF8, 6);
                 noAttr++;
-                while( ( *curr_att ) && ( *curr_att != '\037' ) ) {
-                    char t = *curr_att++;
-                    curAttrName.Append( t );
-                }
-
-                if( *curr_att == '\037' ) curr_att++;
-
+                
                 // Sort out how some kinds of attibutes are displayed to get a more readable look.
                 // DEPARE gets just its range. Lights are grouped.
 
@@ -6314,8 +6302,9 @@ wxString s57chart::CreateObjDescriptions( ListOfObjRazRules* rule_list )
                 }
 
                 attrCounter++;
+                curr_att += 6;
 
-            }             //while *curr_att
+            }             //while attrCounter < current->obj->n_attr
 
             if( !isLight ) {
                 attribStr << _T("</table>\n");
@@ -6333,7 +6322,6 @@ wxString s57chart::CreateObjDescriptions( ListOfObjRazRules* rule_list )
                 ret_val << objText;
             }
 
-            free( curr_att0 );
         }
     } // Object for loop
 
@@ -6587,7 +6575,7 @@ void OpenCPN_OGRErrorHandler( CPLErr eErrClass, int nError, const char * pszErro
     else
         sprintf( buf, "   ERROR %d: %s\n", nError, pszErrorMsg );
 
-    if( g_bGDAL_Debug ) {
+    if( g_bGDAL_Debug  || ( CE_Debug != eErrClass) ) {          // log every warning or error
         wxString msg( buf, wxConvUTF8 );
         wxLogMessage( msg );
     }
@@ -6729,7 +6717,7 @@ void s57_DrawExtendedLightSectors( ocpnDC& dc, ViewPort& viewport, std::vector<s
             narc++;
             step = ( angle2 - angle1 ) / (double)narc;
 
-            if( angle2 - angle1 < 15 && sectorlegs[i].fillSector ) {
+            if( sectorlegs[i].isleading/* && (angle2 - angle1 < 15) */ ) {
                 wxPoint yellowCone[3];
                 yellowCone[0] = lightPos;
                 yellowCone[1] = end1;
@@ -6760,19 +6748,25 @@ void s57_DrawExtendedLightSectors( ocpnDC& dc, ViewPort& viewport, std::vector<s
 
             bool haveAngle1 = false;
             bool haveAngle2 = false;
+            int sec1 = (int)sectorlegs[i].sector1;
+            int sec2 = (int)sectorlegs[i].sector2;
+            if(sec1 > 360) sec1 -= 360;
+            if(sec2 > 360) sec2 -= 360;
+            
             for( unsigned int j=0; j<sectorangles.size(); j++ ) {
-                if( sectorangles[j] == (int)sectorlegs[i].sector1 ) haveAngle1 = true;
-                if( sectorangles[j] == (int)sectorlegs[i].sector2 ) haveAngle2 = true;
+                
+                if( sectorangles[j] == sec1 ) haveAngle1 = true;
+                if( sectorangles[j] == sec2 ) haveAngle2 = true;
             }
 
             if( ! haveAngle1 ) {
                 dc.StrokeLine( lightPos, end1 );
-                sectorangles.push_back( (int) sectorlegs[i].sector1 );
+                sectorangles.push_back( sec1 );
             }
 
             if( ! haveAngle2 ) {
                 dc.StrokeLine( lightPos, end2 );
-                sectorangles.push_back( (int) sectorlegs[i].sector2 );
+                sectorangles.push_back( sec2 );
             }
         }
     }
@@ -6795,6 +6789,15 @@ bool s57_CheckExtendedLightSectors( int mx, int my, ViewPort& viewport, std::vec
     ChartBase *targetchart = cc1->GetChartAtCursor();
     s57chart *chart = dynamic_cast<s57chart*>( targetchart );
 
+    bool bhas_red_green = false;
+    bool bleading_attribute = false;
+    
+    int opacity = 100;
+    if( cc1->GetColorScheme() == GLOBAL_COLOR_SCHEME_DUSK ) opacity = 50;
+    if( cc1->GetColorScheme() == GLOBAL_COLOR_SCHEME_NIGHT) opacity = 20;
+    
+    int yOpacity = (float)opacity*1.3; // Matched perception of white/yellow with red/green
+    
     if( chart ) {
         sectorlegs.clear();
 
@@ -6819,78 +6822,94 @@ bool s57_CheckExtendedLightSectors( int mx, int my, ViewPort& viewport, std::vec
                 wxPoint2DDouble objPos( light->m_lat, light->m_lon );
                 if( lightPosD.m_x == 0 && lightPosD.m_y == 0.0 )
                     lightPosD = objPos;
-                
                 if( lightPosD == objPos ) {
-                    char *curr_att0 = NULL;
-                    wxCharBuffer buffer=light->attList->ToUTF8();
-                    if(buffer.data()) {
-                        size_t len = strlen(buffer.data());
-                        curr_att0 = (char *) calloc( len + 1, 1 );
-                        strncpy( curr_att0, buffer.data(), len );
-                    }
-                    if( curr_att0 ) {
-                        char *curr_att = curr_att0;
-
+                    
+                    if( light->att_array ) {
+                        char *curr_att = light->att_array;
+                        bool bviz = true;
+                        
                         attrCounter = 0;
                         int noAttr = 0;
                         bool inDepthRange = false;
                         s57Sector_t sector;
 
-                        while( *curr_att ) {
-                            curAttrName.Clear();
+                        bleading_attribute = false;
+                        
+                        while( attrCounter < light->n_attr ) {
+                            curAttrName = wxString(curr_att, wxConvUTF8, 6 );
                             noAttr++;
-                            while( ( *curr_att ) && ( *curr_att != '\037' ) ) {
-                                char t = *curr_att++;
-                                curAttrName.Append( t );
-                            }
-
-                            if( *curr_att == '\037' ) curr_att++;
 
                             wxString value = chart->GetObjectAttributeValueAsString( light, attrCounter, curAttrName );
-                            int opacity = 100;
-                            if( cc1->GetColorScheme() == GLOBAL_COLOR_SCHEME_DUSK ) opacity = 50;
-                            if( cc1->GetColorScheme() == GLOBAL_COLOR_SCHEME_NIGHT) opacity = 20;
 
-                            int yOpacity = (float)opacity*1.3; // Matched perception with red/green
-
+                            if( curAttrName == _T("LITVIS") ){
+                                if(value.StartsWith(_T("obsc")) )
+                                    bviz = false;
+                            }
                             if( curAttrName == _T("SECTR1") ) value.ToDouble( &sectr1 );
                             if( curAttrName == _T("SECTR2") ) value.ToDouble( &sectr2 );
                             if( curAttrName == _T("VALNMR") ) value.ToDouble( &valnmr );
                             if( curAttrName == _T("COLOUR") ) {
-                                sector.fillSector = true;
-                                color = wxColor( 255, 255, 0, yOpacity );
                                 if( value == _T("red(3)") ) {
                                     color = wxColor( 255, 0, 0, opacity );
-                                    sector.fillSector = false;
+                                    sector.iswhite = false;
+                                    bhas_red_green = true;
                                 }
                                 if( value == _T("green(4)") ) {
                                     color = wxColor( 0, 255, 0, opacity );
-                                    sector.fillSector = false;
+                                    sector.iswhite = false;
+                                    bhas_red_green = true;
                                 }
                             }
                             if( curAttrName == _T("EXCLIT") ) {
                                 if( value.Find( _T("(3)") ) ) valnmr = 1.0;  // Fog lights.
                             }
+                            if( curAttrName == _T("CATLIT") ){
+                                if( value.Upper().StartsWith( _T("DIRECT")) ||
+                                    value.Upper().StartsWith(_T("LEAD")) )
+                                    bleading_attribute = true;
+                            }
+                                
                             attrCounter++;
+                            curr_att += 6;
                         }
 
-                        free(curr_att0);
-
                         if( ( sectr1 >= 0 ) && ( sectr2 >= 0 ) ) {
+                            if( sectr1 > sectr2 ) {             // normalize
+                                sectr2 += 360.0;
+                            }
+                            
                             sector.pos.m_x = light->m_lon;
                             sector.pos.m_y = light->m_lat;
 
                             sector.range = (valnmr > 0.0) ? valnmr : 2.5; // Short default range.
                             sector.sector1 = sectr1;
                             sector.sector2 = sectr2;
+                            
+                            if(!color.IsOk()){
+                                color = wxColor( 255, 255, 0, yOpacity );
+                                sector.iswhite = true;
+                            }
                             sector.color = color;
+                            sector.isleading = false;           // tentative judgment, check below
 
+                            if( bleading_attribute )
+                                sector.isleading = true;
+                            
                             bool newsector = true;
                             for( unsigned int i=0; i<sectorlegs.size(); i++ ) {
                                 if( sectorlegs[i].pos == sector.pos &&
                                     sectorlegs[i].sector1 == sector.sector1 &&
-                                    sectorlegs[i].sector2 == sector.sector2 ) newsector = false;
+                                    sectorlegs[i].sector2 == sector.sector2 ) {
+                                        newsector = false;
+                                        //  In the case of duplicate sectors, choose the instance with largest range.
+                                        //  This applies to the case where day and night VALNMR are different, and so
+                                        //  makes the vector result independent of the order of day/night light features.
+                                        sectorlegs[i].range = wxMax(sectorlegs[i].range, sector.range);
+                                }
                             }
+                            if(!bviz)
+                                newsector = false;
+                            
                             if( newsector ) {
                                 sectorlegs.push_back( sector );
                                 newSectorsNeedDrawing = true;
@@ -6904,5 +6923,52 @@ bool s57_CheckExtendedLightSectors( int mx, int my, ViewPort& viewport, std::vec
         rule_list->Clear();
         delete rule_list;
     }
+
+#if 0    
+    //  Work with the sector legs vector to identify  and mark "Leading Lights"
+    int ns = sectorlegs.size();
+    if( sectorlegs.size() > 0 ) {
+        for( unsigned int i=0; i<sectorlegs.size(); i++ ) {
+            if( fabs( sectorlegs[i].sector1 - sectorlegs[i].sector2 ) < 0.5 )
+                continue;
+            
+            if(((sectorlegs[i].sector2 - sectorlegs[i].sector1) < 15)  && sectorlegs[i].iswhite ) {
+                //      Check to see if this sector has a visible range greater than any other white light
+                
+                if( sectorlegs.size() > 1 ) {
+                    bool bleading = true;
+                    for( unsigned int j=0; j<sectorlegs.size(); j++ ) {
+                        if(i == j)
+                            continue;
+                        if((sectorlegs[j].iswhite) && (sectorlegs[i].range <= sectorlegs[j].range) ){
+                            if((sectorlegs[j].sector2 - sectorlegs[j].sector1) >= 15){  // test sector should not be a leading light
+                                bleading = false;    // cannot be a sector, since its range is <= another white light
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if(bleading)
+                        sectorlegs[i].isleading = true;
+                }
+            }
+            else
+                sectorlegs[i].isleading = false;
+                
+        }
+    }
+#endif    
+
+//  Work with the sector legs vector to identify  and mark "Leading Lights"
+//  Sectors with CATLIT "Leading" or "Directional" attribute set have already been marked
+    for( unsigned int i=0; i<sectorlegs.size(); i++ ) {
+ 
+        if(((sectorlegs[i].sector2 - sectorlegs[i].sector1) < 15) ) {
+            if( sectorlegs[i].iswhite && bhas_red_green )
+                sectorlegs[i].isleading = true;
+        }
+    }
+            
+    
     return newSectorsNeedDrawing;
 }

@@ -40,6 +40,7 @@ extern int g_route_line_width;
 extern Select *pSelect;
 extern MyConfig *pConfig;
 extern Multiplexer *g_pMUX;
+extern double           g_n_arrival_circle_radius;
 
 #include <wx/listimpl.cpp>
 WX_DEFINE_LIST ( RouteList );
@@ -67,7 +68,7 @@ Route::Route( void )
     m_GUID = pWayPointMan->CreateGUID( NULL );
     m_btemp = false;
     
-    m_ArrivalRadius = .05;        // default, Miles
+    m_ArrivalRadius = g_n_arrival_circle_radius;        // Nautical Miles
 
     RBBox.Reset();
     m_bcrosses_idl = false;
@@ -79,6 +80,12 @@ Route::Route( void )
 
     m_lastMousePointIndex = 0;
     m_NextLegGreatCircle = false;
+    
+    m_PlannedSpeed = ROUTE_DEFAULT_SPEED;
+    m_PlannedDeparture = RTE_UNDEF_DEPARTURE;
+    m_TimeDisplayFormat = RTE_TIME_DISP_UTC;
+    
+    m_HyperlinkList = new HyperlinkList;
 }
 
 Route::~Route( void )
@@ -146,11 +153,11 @@ void Route::CloneTrack( Route *psourceroute, int start_nPoint, int end_nPoint, c
 
         int segment_shift = psourcepoint->m_GPXTrkSegNo;
 
-        if( ( start_nPoint == 2 ) /*&& (psourcepoint->m_GPXTrkSegNo == startTrkSegNo)*/)
-			segment_shift = psourcepoint->m_GPXTrkSegNo - 1; // continue first segment if tracks share the first point
+        if(  start_nPoint == 2 ) 
+            segment_shift = psourcepoint->m_GPXTrkSegNo - 1; // continue first segment if tracks share the first point
 
         if( b_splitting )
-			m_pLastAddedPoint->m_GPXTrkSegNo = ( psourcepoint->m_GPXTrkSegNo - startTrkSegNo ) + 1;
+            m_pLastAddedPoint->m_GPXTrkSegNo = ( psourcepoint->m_GPXTrkSegNo - startTrkSegNo ) + 1;
         else
             m_pLastAddedPoint->m_GPXTrkSegNo = startTrkSegNo + segment_shift;
     }
@@ -874,7 +881,8 @@ void Route::Reverse( bool bRenamePoints )
     pRoutePointList->DeleteContents( false );
     pRoutePointList->Clear();
     m_nPoints = 0;
-
+    m_route_length = 0.0;
+    
     AssembleRoute();                          // Rebuild the route points from the GUID list
 
     if( bRenamePoints ) RenameRoutePoints();

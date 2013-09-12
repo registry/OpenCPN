@@ -233,6 +233,7 @@ extern double           g_n_ownship_beam_meters;
 extern double           g_n_gps_antenna_offset_y;
 extern double           g_n_gps_antenna_offset_x;
 extern int              g_n_ownship_min_mm;
+extern double           g_n_arrival_circle_radius;
 
 extern bool             g_bPreserveScaleOnX;
 
@@ -294,6 +295,8 @@ extern int              g_lastClientRectw;
 extern int              g_lastClientRecth;
 
 extern bool             g_bHighliteTracks;
+extern int              g_cog_predictor_width;
+extern int              g_ais_cog_predictor_width;
 
 extern int              g_route_line_width;
 extern int              g_track_line_width;
@@ -400,7 +403,7 @@ void Track::Stop( bool do_add_point )
     m_track_run = 0;
 }
 
-bool Track::DoExtendDaily()
+Track *Track::DoExtendDaily()
 {
     Route *pExtendRoute = NULL;
     RoutePoint *pExtendPoint = NULL;
@@ -413,10 +416,11 @@ bool Track::DoExtendDaily()
 
         if( !proute->m_bIsInLayer && proute->m_bIsTrack && proute->m_GUID != this->m_GUID ) {
             RoutePoint *track_node = proute->GetLastPoint();
-            if( track_node->GetCreateTime() <= pLastPoint->GetCreateTime() ) if( !pExtendPoint
-                    || track_node->GetCreateTime() > pExtendPoint->GetCreateTime() ) {
-                pExtendPoint = track_node;
-                pExtendRoute = proute;
+            if( track_node->GetCreateTime() <= pLastPoint->GetCreateTime() ) {
+                if( !pExtendPoint  || track_node->GetCreateTime() > pExtendPoint->GetCreateTime() ) {
+                    pExtendPoint = track_node;
+                    pExtendRoute = proute;
+                }
             }
         }
         route_node = route_node->GetNext();                         // next route
@@ -436,19 +440,20 @@ bool Track::DoExtendDaily()
         pSelect->AddAllSelectableTrackSegments( pExtendRoute );
         pSelect->DeleteAllSelectableTrackSegments( this );
         this->ClearHighlights();
-        return true;
+        return (Track *)pExtendRoute;
     } else {
-        if( this->m_RouteNameString.IsNull() ) this->m_RouteNameString =
-                wxDateTime::Today().FormatISODate();
-        return false;
+        if( this->m_RouteNameString.IsNull() )
+            this->m_RouteNameString = wxDateTime::Today().FormatISODate();
+        return NULL;
     }
 }
 
-void Track::FixMidnight( Track *pPreviousTrack )
+void Track::AdjustCurrentTrackPoint( RoutePoint *prototype )
 {
-    RoutePoint *pMidnightPoint = pPreviousTrack->GetLastPoint();
-    CloneAddedTrackPoint( m_lastStoredTP, pMidnightPoint );
-    m_prev_time = pMidnightPoint->GetCreateTime().FromUTC();
+    if(prototype) {
+        CloneAddedTrackPoint( m_lastStoredTP, prototype );
+        m_prev_time = prototype->GetCreateTime().FromUTC();
+    }
 }
 
 void Track::OnTimerTrack( wxTimerEvent& event )
@@ -985,7 +990,7 @@ MyConfig::MyConfig( const wxString &appName, const wxString &vendorName,
     m_pNavObjectInputSet = NULL;
     m_pNavObjectChangesSet = new NavObjectChanges();
 
-    m_bIsImporting = false;
+    m_bSkipChangeSetUpdate = false;
 
     g_pConnectionParams = new wxArrayOfConnPrm();
 }
@@ -1149,6 +1154,7 @@ int MyConfig::LoadMyConfig( int iteration )
     Read( _T ( "SpeedFormat" ), &g_iSpeedFormat, 0 ); //0 = "kts"), 1 = "mph", 2 = "km/h", 3 = "m/s"
 
     Read( _T ( "OwnshipCOGPredictorMinutes" ), &g_ownship_predictor_minutes, 5 );
+    Read( _T ( "OwnshipCOGPredictorWidth" ), &g_cog_predictor_width, 3 );
     Read( _T ( "OwnShipIconType" ), &g_OwnShipIconType, 0 );
     Read( _T ( "OwnShipLength" ), &g_n_ownship_length_meters, 0 );
     Read( _T ( "OwnShipWidth" ), &g_n_ownship_beam_meters, 0 );
@@ -1157,6 +1163,13 @@ int MyConfig::LoadMyConfig( int iteration )
     Read( _T ( "OwnShipMinSize" ), &g_n_ownship_min_mm, 1 );
     g_n_ownship_min_mm = wxMax(g_n_ownship_min_mm, 1);
 
+    g_n_arrival_circle_radius = .050;           // default
+    wxString racr;
+    Read( _T ( "RouteArrivalCircleRadius" ), &racr );
+    if(racr.Len())
+        racr.ToDouble( &g_n_arrival_circle_radius);
+    g_n_arrival_circle_radius = wxMax(g_n_arrival_circle_radius, .001);
+    
     Read( _T ( "FullScreenQuilt" ), &g_bFullScreenQuilt, 1 );
 
     Read( _T ( "StartWithTrackActive" ), &g_bTrackCarryOver, 0 );
@@ -1255,6 +1268,7 @@ int MyConfig::LoadMyConfig( int iteration )
     g_Show_Target_Name_Scale = Read( _T ( "ShowAISTargetNameScale" ), 250000L );
     g_Show_Target_Name_Scale = wxMax( 5000, g_Show_Target_Name_Scale );
     Read( _T ( "bWplIsAprsPositionReport" ), &g_bWplIsAprsPosition, 1 );
+    Read( _T ( "AISCOGPredictorWidth" ), &g_ais_cog_predictor_width, 3 );
 
     Read( _T ( "bAISAlertAudio" ), &g_bAIS_CPA_Alert_Audio );
     Read( _T ( "AISAlertAudioFile" ), &g_sAIS_Alert_Sound_File );
@@ -1334,6 +1348,9 @@ int MyConfig::LoadMyConfig( int iteration )
 
         Read( _T ( "bDeClutterText" ), &read_int, 0 );
         ps52plib->m_bDeClutterText = !( read_int == 0 );
+
+        Read( _T ( "bShowNationalText" ), &read_int, 0 );
+        ps52plib->m_bShowNationalTexts = !( read_int == 0 );
 
         if( Read( _T ( "S52_MAR_SAFETY_CONTOUR" ), &dval, 5.0 ) ) {
             S52_setMarinerParam( S52_MAR_SAFETY_CONTOUR, dval );
@@ -1731,7 +1748,7 @@ int MyConfig::LoadMyConfig( int iteration )
     //  Routes
     if( 0 == iteration )
         pRouteList = new RouteList;
-        
+
     //    Groups
     if( 0 == iteration )
         LoadConfigGroups( g_pGroupArray );
@@ -1743,32 +1760,33 @@ int MyConfig::LoadMyConfig( int iteration )
 
         if( NULL == m_pNavObjectInputSet )
             m_pNavObjectInputSet = new NavObjectCollection1();
-        
+
         if( ::wxFileExists( m_sNavObjSetFile ) ) {
             if( m_pNavObjectInputSet->load_file( m_sNavObjSetFile.fn_str() ) )
                 m_pNavObjectInputSet->LoadAllGPXObjects();
         }
-        
+
         delete m_pNavObjectInputSet;
-        
-        
+
+
         if( ::wxFileExists( m_sNavObjSetChangesFile ) ) {
             //We crashed last time :(
             //That's why this file still exists...
             //Let's reconstruct the unsaved changes
             NavObjectChanges *pNavObjectChangesSet = new NavObjectChanges();
             pNavObjectChangesSet->load_file( m_sNavObjSetChangesFile.fn_str() );
-            
+
             //  Remove the file before applying the changes,
             //  just in case the changes file itself causes a fault.
             //  If it does fault, at least the next restart will proceed without fault.
-            ::wxRemoveFile( m_sNavObjSetChangesFile );
-            
+            if( ::wxFileExists( m_sNavObjSetChangesFile ) )
+                ::wxRemoveFile( m_sNavObjSetChangesFile );
+
             wxLogMessage( _T("Applying NavObjChanges") );
             pNavObjectChangesSet->ApplyChanges();
             delete pNavObjectChangesSet;
-            
-            UpdateNavObj(); 
+
+            UpdateNavObj();
         }
     }
 
@@ -1847,50 +1865,50 @@ bool MyConfig::LoadLayers(wxString &path)
                 file_array.Add( filename); // single-gpx-file layer
             else
                 wxDir::GetAllFiles( filename, &file_array, wxT("*.gpx") );      // layers subdirectory set
-         
+
             if( file_array.GetCount() ){
                 l = new Layer();
                 l->m_LayerID = ++g_LayerIdx;
                 l->m_LayerFileName = file_array[0];
                 if( file_array.GetCount() <= 1 )
                     wxFileName::SplitPath( file_array[0], NULL, NULL, &( l->m_LayerName ), NULL, NULL );
-                else 
+                else
                     wxFileName::SplitPath( filename, NULL, NULL, &( l->m_LayerName ), NULL, NULL );
-                
+
                 bool bLayerViz = g_bShowLayers;
-                
+
                 if( g_VisibleLayers.Contains( l->m_LayerName ) )
                     bLayerViz = true;
                 if( g_InvisibleLayers.Contains( l->m_LayerName ) )
                     bLayerViz = false;
-    
+
                 l->m_bIsVisibleOnChart = bLayerViz;
-            
+
                 wxString laymsg;
                 laymsg.Printf( wxT("New layer %d: %s"), l->m_LayerID, l->m_LayerName.c_str() );
                 wxLogMessage( laymsg );
-            
+
                 pLayerList->Insert( l );
-            
+
                 //  Load the entire file array as a single layer
-                
+
                 for( unsigned int i = 0; i < file_array.GetCount(); i++ ) {
                     wxString file_path = file_array[i];
-                    
+
                     if( ::wxFileExists( file_path ) ) {
                         NavObjectCollection1 *pSet = new NavObjectCollection1;
                         pSet->load_file(file_path.fn_str());
                         l->m_NoOfItems = pSet->LoadAllGPXObjectsAsLayer(l->m_LayerID, bLayerViz);
-                        
+
                         delete pSet;
                     }
                 }
             }
-            
+
             cont = dir.GetNext( &filename );
         }
     }
-    
+
     return true;
 }
 
@@ -1958,11 +1976,11 @@ bool MyConfig::AddNewRoute( Route *pr, int crm )
         return true;
 
 
-    if( !m_bIsImporting ) {
+    if( !m_bSkipChangeSetUpdate ) {
         m_pNavObjectChangesSet->AddRoute( pr, "add" );
         StoreNavObjChanges();
     }
-    
+
     return true;
 }
 
@@ -1971,12 +1989,12 @@ bool MyConfig::UpdateRoute( Route *pr )
     if( pr->m_bIsInLayer ) return true;
 
 
-    if( !m_bIsImporting ) {
-        if( pr->m_bIsTrack ) 
+    if( !m_bSkipChangeSetUpdate ) {
+        if( pr->m_bIsTrack )
             m_pNavObjectChangesSet->AddTrack( (Track *)pr, "update" );
         else
             m_pNavObjectChangesSet->AddRoute( pr, "update" );
-        
+
         StoreNavObjChanges();
     }
 
@@ -1988,8 +2006,8 @@ bool MyConfig::DeleteConfigRoute( Route *pr )
     if( pr->m_bIsInLayer )
         return true;
 
-    if( !m_bIsImporting ) {
-        if( !pr->m_bIsTrack ) 
+    if( !m_bSkipChangeSetUpdate ) {
+        if( !pr->m_bIsTrack )
             m_pNavObjectChangesSet->AddRoute( (Track *)pr, "delete" );
         else
             m_pNavObjectChangesSet->AddTrack( (Track *)pr, "delete" );
@@ -2004,7 +2022,7 @@ bool MyConfig::AddNewWayPoint( RoutePoint *pWP, int crm )
     if( pWP->m_bIsInLayer )
         return true;
 
-    if( !m_bIsImporting ) {
+    if( !m_bSkipChangeSetUpdate ) {
         m_pNavObjectChangesSet->AddWP( pWP, "add" );
         StoreNavObjChanges();
     }
@@ -2017,7 +2035,7 @@ bool MyConfig::UpdateWayPoint( RoutePoint *pWP )
     if( pWP->m_bIsInLayer )
         return true;
 
-    if( !m_bIsImporting ) {
+    if( !m_bSkipChangeSetUpdate ) {
         m_pNavObjectChangesSet->AddWP( pWP, "update" );
         StoreNavObjChanges();
     }
@@ -2030,7 +2048,7 @@ bool MyConfig::DeleteWayPoint( RoutePoint *pWP )
     if( pWP->m_bIsInLayer )
         return true;
 
-    if( !m_bIsImporting ) {
+    if( !m_bSkipChangeSetUpdate ) {
         m_pNavObjectChangesSet->AddWP( pWP, "delete" );
         StoreNavObjChanges();
     }
@@ -2213,6 +2231,7 @@ void MyConfig::UpdateSettings()
     Write( _T ( "COGUPAvgSeconds" ), g_COGAvgSec );
 
     Write( _T ( "OwnshipCOGPredictorMinutes" ), g_ownship_predictor_minutes );
+    Write( _T ( "OwnshipCOGPredictorWidth" ), g_cog_predictor_width );
     Write( _T ( "OwnShipIconType" ), g_OwnShipIconType );
     Write( _T ( "OwnShipLength" ), g_n_ownship_length_meters );
     Write( _T ( "OwnShipWidth" ), g_n_ownship_beam_meters );
@@ -2220,6 +2239,11 @@ void MyConfig::UpdateSettings()
     Write( _T ( "OwnShipGPSOffsetY" ), g_n_gps_antenna_offset_y );
     Write( _T ( "OwnShipMinSize" ), g_n_ownship_min_mm );
 
+    wxString racr;
+ //   racr.Printf( _T ( "%g" ), g_n_arrival_circle_radius );
+ //   Write( _T ( "RouteArrivalCircleRadius" ), racr );
+    Write( _T ( "RouteArrivalCircleRadius" ), wxString::Format( _T("%.2f"), g_n_arrival_circle_radius ));
+    
     Write( _T ( "ChartQuilting" ), g_bQuiltEnable );
     Write( _T ( "FullScreenQuilt" ), g_bFullScreenQuilt );
 
@@ -2354,6 +2378,7 @@ void MyConfig::UpdateSettings()
     Write( _T ( "bShowAISName" ), g_bShowAISName );
     Write( _T ( "ShowAISTargetNameScale" ), g_Show_Target_Name_Scale );
     Write( _T ( "bWplIsAprsPositionReport" ), g_bWplIsAprsPosition );
+    Write( _T ( "AISCOGPredictorWidth" ), g_ais_cog_predictor_width );
 
     Write( _T ( "AlertDialogSizeX" ), g_ais_alert_dialog_sx );
     Write( _T ( "AlertDialogSizeY" ), g_ais_alert_dialog_sy );
@@ -2393,6 +2418,7 @@ void MyConfig::UpdateSettings()
         Write( _T ( "bShowLightDescription" ), ps52plib->m_bShowLdisText );
         Write( _T ( "bExtendLightSectors" ), ps52plib->m_bExtendLightSectors );
         Write( _T ( "bDeClutterText" ), ps52plib->m_bDeClutterText );
+        Write( _T ( "bShowNationalText" ), ps52plib->m_bShowNationalTexts );
 
         Write( _T ( "S52_MAR_SAFETY_CONTOUR" ), S52_getMarinerParam( S52_MAR_SAFETY_CONTOUR ) );
         Write( _T ( "S52_MAR_SHALLOW_CONTOUR" ), S52_getMarinerParam( S52_MAR_SHALLOW_CONTOUR ) );
@@ -2491,15 +2517,16 @@ void MyConfig::UpdateNavObj( void )
 
 //   Create the NavObjectCollection, and save to specified file
     NavObjectCollection1 *pNavObjectSet = new NavObjectCollection1();
-    
+
     pNavObjectSet->CreateAllGPXObjects();
     pNavObjectSet->SaveFile( m_sNavObjSetFile );
-    
+
     delete pNavObjectSet;
 
+    wxRemoveFile( m_sNavObjSetChangesFile );
     delete m_pNavObjectChangesSet;
     m_pNavObjectChangesSet = new NavObjectChanges();
-    
+
 }
 
 void MyConfig::StoreNavObjChanges( void )
@@ -2507,9 +2534,9 @@ void MyConfig::StoreNavObjChanges( void )
     m_pNavObjectChangesSet->SaveFile( m_sNavObjSetChangesFile );
 }
 
-bool MyConfig::ExportGPXRoutes( wxWindow* parent, RouteList *pRoutes )
+bool MyConfig::ExportGPXRoutes( wxWindow* parent, RouteList *pRoutes, const wxString suggestedName )
 {
-    wxFileDialog saveDialog( parent, _( "Export GPX file" ), m_gpx_path, _T("routes"),
+    wxFileDialog saveDialog( parent, _( "Export GPX file" ), m_gpx_path, suggestedName,
             wxT ( "GPX files (*.gpx)|*.gpx" ), wxFD_SAVE );
 
     int response = saveDialog.ShowModal();
@@ -2537,9 +2564,9 @@ bool MyConfig::ExportGPXRoutes( wxWindow* parent, RouteList *pRoutes )
         return false;
 }
 
-bool MyConfig::ExportGPXWaypoints( wxWindow* parent, RoutePointList *pRoutePoints )
+bool MyConfig::ExportGPXWaypoints( wxWindow* parent, RoutePointList *pRoutePoints, const wxString suggestedName )
 {
-    wxFileDialog saveDialog( parent, _( "Export GPX file" ), m_gpx_path, wxT ( "" ),
+    wxFileDialog saveDialog( parent, _( "Export GPX file" ), m_gpx_path, suggestedName,
             wxT ( "GPX files (*.gpx)|*.gpx" ), wxFD_SAVE );
 
     int response = saveDialog.ShowModal();
@@ -2588,9 +2615,9 @@ void MyConfig::ExportGPX( wxWindow* parent, bool bviz_only, bool blayer )
         }
 
         ::wxBeginBusyCursor();
-        
+
         NavObjectCollection1 *pgpx = new NavObjectCollection1;
-        
+
         wxProgressDialog *pprog = NULL;
         int count = pWayPointMan->m_pWayPointList->GetCount();
         if( count > 200) {
@@ -2709,7 +2736,7 @@ void MyConfig::UI_ImportGPX( wxWindow* parent, bool islayer, wxString dirpath, b
                 else
                     wxFileName::SplitPath( dirpath, NULL, NULL, &( l->m_LayerName ), NULL, NULL );
             }
-            
+
             bool bLayerViz = g_bShowLayers;
             if( g_VisibleLayers.Contains( l->m_LayerName ) )
                 bLayerViz = true;
@@ -2728,16 +2755,16 @@ void MyConfig::UI_ImportGPX( wxWindow* parent, bool islayer, wxString dirpath, b
             wxString path = file_array[i];
 
             if( ::wxFileExists( path ) ) {
-                
+
                 NavObjectCollection1 *pSet = new NavObjectCollection1;
                 pSet->load_file(path.fn_str());
-                
+
                 if(islayer){
                     l->m_NoOfItems = pSet->LoadAllGPXObjectsAsLayer(l->m_LayerID, l->m_bIsVisibleOnChart);
                 }
                 else
                     pSet->LoadAllGPXObjects();
-                
+
                 delete pSet;
             }
         }

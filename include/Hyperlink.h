@@ -27,7 +27,7 @@
 
 #include <wx/string.h>
 #include <wx/list.h>
-
+#include <wx/image.h>
 class Hyperlink // toh, 2009.02.14
 {
       public:

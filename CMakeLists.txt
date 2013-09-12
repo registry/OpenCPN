@@ -104,9 +104,9 @@ IF (NOT WIN32)
   ENDIF (EXISTS /etc/gentoo-release)
   IF(APPLE)
     IF (CMAKE_SIZEOF_VOID_P MATCHES "8")
-      IF (CMAKE_OSX_64)
+#      IF (CMAKE_OSX_64)
         SET(ARCH "x86_64")
-      ENDIF (CMAKE_OSX_64)
+#      ENDIF (CMAKE_OSX_64)
     ENDIF (CMAKE_SIZEOF_VOID_P MATCHES "8")
   ENDIF()
 ELSE (NOT WIN32)
@@ -121,6 +121,7 @@ ENDIF (CMAKE_SYSTEM_PROCESSOR MATCHES "arm*")
 IF (ARCH MATCHES "armhf")
   ADD_DEFINITIONS(-DARMHF)
 ENDIF (ARCH MATCHES "armhf")
+
 
 MESSAGE (STATUS "*** Build Architecture is ${ARCH}")
 SET(PACKAGE_RELEASE "1" CACHE STRING "Package release number")
@@ -180,10 +181,16 @@ INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/src)
 #ADD_DEFINITIONS( "-Wall -ansi -pedantic -Wno-variadic-macros" )
 #TODO: Should we use  -fno-stack-protector
 #  IF NOT DEBUGGING CFLAGS="-O2 -march=native"
-IF(NOT WIN32)
+IF(NOT WIN32 AND NOT APPLE )
   ADD_DEFINITIONS( "-Wall -Wno-unused -fexceptions -rdynamic" )
   ADD_DEFINITIONS( " -g -fno-strict-aliasing")
-ENDIF(NOT WIN32)
+ENDIF(NOT WIN32 AND NOT APPLE)
+
+IF( APPLE )
+  ADD_DEFINITIONS( "-Wall -Wno-unused -fexceptions -Wno-overloaded-virtual" )
+  ADD_DEFINITIONS( " -g -fno-strict-aliasing")
+  ADD_DEFINITIONS( " -Wno-deprecated -Wno-deprecated-declarations" )
+ENDIF(APPLE)
 
 #Enable CrashReporting for Windows
 IF(WIN32)
@@ -295,8 +302,8 @@ SET(SRC_NMEA0183
 		src/nmea0183/gsv.cpp
 		src/nmea0183/GPwpl.cpp
 		src/nmea0183/GPwpl.hpp
-                src/nmea0183/apb.cpp
-                src/nmea0183/apb.hpp
+        src/nmea0183/apb.cpp
+        src/nmea0183/apb.hpp
 	)
 ADD_LIBRARY(NMEA0183 ${SRC_NMEA0183})
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/src/nmea0183)
@@ -326,8 +333,8 @@ INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/src/nmea0183)
 
 
 SET(HDRS
-        include/ocpn_types.h
-        include/ocpndc.h
+                include/ocpn_types.h
+                include/ocpndc.h
 		include/chart1.h
 		include/bbox.h
 		include/ocpn_pixel.h
@@ -422,14 +429,17 @@ SET(HDRS
 		include/ConnectionParams.h
 		include/OCP_DataStreamInput_Thread.h
 		include/dsPortType.h
-        include/multiplexer.h
+                include/multiplexer.h
+                include/OCPNRegion.h
+                include/TrackPropDlg.h
+                include/LinkPropDlg.h
 )
 
 SET(SRCS
 		src/chart1.cpp
 		src/bbox.cpp
 		src/ocpn_pixel.cpp
-        src/ocpndc.cpp
+                src/ocpndc.cpp
 		src/chartdb.cpp
 		src/chartdbs.cpp
 		src/chartimg.cpp
@@ -509,8 +519,11 @@ SET(SRCS
 		src/OCPN_DataStreamEvent.cpp
 		src/ConnectionParams.cpp
 		src/OCP_DataStreamInput_Thread.cpp
-        src/multiplexer.cpp
+                src/multiplexer.cpp
                 src/pugixml.cpp
+                src/OCPNRegion.cpp
+                src/TrackPropDlg.cpp
+                src/LinkPropDlg.cpp
     )
 
 IF(wx_Version MATCHES "2.9")
@@ -640,9 +653,9 @@ IF (USE_GARMINHOST)
                   src/garmin/jeeps/gpscom.c
                   src/garmin/jeeps/gpsmath.c
                   src/garmin/jeeps/gpsmem.c
-	              src/garmin/jeeps/gpsprot.c
+	          src/garmin/jeeps/gpsprot.c
                   src/garmin/jeeps/gpsread.c
-	              src/garmin/jeeps/gpsdevice.c
+	          src/garmin/jeeps/gpsdevice.c
                   src/garmin/jeeps/gpsdevice_ser.c
                   src/garmin/jeeps/gpsdevice_usb.c
                   src/garmin/jeeps/gpsrqst.c
@@ -773,11 +786,11 @@ IF(APPLE)
   SET(CMAKE_C_FLAGS_RELEASE "-O3 -arch ${ARCH}")
   SET(CMAKE_C_FLAGS_RELWITHDEBINFO "-g -O3 -arch ${ARCH}")
 
-  SET(CMAKE_CXX_FLAGS "-O2 -arch ${ARCH} -Wno-deprecated -Wno-deprecated-declarations")
-  SET(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -arch ${ARCH} -Wno-deprecated -Wno-deprecated-declarations")
-  SET(CMAKE_CXX_FLAGS_MINSIZEREL "-O2 -arch ${ARCH} -Wno-deprecated -Wno-deprecated-declarations")
-  SET(CMAKE_CXX_FLAGS_RELEASE "-O3 -arch ${ARCH} -Wno-deprecated -Wno-deprecated-declarations")
-  SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g -O3 -arch ${ARCH} -Wno-deprecated -Wno-deprecated-declarations")
+  SET(CMAKE_CXX_FLAGS "-O2 -arch ${ARCH}")
+  SET(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -arch ${ARCH}")
+  SET(CMAKE_CXX_FLAGS_MINSIZEREL "-O2 -arch ${ARCH}")
+  SET(CMAKE_CXX_FLAGS_RELEASE "-O3 -arch ${ARCH}")
+  SET(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g -O3 -arch ${ARCH}")
 
   SET(CMAKE_EXE_LINKER_FLAGS "-O2 -arch ${ARCH}")
   SET(CMAKE_SHARED_LINKER_FLAGS "-O2 -arch ${ARCH}")
@@ -791,7 +804,7 @@ ENDIF(APPLE)
 
 #  Mac has trouble finding libgobject-2.0.dylib
 #  We look for it explicitely
-IF(APPLE)
+IF(xAPPLE)
 #       Assume pkg-config is available.
     INCLUDE( FindPkgConfig )
     PKG_SEARCH_MODULE( GOBJECT REQUIRED gobject-2.0 )
@@ -799,7 +812,7 @@ IF(APPLE)
 
     SET(EXTRA_LIBS ${EXTRA_LIBS} ${GOBJECT_LDFLAGS})
     SET(EXTRA_LIBS ${EXTRA_LIBS} "iconv")
-ENDIF(APPLE)
+ENDIF(xAPPLE)
 
 IF(WIN32)
     IF(MSVC)

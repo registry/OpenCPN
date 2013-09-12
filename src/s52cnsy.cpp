@@ -150,43 +150,60 @@ static void *DATCVR01(void *param)
 
 }
 
+
+bool GetIntAttr(S57Obj *obj, const char *AttrName, int &val)
+{
+    int idx = obj->GetAttributeIndex(AttrName);
+    
+    if(idx >= 0) {
+        //      using idx to get the attribute value
+         S57attVal *v = obj->attVal->Item(idx);
+        val = *(int*)(v->value);
+        
+        return true;
+    }
+    else
+        return false;
+        
+}
+#if 0
 bool GetIntAttr(S57Obj *obj, const char *AttrName, int &val)
 {
     char *attList = (char *)calloc(obj->attList->Len()+1, 1);
     strncpy(attList, obj->attList->mb_str(), obj->attList->Len());
-
-        char *patl = attList;
-        char *patr;
-        int idx = 0;
-        while(*patl)
+    
+    char *patl = attList;
+    char *patr;
+    int idx = 0;
+    while(*patl)
+    {
+        patr = patl;
+        while(*patr != '\037')
+            patr++;
+        
+        if(!strncmp(patl, AttrName, 6))
+            break;
+        
+        patl = patr + 1;
+        idx++;
+    }
+    
+    if(!*patl)                                     // Requested Attribute not found
         {
-                patr = patl;
-                while(*patr != '\037')
-                        patr++;
-
-                if(!strncmp(patl, AttrName, 6))
-                        break;
-
-                patl = patr + 1;
-                idx++;
+            free(attList);
+            return false;                            // so don't return a value
         }
-
-        if(!*patl)                                     // Requested Attribute not found
-        {
-              free(attList);
-              return false;                            // so don't return a value
-        }
-
-//      using idx to get the attribute value
+        
+        //      using idx to get the attribute value
         wxArrayOfS57attVal      *pattrVal = obj->attVal;
-
-        S57attVal *v = pattrVal->Item(idx);
-        val = *(int*)(v->value);
-
-        free(attList);
-        return true;
+    
+    S57attVal *v = pattrVal->Item(idx);
+    val = *(int*)(v->value);
+    
+    free(attList);
+    return true;
 }
-
+#endif
 /*
 bool GetFloatAttr(S57Obj *obj, char *AttrName, float &val)
 {
@@ -227,124 +244,53 @@ bool GetFloatAttr(S57Obj *obj, char *AttrName, float &val)
 */
 bool GetDoubleAttr(S57Obj *obj, const char *AttrName, double &val)
 {
-    char *attList = (char *)calloc(obj->attList->Len()+1, 1);
-    strncpy(attList, obj->attList->mb_str(), obj->attList->Len());
-
-    char *patl = attList;
-    char *patr;
-    int idx = 0;
-    while(*patl)
-    {
-        patr = patl;
-        while(*patr != '\037')
-            patr++;
-
-        if(!strncmp(patl, AttrName, 6))
-            break;
-
-        patl = patr + 1;
-        idx++;
-    }
-
-    if(!*patl)                                        // Requested Attribute not found
-    {
-        free(attList);
-        return false;
-    }
-
+    int idx = obj->GetAttributeIndex(AttrName);
+    
+    if(idx >= 0) {
 //      using idx to get the attribute value
-    wxArrayOfS57attVal      *pattrVal = obj->attVal;
 
-    S57attVal *v = pattrVal->Item(idx);
-    val = *(double*)(v->value);
+        S57attVal *v = obj->attVal->Item(idx);
+        val = *(double*)(v->value);
 
-    free(attList);
-    return true;
+        return true;
+    }
+    else
+        return false;
 }
 
 
 bool GetStringAttr(S57Obj *obj, const char *AttrName, char *pval, int nc)
 {
-    *pval = 0;
-    char *attList = (char *)calloc(obj->attList->Len()+1, 1);
-    strncpy(attList, obj->attList->mb_str(), obj->attList->Len());
-//        char *attList = (char *)(obj->attList->);        //attList is wxString
-
-        char *patl = attList;
-        char *patr;
-        int idx = 0;
-        while(*patl)
-        {
-                patr = patl;
-                while(*patr != '\037')
-                        patr++;
-
-                if(!strncmp(patl, AttrName, 6))
-                        break;
-
-                patl = patr + 1;
-                idx++;
-        }
-
-        if(!*patl)
-        {
-              free(attList);
-              return false;
-        }
-
-//      using idx to get the attribute value
-        wxArrayOfS57attVal      *pattrVal = obj->attVal;
-
-        S57attVal *v = pattrVal->Item(idx);
+    int idx = obj->GetAttributeIndex(AttrName);
+    
+    if(idx >= 0) {
+        //      using idx to get the attribute value
+        S57attVal *v = obj->attVal->Item(idx);
 
         char *val = (char *)(v->value);
 
         strncpy(pval, val, nc);
 
-        free(attList);
         return true;
+    }
+    else
+        return false;
 }
 
 wxString *GetStringAttrWXS(S57Obj *obj, const char *AttrName)
 {
-
-    char *attList = (char *)calloc(obj->attList->Len()+1, 1);
-    strncpy(attList, obj->attList->mb_str(), obj->attList->Len());
-//        char *attList = (char *)(obj->attList->);        //attList is wxString
-
-        char *patl = attList;
-        char *patr;
-        int idx = 0;
-        while(*patl)
-        {
-                patr = patl;
-                while(*patr != '\037')
-                        patr++;
-
-                if(!strncmp(patl, AttrName, 6))
-                        break;
-
-                patl = patr + 1;
-                idx++;
-        }
-
-        if(!*patl)
-        {
-              free(attList);
-              return NULL;
-        }
-
-//      using idx to get the attribute value
-        wxArrayOfS57attVal      *pattrVal = obj->attVal;
-
-        S57attVal *v = pattrVal->Item(idx);
-
+    int idx = obj->GetAttributeIndex(AttrName);
+    
+    if(idx >= 0) {
+        //      using idx to get the attribute value
+        S57attVal *v = obj->attVal->Item(idx);
+        
         char *val = (char *)(v->value);
-
-        wxString *ret = new wxString(val,  wxConvUTF8);
-
-        free(attList);
-        return ret;
+        
+        return new wxString(val,  wxConvUTF8);
+    }
+    else
+        return NULL;
 }
 
 static int      _parseList(const char *str_in, char *buf, int buf_size)
@@ -956,9 +902,9 @@ static void *DEPCNT02 (void *param)
                   if (safe) {
                       wxString safeCntr = _T("LS(DASH,2,DEPSC)");
                       S57Obj tempObj;
-                      tempObj.attList = new wxString();
                       LUPrec* safelup = ps52plib->S52_LUPLookup( PLAIN_BOUNDARIES, "SAFECD", &tempObj, false );
-                      if( safelup ) safeCntr = *safelup->INST;
+                      if( safelup )
+                          safeCntr = *safelup->INST;
                       rule_str = _T(";") + safeCntr;
                   }
                   else
@@ -968,9 +914,9 @@ static void *DEPCNT02 (void *param)
             if (safe) {
                 wxString safeCntr = _T("LS(SOLD,2,DEPSC)");
                 S57Obj tempObj;
-                tempObj.attList = new wxString();
                 LUPrec* safelup = ps52plib->S52_LUPLookup( PLAIN_BOUNDARIES, "SAFECN", &tempObj, false );
-                if( safelup ) safeCntr = *safelup->INST;
+                if( safelup )
+                    safeCntr = *safelup->INST;
                 rule_str = _T(";") + safeCntr;
             }
             else
@@ -1187,15 +1133,17 @@ static void *LIGHTS05 (void *param)
     GetDoubleAttr(obj, "VALNMR", valnmr);
 
 
-    char catlitstr[20];
+    char catlitstr[20] = {'\0'};
     GetStringAttr(obj, "CATLIT", catlitstr, 19);
 
-    char litvisstr[20];
+    char litvisstr[20] = {'\0'};;
     GetStringAttr(obj, "LITVIS", litvisstr, 19);
 
 
     char     catlit[LISTSIZE]  = {'\0'};
     char     litvis[LISTSIZE]  = {'\0'};
+    char     col_str[20] = {'\0'};
+    
     bool     flare_at_45       = false;
     double   sectr1            = UNKNOWN_DOUBLE;
     double   sectr2            = UNKNOWN_DOUBLE;
@@ -1234,7 +1182,6 @@ static void *LIGHTS05 (void *param)
 
     // Continuation A
 
-    char col_str[20];
     GetStringAttr(obj, "COLOUR", col_str, 19);
 
     if (strlen(col_str))
@@ -1718,47 +1665,49 @@ static void *OBSTRN04 (void *param)
       {
              if (GEO_LINE == obj->Primitive_type)
              {
-                         goto end;
-                         /*
-            // Continuation B
-                  GString *quaposstr = S57_getAttVal(geo, "QUAPOS");
-                  int      quapos    = 0;
+                 // Continuation B
+                 
+                 quapnt01str = CSQUAPNT01(obj);
+                 
+                 if( quapnt01str->Len() > 1 ) {
+                     long quapos;
+                     quapnt01str->ToLong(&quapos);
+                     if ( 2 <= quapos && quapos < 10){
+                         if (udwhaz03str->Len())
+                             obstrn04str.Append(_T(";LC(LOWACC41)"));
+                         else
+                             obstrn04str.Append(_T(";LC(LOWACC31)"));
+                     }
+                     goto end;
+                 }
+                 
+                 if ( udwhaz03str->Len() )
+                 {
+                     obstrn04str.Append( _T("LS(DOTT,2,CHBLK)") );
+                     goto end;
+                 }
 
-                  if (NULL != quaposstr) {
-                        quapos = atoi(quaposstr->str);
-                        if ( 2 <= quapos && quapos < 10){
-                              if (NULL != udwhaz03str)
-                                    g_string_append(obstrn04str, ";LC(LOWACC41)");
-                              else
-                                    g_string_append(obstrn04str, ";LC(LOWACC31)");
-                        }
-                  }
+                 if (UNKNOWN != valsou){
+                     if (valsou <= 20.0)
+                         obstrn04str.Append( _T(";LS(DOTT,2,CHBLK)") );
+                     else
+                         obstrn04str.Append( _T(";LS(DASH,2,CHBLK)") );
+                 }
+                 else
+                     obstrn04str.Append( _T(";LS(DOTT,2,CHBLK)") );
 
-                  if (NULL != udwhaz03str)
-                        g_string_append(obstrn04str, ";LS(DOTT,2,CHBLK)");
-
-                  if (UNKNOWN != valsou)
+                 
+                 if (udwhaz03str->Len()){
+                        //  Show the isolated danger symbol at the midpoint of the line
+                    }
+                 else {
+                    if (UNKNOWN != valsou)
                         if (valsou <= 20.0)
-                              g_string_append(obstrn04str, ";LS(DOTT,2,CHBLK)");
-                  else
-                        g_string_append(obstrn04str, ";LS(DASH,2,CHBLK)");
-                  else
-                        g_string_append(obstrn04str, ";LS(DOTT,2,CHBLK)");
-
-
-                  if (NULL != udwhaz03str)
-                        g_string_append(obstrn04str, udwhaz03str->str);
-                  else {
-                        if (UNKNOWN != valsou)
-                              if (valsou <= 20.0)
-                                    g_string_append(obstrn04str, sndfrm02str->str);
-                  }
-
-                  return obstrn04str;
-                         */
+                            obstrn04str.Append(*sndfrm02str);
+                 }
                }
 
-            else
+            else                // Area feature
             {
                   quapnt01str = CSQUAPNT01(obj);
 
@@ -2098,6 +2047,13 @@ static void *SLCONS03(void *param)
                 cmdw ="SY(LOWACC01)";
         }
     } else {
+        
+        // This instruction not found in PLIB 3.4, but seems to appear in later PLIB implementations
+        // by commercial ECDIS providers, so.....
+        if (GEO_AREA == obj->Primitive_type) {
+            slcons03 = _T("AP(CROSSX01);");
+        }
+            
         // GEO_LINE and GEO_AREA are the same
         if (bquapos) {
             if (2 <= quapos && quapos < 10)
@@ -2111,7 +2067,7 @@ static void *SLCONS03(void *param)
                 ival = 0;
                 bvalstr  = GetIntAttr(obj, "CATSLC", ival);
 
-                if (bvalstr && ( 6  == ival || 15 == ival || 16 == ival ))
+                if (bvalstr && ( 4 == ival || 6  == ival || 8  == ival || 15 == ival || 16 == ival ))
                     cmdw = "LS(SOLD,4,CSTLN)";
                 else {
                     bvalstr = GetIntAttr(obj, "WATLEV", ival);
@@ -2758,7 +2714,7 @@ static void *TOPMAR01 (void *param)
 // searches for platforms by looking for other objects that are located at the
 // same position.. Based on the finding whether the platform is rigid or
 // floating, the respective upright or sloping symbol is selected and presented
-// at the objects location. Buoy symbols and topmark symbols have been
+// at the objects location. Buoyf symbols and topmark symbols have been
 // carefully designed to fit to each other when combined at the same position.
 // The result is a composed symbol that looks like the traditional symbols the
 // mariner is used to.
@@ -3321,7 +3277,7 @@ static wxString _LITDSN01(S57Obj *obj)
 
 
      // SIGGRP, (c)(c) ...
-      char grp_str[20] = {'\0'};;
+      char grp_str[20] = {'\0'};
       GetStringAttr(obj, "SIGGRP", grp_str, 19);
       if(strlen(grp_str))
       {
@@ -3363,7 +3319,7 @@ static wxString _LITDSN01(S57Obj *obj)
       }
 
       // COLOUR,
-      char col_str[20];
+      char col_str[20] = {'\0'};
 
       // Don't show for sectored lights since we are only showing one of the sectors.
       double sectrTest;

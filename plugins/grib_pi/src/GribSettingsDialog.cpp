@@ -71,7 +71,7 @@ void GribOverlaySettings::Read()
         wxString Name=name_from_index[i];
 
         int units;
-        pConf->Read ( Name + _T ( "Units" ), &units);
+        pConf->Read ( Name + _T ( "Units" ), &units,0);
         Settings[i].m_Units = (SettingsType)units;
 
         pConf->Read ( Name + _T ( "BarbedArrows" ), &Settings[i].m_bBarbedArrows, i==WIND);
@@ -240,9 +240,9 @@ GribSettingsDialog::GribSettingsDialog(GRIBUIDialog &parent, GribOverlaySettings
     m_sUpdatesPerSecond->SetValue(m_Settings.m_UpdatesPerSecond);
     m_sHourDivider->SetValue(m_Settings.m_HourDivider);
     if(!m_cInterpolate->IsChecked() ) {              //hide no suiting parameters
-        m_staticText5->Hide();
+        m_tSlicesPerUpdate->Hide();
         m_sSlicesPerUpdate->Hide();
-        m_staticText9->Hide();
+        m_tHourDivider->Hide();
         m_sHourDivider->Hide();
     }
 
@@ -252,6 +252,7 @@ GribSettingsDialog::GribSettingsDialog(GRIBUIDialog &parent, GribOverlaySettings
     m_cDataType->SetSelection(m_lastdatatype);
     PopulateUnits(m_lastdatatype);
     ReadDataTypeSettings(m_lastdatatype);
+    Fit();
 }
 
 /* set settings to the dialog controls */
@@ -332,14 +333,14 @@ void GribSettingsDialog::OnApply( wxCommandEvent& event )
 void GribSettingsDialog::OnIntepolateChange( wxCommandEvent& event )
 {
     if( m_cInterpolate->IsChecked() ) {
-        m_staticText5->Show();
+        m_tSlicesPerUpdate->Show();
         m_sSlicesPerUpdate->Show();
-        m_staticText9->Show();
+        m_tHourDivider->Show();
         m_sHourDivider->Show();
     } else {                                        //hide no suiting parameters 
-        m_staticText5->Hide();
+        m_tSlicesPerUpdate->Hide();
         m_sSlicesPerUpdate->Hide();
-        m_staticText9->Hide();
+        m_tHourDivider->Hide();
         m_sHourDivider->Hide();
     }
     this->Fit();

@@ -227,6 +227,8 @@ bool Routeman::ActivateRoute( Route *pRouteToActivate, RoutePoint *pStartPoint )
     ActivateRoutePoint( pRouteToActivate, pActivePoint );
 
     m_bArrival = false;
+    m_arrival_min = 1e6;
+    m_arrival_test = 0;
 
     pRouteToActivate->m_bRtIsActive = true;
 
@@ -293,6 +295,9 @@ bool Routeman::ActivateRoutePoint( Route *pA, RoutePoint *pRP_target )
     g_blink_rect = pRP_target->CurrentRect_in_DC;               // set up global blinker
 
     m_bArrival = false;
+    m_arrival_min = 1e6;
+    m_arrival_test = 0;
+    
 
     //    Update the RouteProperties Dialog, if currently shown
     if( ( NULL != pRoutePropDialog ) && ( pRoutePropDialog->IsShown() ) ) {
@@ -336,6 +341,8 @@ bool Routeman::ActivateNextPoint( Route *pr, bool skipped )
         g_blink_rect = pActivePoint->CurrentRect_in_DC;               // set up global blinker
 
         m_bArrival = false;
+        m_arrival_min = 1e6;
+        m_arrival_test = 0;
 
         //    Update the RouteProperties Dialog, if currently shown
         if( ( NULL != pRoutePropDialog ) && ( pRoutePropDialog->IsShown() ) ) {
@@ -443,27 +450,32 @@ bool Routeman::UpdateProgress()
             UpdateAutopilot();
 
             bDidArrival = true;
-
-            if( !ActivateNextPoint( pActiveRoute, false ) )            // at the end?
-                    {
-                Route *pthis_route = pActiveRoute;
-                DeactivateRoute( true );                  // this is an arrival
-                if( pthis_route->m_bDeleteOnArrival ) {
-                    pConfig->DeleteConfigRoute( pthis_route );
-                    DeleteRoute( pthis_route );
-                    if( pRoutePropDialog ) {
-                        pRoutePropDialog->SetRouteAndUpdate( NULL );
-                        pRoutePropDialog->UpdateProperties();
-                    }
-                    if( pRouteManagerDialog ) pRouteManagerDialog->UpdateRouteListCtrl();
-
-                }
-            }
+            DoAdvance();
 
         }
-
+        else {
+        //      Test to see if we are moving away from the arrival point, and
+        //      have been mving away for 2 seconds.  
+        //      If so, we should declare "Arrival"
+            if( (CurrentRangeToActiveNormalCrossing - m_arrival_min) >  pActiveRoute->GetRouteArrivalRadius() ){
+                if(++m_arrival_test > 2) {
+                    m_bArrival = true;
+                    UpdateAutopilot();
+                    
+                    bDidArrival = true;
+                    DoAdvance();
+                }
+            }
+            else
+                m_arrival_test = 0;
+                
+        }
+        
+        if( !bDidArrival )                                        
+            m_arrival_min = wxMin( m_arrival_min, CurrentRangeToActiveNormalCrossing );
+        
         if( !bDidArrival )                                        // Only once on arrival
-        UpdateAutopilot();
+            UpdateAutopilot();
 
         bret_val = true;                                        // a route is active
     }
@@ -472,6 +484,30 @@ bool Routeman::UpdateProgress()
 
     return bret_val;
 }
+
+void Routeman::DoAdvance(void)
+{
+    if( !ActivateNextPoint( pActiveRoute, false ) )            // at the end?
+    {
+        Route *pthis_route = pActiveRoute;
+        DeactivateRoute( true );                  // this is an arrival
+        
+        if( pthis_route->m_bDeleteOnArrival ) {
+            pConfig->DeleteConfigRoute( pthis_route );
+            DeleteRoute( pthis_route );
+            if( pRoutePropDialog ) {
+                pRoutePropDialog->SetRouteAndUpdate( NULL );
+                pRoutePropDialog->UpdateProperties();
+            }
+        }
+
+        if( pRouteManagerDialog )
+            pRouteManagerDialog->UpdateRouteListCtrl();
+                            
+    }
+}
+                    
+    
 
 bool Routeman::DeactivateRoute( bool b_arrival )
 {
@@ -763,11 +799,11 @@ void Routeman::DeleteAllRoutes( void )
         }
 
         if( !proute->m_bIsTrack ) {
-            pConfig->m_bIsImporting = true;
+            pConfig->m_bSkipChangeSetUpdate = true;
             pConfig->DeleteConfigRoute( proute );
             DeleteRoute( proute );
             node = pRouteList->GetFirst();                   // Route
-            pConfig->m_bIsImporting = false;
+            pConfig->m_bSkipChangeSetUpdate = false;
         } else
             node = node->GetNext();
     }
@@ -791,11 +827,11 @@ void Routeman::DeleteAllTracks( void )
         }
 
         if( proute->m_bIsTrack ) {
-            pConfig->m_bIsImporting = true;
+            pConfig->m_bSkipChangeSetUpdate = true;
             pConfig->DeleteConfigRoute( proute );
             DeleteTrack( proute );
             node = pRouteList->GetFirst();                   // Route
-            pConfig->m_bIsImporting = false;
+            pConfig->m_bSkipChangeSetUpdate = false;
         } else
             node = node->GetNext();
     }
@@ -846,10 +882,10 @@ void Routeman::DeleteTrack( Route *pRoute )
             if( pcontainer_route == NULL ) {
                 prp->m_bIsInRoute = false;          // Take this point out of this (and only) route
                 if( !prp->m_bKeepXRoute ) {
-                    pConfig->m_bIsImporting = true;
+                    pConfig->m_bSkipChangeSetUpdate = true;
                     pConfig->DeleteWayPoint( prp );
                     pSelect->DeleteSelectablePoint( prp, SELTYPE_ROUTEPOINT );
-                    pConfig->m_bIsImporting = false;
+                    pConfig->m_bSkipChangeSetUpdate = false;
 
                     pRoute->pRoutePointList->DeleteNode( pnode );
                     /*
@@ -1454,7 +1490,7 @@ void WayPointman::DeleteAllWaypoints( bool b_delete_used )
 
 }
 
-void WayPointman::DestroyWaypoint( RoutePoint *pRp )
+void WayPointman::DestroyWaypoint( RoutePoint *pRp, bool b_update_changeset )
 {
     if( pRp ) {
         // Get a list of all routes containing this point
@@ -1476,10 +1512,10 @@ void WayPointman::DestroyWaypoint( RoutePoint *pRp )
             for( unsigned int ir = 0; ir < proute_array->GetCount(); ir++ ) {
                 Route *pr = (Route *) proute_array->Item( ir );
                 if( pr->GetnPoints() < 2 ) {
-                    pConfig->m_bIsImporting = true;
+                    pConfig->m_bSkipChangeSetUpdate = true;
                     pConfig->DeleteConfigRoute( pr );
                     g_pRouteMan->DeleteRoute( pr );
-                    pConfig->m_bIsImporting = false;
+                    pConfig->m_bSkipChangeSetUpdate = false;
                 }
             }
 
@@ -1487,7 +1523,13 @@ void WayPointman::DestroyWaypoint( RoutePoint *pRp )
         }
 
         // Now it is safe to delete the point
+        if( ! b_update_changeset )
+            pConfig->m_bSkipChangeSetUpdate = true;             // turn OFF change-set updating if requested
+        
         pConfig->DeleteWayPoint( pRp );
+        
+        pConfig->m_bSkipChangeSetUpdate = false;
+        
         pSelect->DeleteSelectablePoint( pRp, SELTYPE_ROUTEPOINT );
 
         //TODO  FIXME

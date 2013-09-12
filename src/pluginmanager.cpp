@@ -281,6 +281,32 @@ bool PlugInManager::LoadAllPlugIns(const wxString &plugin_dir)
         return false;
 }
 
+bool PlugInManager::CallLateInit(void)
+{
+    bool bret = true;
+
+    for(unsigned int i = 0 ; i < plugin_array.GetCount() ; i++)
+    {
+        PlugInContainer *pic = plugin_array.Item(i);
+
+        switch(pic->m_api_version)
+        {
+            case 110:
+                if(pic->m_cap_flag & WANTS_LATE_INIT) {
+                    wxString msg(_T("PlugInManager: Calling LateInit PlugIn: "));
+                    msg += pic->m_plugin_file;
+                    wxLogMessage(msg);
+
+                    opencpn_plugin_110* ppi = dynamic_cast<opencpn_plugin_110*>(pic->m_pplugin);
+                    ppi->LateInit();
+                    }
+                break;
+        }
+    }
+
+    return bret;
+}
+
 bool PlugInManager::UpdatePlugIns()
 {
     bool bret = false;
@@ -564,6 +590,10 @@ PlugInContainer *PlugInManager::LoadPlugIn(wxString plugin_file)
         pic->m_pplugin = dynamic_cast<opencpn_plugin_19*>(plug_in);
         break;
 
+    case 110:
+        pic->m_pplugin = dynamic_cast<opencpn_plugin_110*>(plug_in);
+        break;
+        
     default:
         break;
     }
@@ -621,6 +651,7 @@ bool PlugInManager::RenderAllCanvasOverlayPlugIns( ocpnDC &dc, const ViewPort &v
                     }
                     case 108:
                     case 109:
+                    case 110:
                     {
                         opencpn_plugin_18 *ppi = dynamic_cast<opencpn_plugin_18 *>(pic->m_pplugin);
                         if(ppi)
@@ -669,6 +700,7 @@ bool PlugInManager::RenderAllCanvasOverlayPlugIns( ocpnDC &dc, const ViewPort &v
                     }
                     case 108:
                     case 109:
+                    case 110:
                     {
                         opencpn_plugin_18 *ppi = dynamic_cast<opencpn_plugin_18 *>(pic->m_pplugin);
                         if(ppi)
@@ -727,6 +759,7 @@ bool PlugInManager::RenderAllGLCanvasOverlayPlugIns( wxGLContext *pcontext, cons
 
                 case 108:
                 case 109:
+                case 110:
                 {
                     opencpn_plugin_18 *ppi = dynamic_cast<opencpn_plugin_18 *>(pic->m_pplugin);
                     if(ppi)
@@ -782,6 +815,7 @@ void NotifySetupOptionsPlugin( PlugInContainer *pic )
             switch(pic->m_api_version)
             {
             case 109:
+            case 110:
             {
                 opencpn_plugin_19 *ppi = dynamic_cast<opencpn_plugin_19 *>(pic->m_pplugin);
                 if(ppi) {
@@ -941,6 +975,7 @@ void PlugInManager::SendMessageToAllPlugins(const wxString &message_id, const wx
                 }
                 case 108:
                 case 109:
+                case 110:
                 {
                     opencpn_plugin_18 *ppi = dynamic_cast<opencpn_plugin_18 *>(pic->m_pplugin);
                     if(ppi)
@@ -1015,6 +1050,7 @@ void PlugInManager::SendPositionFixToAllPlugIns(GenericPosDatEx *ppos)
                 {
                 case 108:
                 case 109:
+                case 110:
                 {
                     opencpn_plugin_18 *ppi = dynamic_cast<opencpn_plugin_18 *>(pic->m_pplugin);
                     if(ppi)
@@ -1071,7 +1107,10 @@ int PlugInManager::AddToolbarTool(wxString label, wxBitmap *bitmap, wxBitmap *bm
         ocpnStyle::Style*style = g_StyleManager->GetCurrentStyle();
         pttc->bitmap_day = new wxBitmap( style->GetIcon( _T("default_pi") ));
     } else {
-        pttc->bitmap_day = new wxBitmap(*bitmap);
+        //  Force a non-reference copy of the bitmap from the PlugIn
+        wxRect rb(0, 0, bitmap->GetWidth(), bitmap->GetHeight());
+        pttc->bitmap_day = new wxBitmap(rb.width, rb.height, -1);
+        *pttc->bitmap_day = bitmap->GetSubBitmap( rb );
     }
 
     pttc->bitmap_dusk = BuildDimmedToolBitmap(pttc->bitmap_day, 128);
@@ -1166,7 +1205,10 @@ void PlugInManager::SetToolbarItemBitmaps(int item, wxBitmap *bitmap, wxBitmap *
                     ocpnStyle::Style*style = g_StyleManager->GetCurrentStyle();
                     pttc->bitmap_day = new wxBitmap( style->GetIcon( _T("default_pi") ));
                 } else {
-                    pttc->bitmap_day = new wxBitmap(*bitmap);
+                    //  Force a non-reference copy of the bitmap from the PlugIn
+                    wxRect rb(0, 0, bitmap->GetWidth(), bitmap->GetHeight());
+                    pttc->bitmap_day = new wxBitmap(rb.width, rb.height, -1);
+                    *pttc->bitmap_day = bitmap->GetSubBitmap( rb );
                 }
 
                 pttc->bitmap_dusk = BuildDimmedToolBitmap(bitmap, 128);
@@ -2394,6 +2436,21 @@ void opencpn_plugin_19::OnSetupOptions(void)
 {
 }
 
+//    Opencpn_Plugin_110 Implementation
+opencpn_plugin_110::opencpn_plugin_110(void *pmgr)
+: opencpn_plugin_19(pmgr)
+{
+}
+
+opencpn_plugin_110::~opencpn_plugin_110(void)
+{
+}
+
+void opencpn_plugin_110::LateInit(void)
+{
+}
+
+
 
 //          Helper and interface classes
 
@@ -2487,6 +2544,16 @@ PluginListPanel::~PluginListPanel()
 {
 }
 
+void PluginListPanel::UpdateSelections()
+{
+    for(unsigned int i=0 ; i < m_PluginItems.GetCount() ; i++) {
+        PluginPanel *pPluginPanel = m_PluginItems.Item(i);
+        if( pPluginPanel ){
+            pPluginPanel->SetSelected( pPluginPanel->GetSelected() );
+        }
+    }
+}
+    
 void PluginListPanel::SelectPlugin( PluginPanel *pi )
 {
     if (m_PluginSelected == pi)
@@ -2942,19 +3009,21 @@ double ChartPlugInWrapper::GetNormalScaleMax(double canvas_scale_factor, int can
         return 2.0e7;
 }
 
-bool ChartPlugInWrapper::RenderRegionViewOnGL(const wxGLContext &glc, const ViewPort& VPoint, const wxRegion &Region)
+bool ChartPlugInWrapper::RenderRegionViewOnGL(const wxGLContext &glc, const ViewPort& VPoint, const OCPNRegion &Region)
 {
     return true;
 }
 
 
 bool ChartPlugInWrapper::RenderRegionViewOnDC(wxMemoryDC& dc, const ViewPort& VPoint,
-        const wxRegion &Region)
+        const OCPNRegion &Region)
 {
     if(m_ppicb)
     {
         PlugIn_ViewPort pivp = CreatePlugInViewport( VPoint);
-        dc.SelectObject(m_ppicb->RenderRegionView( pivp, Region));
+        OCPNRegion rg = Region;
+        wxRegion r = rg.ConvertTowxRegion();
+        dc.SelectObject(m_ppicb->RenderRegionView( pivp, r));
         return true;
     }
     else
@@ -2973,7 +3042,7 @@ bool ChartPlugInWrapper::AdjustVP(ViewPort &vp_last, ViewPort &vp_proposed)
         return false;
 }
 
-void ChartPlugInWrapper::GetValidCanvasRegion(const ViewPort& VPoint, wxRegion *pValidRegion)
+void ChartPlugInWrapper::GetValidCanvasRegion(const ViewPort& VPoint, OCPNRegion *pValidRegion)
 {
     if(m_ppicb)
     {

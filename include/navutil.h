@@ -103,8 +103,7 @@ class Track : public wxEvtHandler, public Route
 
             void Start(void);
             void Stop(bool do_add_point = false);
-            void FixMidnight(Track *pPreviousTrack);
-            bool DoExtendDaily(void);
+            Track *DoExtendDaily(void);
             bool IsRunning(){ return m_bRunning; }
             void Draw(ocpnDC& dc, ViewPort &VP);
 
@@ -116,6 +115,8 @@ class Track : public wxEvtHandler, public Route
             double GetXTE(RoutePoint *fm1, RoutePoint *fm2, RoutePoint *to);
             double GetXTE( double fm1Lat, double fm1Lon, double fm2Lat, double fm2Lon, double toLat, double toLon  );
 
+            void AdjustCurrentTrackPoint( RoutePoint *prototype );
+            
       private:
             void OnTimerTrack(wxTimerEvent& event);
             void AddPointNow(bool do_add_point = false);
@@ -205,12 +206,12 @@ public:
       virtual void StoreNavObjChanges();
 
       bool LoadLayers(wxString &path);
-      
+
       void ExportGPX(wxWindow* parent, bool bviz_only = false, bool blayer = false);
       void UI_ImportGPX(wxWindow* parent, bool islayer = false, wxString dirpath = _T(""), bool isdirectory = true);
 
-      bool ExportGPXRoutes(wxWindow* parent, RouteList *pRoutes);
-      bool ExportGPXWaypoints(wxWindow* parent, RoutePointList *pRoutePoints);
+      bool ExportGPXRoutes(wxWindow* parent, RouteList *pRoutes, const wxString suggestedName = _T("routes"));
+      bool ExportGPXWaypoints(wxWindow* parent, RoutePointList *pRoutePoints, const wxString suggestedName = _T("waypoints"));
 
       void CreateRotatingNavObjBackup();
 
@@ -224,11 +225,11 @@ public:
 
       NavObjectChanges        *m_pNavObjectChangesSet;
       NavObjectCollection1    *m_pNavObjectInputSet;
+      bool                    m_bSkipChangeSetUpdate;
       
 //    These members are set/reset in Options dialog
       bool  m_bShowDebugWindows;
 
-      bool  m_bIsImporting;
 
 
 };

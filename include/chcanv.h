@@ -140,6 +140,7 @@ public:
 
       void PopupMenuHandler(wxCommandEvent& event);
 
+      void EnablePaint(bool b_enable);
       virtual bool SetCursor(const wxCursor &c);
       virtual void Refresh( bool eraseBackground = true,
                             const wxRect *rect = (const wxRect *) NULL );
@@ -337,7 +338,7 @@ private:
       void MouseEvent(wxMouseEvent& event);
       void ShipDraw(ocpnDC& dc);
       void DrawArrow(ocpnDC& dc, int x, int y, double rot_angle, double scale);
-      void OnRouteLegPopupTimerEvent ( wxTimerEvent& event );
+      void OnRolloverPopupTimerEvent ( wxTimerEvent& event );
       void FindRoutePointsAtCursor( float selectRadius, bool setBeingEdited );
 
       void RotateTimerEvent(wxTimerEvent& event);
@@ -396,7 +397,10 @@ private:
       void ShowObjectQueryWindow( int x, int y, float zlat, float zlon);
       void ShowMarkPropertiesDialog( RoutePoint* markPoint );
       void ShowRoutePropertiesDialog(wxString title, Route* selected);
+      void ShowTrackPropertiesDialog( Route* selected );
 
+      void ShowBrightnessLevelTimedPopup( int brightness, int min, int max );
+      
       //    Data
       int         m_canvas_width, m_canvas_height;
 
@@ -425,13 +429,13 @@ private:
       wxTimer     *m_DoubleClickTimer;
 
       wxTimer     m_MouseWheelTimer;
-      wxTimer     m_RouteLegPopupTimer;
+      wxTimer     m_RolloverPopupTimer;
 
       int         m_mouse_wheel_oneshot;
       int         m_last_wheel_dir;
 
       int         m_curtrack_timer_msec;
-      int         m_routeleg_popup_timer_msec;
+      int         m_rollover_popup_timer_msec;
 
       GSHHSChart  *pWorldBackgroundChart;
 
@@ -474,9 +478,11 @@ private:
       wxBitmap    m_bmCurrentDusk;
       wxBitmap    m_bmCurrentNight;
 
-      RolloverWin *m_pRolloverWin;
+      RolloverWin *m_pRouteRolloverWin;
       RolloverWin *m_pAISRolloverWin;
-
+      
+      TimedPopupWin *m_pBrightPopup;
+      
       wxImage     m_os_image_red_day;
       wxImage     m_os_image_red_dusk;
       wxImage     m_os_image_red_night;
@@ -537,6 +543,8 @@ private:
       double      m_zoom_current_factor;
 
       bool        m_benable_autopan;
+      bool        m_b_paint_enable;
+      
 
 DECLARE_EVENT_TABLE()
 };

@@ -34,6 +34,8 @@
 class ocpnDC;
 class wxDC;
 
+enum BouyPassingSide { BOUY_NONE=0, BOUY_SB=1, BOUY_P=2, BOUY_GATE=3, BOUY_AHEAD=4, BOUY_REAR=5 };
+
 class RoutePoint
 {
 public:
@@ -62,6 +64,15 @@ public:
       wxString GetName(void){ return m_MarkName; }
       wxString GetDescription(void) { return m_MarkDescription; }
 
+
+      void SetApproach( bool appr = false ) { m_bIsApproach = appr; }
+      bool IsApproach () { return m_bIsApproach; }
+      void SetApproachName( wxString name);
+      wxString GetApproachName() { return m_ApproachName; } 
+      void CalculateApproachNameExtents(void);
+      BouyPassingSide GetBouyPassingSide() { return m_BouyPassingSide; }
+      void SetBouyPassingSide ( BouyPassingSide side=BOUY_NONE  ) { m_BouyPassingSide = side; };  
+      
       void SetName(const wxString & name);
       void CalculateNameExtents(void);
 
@@ -109,6 +120,12 @@ public:
       bool              m_bBlink;
       bool              m_bDynamicName;
       bool              m_bShowName;
+
+      bool              m_bIsApproach;
+      wxString          m_ApproachName;
+      wxSize            m_ApproachNameExtents;
+      BouyPassingSide   m_BouyPassingSide;     
+      
       wxRect            CurrentRect_in_DC;
       int               m_NameLocationOffsetX;
       int               m_NameLocationOffsetY;
