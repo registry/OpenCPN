@@ -156,6 +156,7 @@ wxString                  glog_file;
 wxString                  gConfig_File;
 
 int                       g_unit_test_1;
+bool                      g_start_fullscreen;
 
 MyFrame                   *gFrame;
 
@@ -597,6 +598,10 @@ wxRect                    g_last_tb_rect;
 
 MyDialogPtrArray          g_MacShowDialogArray;
 
+bool                      g_bShowMag;
+double                    g_UserVar;
+
+
 //                        OpenGL Globals
 int                       g_GPU_MemSize;
 bool                      g_b_useStencil;
@@ -757,10 +762,9 @@ void MyApp::OnInitCmdLine( wxCmdLineParser& parser )
 {
     //    Add some OpenCPN specific command line options
     parser.AddSwitch( _T("unit_test_1") );
-
     parser.AddSwitch( _T("p") );
-
     parser.AddSwitch( _T("no_opengl") );
+    parser.AddSwitch( _T("fullscreen") );
 }
 
 bool MyApp::OnCmdLineParsed( wxCmdLineParser& parser )
@@ -768,6 +772,7 @@ bool MyApp::OnCmdLineParsed( wxCmdLineParser& parser )
     g_unit_test_1 = parser.Found( _T("unit_test_1") );
     g_bportable = parser.Found( _T("p") );
     g_bdisable_opengl = parser.Found( _T("no_opengl") );
+    g_start_fullscreen = parser.Found( _T("fullscreen") );
 
     return true;
 }
@@ -1403,6 +1408,22 @@ bool MyApp::OnInit()
 
     g_config_version_string = vs;
 
+    //  Validate OpenGL functionality, if selected
+#ifdef __WXMSW__
+    if( /*g_bopengl &&*/ !g_bdisable_opengl ) {
+        wxFileName fn(std_path.GetExecutablePath());
+        bool b_test_result = TestGLCanvas(fn.GetPathWithSep() );
+        
+        if( !b_test_result )
+            wxLogMessage( _T("OpenGL disabled due to test app failure.") );
+        
+        g_bdisable_opengl = !b_test_result;
+    }
+#endif
+    
+    
+    
+    
  #ifdef USE_S57
 
 //      Set up a useable CPL library error handler for S57 stuff
@@ -1738,7 +1759,7 @@ if( 0 == g_memCacheLimit )
 
     cc1 = new ChartCanvas( gFrame );                         // the chart display canvas
     gFrame->SetCanvasWindow( cc1 );
-
+    
     cc1->SetQuiltMode( g_bQuiltEnable );                     // set initial quilt mode
     cc1->m_bFollow = pConfig->st_bFollow;               // set initial state
     cc1->SetViewPoint( vLat, vLon, initial_scale_ppm, 0., 0. );
@@ -1752,6 +1773,9 @@ if( 0 == g_memCacheLimit )
     pthumbwin = new ThumbWin( cc1 );
 
     gFrame->ApplyGlobalSettings( 1, false );               // done once on init with resize
+    
+    if ( g_start_fullscreen )
+        gFrame->ToggleFullScreen();
 
     g_toolbar_x = wxMax(g_toolbar_x, 0);
     g_toolbar_y = wxMax(g_toolbar_y, 0);
@@ -2341,6 +2365,9 @@ MyFrame::MyFrame( wxFrame *frame, const wxString& title, const wxPoint& pos, con
             dstr->SetOutputFilter(cp->OutputSentenceList);
             dstr->SetOutputFilterType(cp->OutputSentenceListType);
             dstr->SetChecksumCheck(cp->ChecksumCheck);
+            
+            cp->b_IsSetup = true;
+            
             g_pMUX->AddStream(dstr);
         }
     }
@@ -4969,7 +4996,10 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
         double brg, dist;
         DistanceBearingMercator( cursor_lat, cursor_lon, gLat, gLon, &brg, &dist );
         wxString s;
-        s.Printf( wxString("%03d°  ", wxConvUTF8 ), (int) brg );
+        if( g_bShowMag )
+            s.Printf( wxString("%03d°(M)  ", wxConvUTF8 ), (int)GetTrueOrMag( brg ) );
+        else
+            s.Printf( wxString("%03d°  ", wxConvUTF8 ), (int)GetTrueOrMag( brg ) );
         s << cc1->FormatDistanceAdaptive( dist );
         if( GetStatusBar() ) SetStatusText( s, STAT_FIELD_CURSOR_BRGRNG );
     }
@@ -5086,6 +5116,18 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
             m_bdefer_resize = false;
         }
     }
+}
+
+double MyFrame::GetTrueOrMag(double a)
+{
+    if( g_bShowMag ){
+        if(!wxIsNaN(gVar))
+            return ((a + gVar) >= 0.) ? (a + gVar) : (a + gVar + 360.);
+        else
+            return ((a + g_UserVar) >= 0.) ? (a + g_UserVar) : (a + g_UserVar + 360.);
+    }
+    else
+        return a;
 }
 
 void MyFrame::TouchAISActive( void )
@@ -7240,9 +7282,14 @@ void MyFrame::PostProcessNNEA( bool pos_valid, const wxString &sfixtime )
             sogcog.Printf( _T("SOG %2.2f ") + getUsrSpeedUnit() + _T("  "), toUsrSpeed( gSog ) );
 
         wxString cogs;
-        if( wxIsNaN(gCog) ) cogs.Printf( wxString( "COG ---\u00B0", wxConvUTF8 ) );
-        else
-            cogs.Printf( wxString("COG %2.0f°", wxConvUTF8 ), gCog );
+        if( wxIsNaN(gCog) )
+            cogs.Printf( wxString( "COG ---\u00B0", wxConvUTF8 ) );
+        else {
+            if( g_bShowMag )
+                cogs << wxString::Format( wxString("COG %03d°(M)  ", wxConvUTF8 ), (int)gFrame->GetTrueOrMag( gCog ) );
+            else
+                cogs << wxString::Format( wxString("COG %03d°  ", wxConvUTF8 ), (int)gFrame->GetTrueOrMag( gCog ) );
+        }
 
         sogcog.Append( cogs );
         SetStatusText( sogcog, STAT_FIELD_SOGCOG );
@@ -8671,6 +8718,35 @@ void RedirectIOToConsole()
 
 //#endif
 #endif
+
+
+#ifdef __WXMSW__
+bool TestGLCanvas(wxString &prog_dir)
+{
+    wxString test_app = prog_dir;
+    test_app += _T("cube.exe");
+    
+    if(::wxFileExists(test_app)){
+        long proc_return = ::wxExecute(test_app, wxEXEC_SYNC);
+        printf("OpenGL Test Process returned %0X\n", proc_return);
+        if(proc_return == 0)
+            printf("GLCanvas OK\n");
+        else
+            printf("GLCanvas failed to start, disabling OpenGL.\n");
+        
+        return (proc_return == 0);
+    }
+    else
+        return true;
+    
+    
+}
+#endif
+
+
+
+    
+
 
 #if 0
 /*************************************************************************

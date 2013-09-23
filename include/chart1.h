@@ -57,6 +57,8 @@ int GetApplicationMemoryUse(void);
 // The point for anchor watch should really be a class...
 double AnchorDistFix( double const d, double const AnchorPointMinDist, double const AnchorPointMaxDist);   //  pjotrc 2010.02.22
 
+bool TestGLCanvas(wxString &prog_dir);
+
 class NMEA_Msg_Container;
 WX_DECLARE_STRING_HASH_MAP( NMEA_Msg_Container*, MsgPriorityHash );
 
@@ -296,6 +298,8 @@ class MyFrame: public wxFrame
     void ChartsRefresh(int dbi_hint, ViewPort &vp, bool b_purge = true);
 
     bool CheckGroup(int igroup);
+    double GetTrueOrMag(double a);
+    
 
     void TouchAISActive(void);
     void UpdateAISTool(void);
