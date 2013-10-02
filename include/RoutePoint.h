@@ -72,6 +72,11 @@ public:
       void CalculateApproachNameExtents(void);
       BouyPassingSide GetBouyPassingSide() { return m_BouyPassingSide; }
       void SetBouyPassingSide ( BouyPassingSide side=BOUY_NONE  ) { m_BouyPassingSide = side; };  
+      void *GetSelectNode(void) { return m_SelectNode; }
+      void SetSelectNode(void* node) { m_SelectNode = node; }
+
+      void *GetManagerListNode(void) { return m_ManagerNode; }
+      void SetManagerListNode(void* node) { m_ManagerNode = node; }
       
       void SetName(const wxString & name);
       void CalculateNameExtents(void);
@@ -143,6 +148,9 @@ public:
 private:
       wxString          m_MarkName;
       wxDateTime        m_CreateTimeX;
+      
+      void              *m_SelectNode;
+      void              *m_ManagerNode;
       
 };
 

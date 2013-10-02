@@ -1019,6 +1019,7 @@ ChartCanvas::ChartCanvas ( wxFrame *frame ) :
 
     if ( !g_bdisable_opengl )
     {
+        wxLogMessage( _T("Creating glChartCanvas") );
         m_glcc = new glChartCanvas(this);
 
     #if wxCHECK_VERSION(2, 9, 0)
@@ -1299,10 +1300,48 @@ ChartCanvas::ChartCanvas ( wxFrame *frame ) :
             }
         }
     }
-
+ 
+ 
+    // Yellow
+    m_os_image_yellow_day = m_os_image_red_day.Copy();
+    
+    gimg_width = m_os_image_yellow_day.GetWidth();
+    gimg_height = m_os_image_yellow_day.GetHeight();
+    
+    m_os_image_yellow_dusk = m_os_image_red_day.Copy();
+    m_os_image_yellow_night = m_os_image_red_day.Copy();
+    
+    for( int iy = 0; iy < gimg_height; iy++ ) {
+        for( int ix = 0; ix < gimg_width; ix++ ) {
+            if( !m_os_image_yellow_day.IsTransparent( ix, iy ) ) {
+                wxImage::RGBValue rgb( m_os_image_yellow_day.GetRed( ix, iy ),
+                                       m_os_image_yellow_day.GetGreen( ix, iy ),
+                                       m_os_image_yellow_day.GetBlue( ix, iy ) );
+                wxImage::HSVValue hsv = wxImage::RGBtoHSV( rgb );
+                hsv.hue += 60./360.;             //shift to yellow        
+                wxImage::RGBValue nrgb = wxImage::HSVtoRGB( hsv );
+                m_os_image_yellow_day.SetRGB( ix, iy, nrgb.red, nrgb.green, nrgb.blue );
+                
+                hsv = wxImage::RGBtoHSV( rgb );
+                hsv.value = hsv.value * factor_dusk;
+                hsv.hue += 60./360.;             // shift to yellow
+                nrgb = wxImage::HSVtoRGB( hsv );
+                m_os_image_yellow_dusk.SetRGB( ix, iy, nrgb.red, nrgb.green, nrgb.blue );
+                
+                hsv = wxImage::RGBtoHSV( rgb );
+                hsv.hue += 60./360.;             //shift to yellow
+                hsv.value = hsv.value * factor_night;
+                nrgb = wxImage::HSVtoRGB( hsv );
+                m_os_image_yellow_night.SetRGB( ix, iy, nrgb.red, nrgb.green, nrgb.blue );
+            }
+        }
+    }
+    
+    
     //  Set initial pointers to ownship images
     m_pos_image_red = &m_os_image_red_day;
-
+    m_pos_image_yellow = &m_os_image_yellow_day;
+    
     //  Look for user defined ownship image
     //  This may be found in the shared data location along with other user defined icons.
     //  and will be called "ownship.xpm" or "ownship.png"
@@ -2078,24 +2117,28 @@ void ChartCanvas::SetColorScheme( ColorScheme cs )
     case GLOBAL_COLOR_SCHEME_DAY:
         m_pos_image_red = &m_os_image_red_day;
         m_pos_image_grey = &m_os_image_grey_day;
+        m_pos_image_yellow = &m_os_image_yellow_day;
         m_pos_image_user = m_pos_image_user_day;
         m_pos_image_user_grey = m_pos_image_user_grey_day;
         break;
     case GLOBAL_COLOR_SCHEME_DUSK:
         m_pos_image_red = &m_os_image_red_dusk;
         m_pos_image_grey = &m_os_image_grey_dusk;
+        m_pos_image_yellow = &m_os_image_yellow_dusk;
         m_pos_image_user = m_pos_image_user_dusk;
         m_pos_image_user_grey = m_pos_image_user_grey_dusk;
         break;
     case GLOBAL_COLOR_SCHEME_NIGHT:
         m_pos_image_red = &m_os_image_red_night;
         m_pos_image_grey = &m_os_image_grey_night;
+        m_pos_image_yellow = &m_os_image_yellow_night;
         m_pos_image_user = m_pos_image_user_night;
         m_pos_image_user_grey = m_pos_image_user_grey_night;
         break;
     default:
         m_pos_image_red = &m_os_image_red_day;
         m_pos_image_grey = &m_os_image_grey_day;
+        m_pos_image_yellow = &m_os_image_yellow_day;
         m_pos_image_user = m_pos_image_user_day;
         m_pos_image_user_grey = m_pos_image_user_grey_day;
         break;
@@ -3232,9 +3275,11 @@ void ChartCanvas::ShipDraw( ocpnDC& dc )
         //     It changes color based on GPS and Chart accuracy/availability
         wxColour ship_color( GetGlobalColor( _T ( "URED" ) ) );         // default is OK
 
-        if( SHIP_NORMAL != m_ownship_state ) ship_color = GetGlobalColor( _T ( "GREY1" ) );
+        if( SHIP_NORMAL != m_ownship_state )
+            ship_color = GetGlobalColor( _T ( "GREY1" ) );
 
-        if( SHIP_LOWACCURACY == m_ownship_state ) ship_color = GetGlobalColor( _T ( "YELO1" ) );
+        if( SHIP_LOWACCURACY == m_ownship_state )
+            ship_color = GetGlobalColor( _T ( "YELO1" ) );
 
         if( GetVP().chart_scale > 300000 )             // According to S52, this should be 50,000
         {
@@ -3256,8 +3301,13 @@ void ChartCanvas::ShipDraw( ocpnDC& dc )
 
             wxImage pos_image;
             pos_image = m_pos_image_red->Copy();
-            if( SHIP_NORMAL != m_ownship_state ) pos_image = m_pos_image_grey->Copy();
+            
+            if( SHIP_LOWACCURACY == m_ownship_state )
+                pos_image = m_pos_image_yellow->Copy();
+            else if( SHIP_NORMAL != m_ownship_state )
+                pos_image = m_pos_image_grey->Copy();
 
+            
             //      Substitute user ownship image if found
             if( m_pos_image_user ) {
                 pos_image = m_pos_image_user->Copy();
@@ -4497,8 +4547,7 @@ void ChartCanvas::AISDrawTarget( AIS_Target_Data *td, ocpnDC& dc )
             double true_scale_display = floor( VPoint.chart_scale / 100. ) * 100.;
             if( true_scale_display < g_Show_Target_Name_Scale ) { // from which scale to display name
 
-                wxString tgt_name =wxString::FromUTF8( td->ShipName );
-                tgt_name = tgt_name.substr( 0, tgt_name.find( _T ( "@" ), 0 ) );
+                wxString tgt_name = td->GetFullName();
                 tgt_name = tgt_name.substr( 0, tgt_name.find( _T ( "Unknown" ), 0) );
 
                 if ( tgt_name != wxEmptyString ) {
@@ -6893,7 +6942,7 @@ void pupHandler_PasteWaypoint() {
         newPoint->m_bIsolatedMark = true;
         pSelect->AddSelectableRoutePoint( newPoint->m_lat, newPoint->m_lon, newPoint );
         pConfig->AddNewWayPoint( newPoint, -1 );
-        pWayPointMan->m_pWayPointList->Append( newPoint );
+        pWayPointMan->AddRoutePoint( newPoint );
         if( pRouteManagerDialog && pRouteManagerDialog->IsShown() ) pRouteManagerDialog->UpdateWptListCtrl();
     }
 
@@ -6993,7 +7042,7 @@ void pupHandler_PasteRoute() {
             newRoute->AddPoint( newPoint );
             pSelect->AddSelectableRoutePoint( newPoint->m_lat, newPoint->m_lon, newPoint );
             pConfig->AddNewWayPoint( newPoint, -1 );
-            pWayPointMan->m_pWayPointList->Append( newPoint );
+            pWayPointMan->AddRoutePoint( newPoint );
         }
         if( i > 1 && createNewRoute ) pSelect->AddSelectableRouteSegment( prevPoint->m_lat,
                 prevPoint->m_lon, curPoint->m_lat, curPoint->m_lon, prevPoint, newPoint, newRoute );
@@ -7237,7 +7286,7 @@ void ChartCanvas::PopupMenuHandler( wxCommandEvent& event )
                 pConfig->DeleteWayPoint( m_pFoundRoutePoint );
                 pSelect->DeleteSelectablePoint( m_pFoundRoutePoint, SELTYPE_ROUTEPOINT );
                 if( NULL != pWayPointMan )
-                    pWayPointMan->m_pWayPointList->DeleteObject( m_pFoundRoutePoint );
+                    pWayPointMan->RemoveRoutePoint( m_pFoundRoutePoint );
                 m_pFoundRoutePoint = NULL;
                 undo->AfterUndoableAction( NULL );
             }
@@ -8747,8 +8796,10 @@ void ChartCanvas::Refresh( bool eraseBackground, const wxRect *rect )
     //      Retrigger the route leg popup timer
     //      This handles the case when the chart is moving in auto-follow mode, but no user mouse input is made.
     //      The timer handler may Hide() the popup if the chart moved enough
+    //      n.b.  We use slightly longer oneshot value to allow this method's Refresh() to complete before 
+    //      ptentially getting another Refresh() in the popup timer handler.
     if( (m_pRouteRolloverWin && m_pRouteRolloverWin->IsActive()) || (m_pAISRolloverWin && m_pAISRolloverWin->IsActive()) )
-        m_RolloverPopupTimer.Start( 10, wxTIMER_ONE_SHOT ); 
+        m_RolloverPopupTimer.Start( 500, wxTIMER_ONE_SHOT ); 
          
 
     if( g_bopengl ) {
@@ -9373,7 +9424,7 @@ void ChartCanvas::DrawAllWaypointsInBBox( ocpnDC& dc, LLBBox& BltBBox, const wxR
         wxDCClipper( *pdc, clipregion );
     }
 
-    wxRoutePointListNode *node = pWayPointMan->m_pWayPointList->GetFirst();
+    wxRoutePointListNode *node = pWayPointMan->GetWaypointList()->GetFirst();
 
     while( node ) {
         RoutePoint *pWP = node->GetData();
