@@ -1514,6 +1514,8 @@ bool s57chart::RenderOverlayRegionViewOnGL( const wxGLContext &glc, const ViewPo
 bool s57chart::DoRenderRegionViewOnGL( const wxGLContext &glc, const ViewPort& VPoint,
         const OCPNRegion &Region, bool b_overlay )
 {
+#ifdef ocpnUSE_GL
+    
 //     CALLGRIND_START_INSTRUMENTATION
 //      g_bDebugS57 = true;
 
@@ -1666,13 +1668,15 @@ bool s57chart::DoRenderRegionViewOnGL( const wxGLContext &glc, const ViewPort& V
     glPopMatrix();
 
 //      CALLGRIND_STOP_INSTRUMENTATION
-
+#endif
     return true;
 }
 
 void s57chart::SetClipRegionGL( const wxGLContext &glc, const ViewPort& VPoint,
         const OCPNRegion &Region, bool b_render_nodta )
 {
+#ifdef ocpnUSE_GL
+    
     if( g_b_useStencil ) {
         //    Create a stencil buffer for clipping to the region
         glEnable( GL_STENCIL_TEST );
@@ -1756,12 +1760,14 @@ void s57chart::SetClipRegionGL( const wxGLContext &glc, const ViewPort& VPoint,
     }
 
     glColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );  // re-enable color buffer
-
+#endif
 }
 
 void s57chart::SetClipRegionGL( const wxGLContext &glc, const ViewPort& VPoint, const wxRect &Rect,
         bool b_render_nodta )
 {
+#ifdef ocpnUSE_GL
+    
     if( g_b_useStencil ) {
         //    Create a stencil buffer for clipping to the region
         glEnable( GL_STENCIL_TEST );
@@ -1836,11 +1842,13 @@ void s57chart::SetClipRegionGL( const wxGLContext &glc, const ViewPort& VPoint, 
     }
 
     glColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );  // re-enable color buffer
-
+#endif
 }
 
 bool s57chart::DoRenderRectOnGL( const wxGLContext &glc, const ViewPort& VPoint, wxRect &rect )
 {
+#ifdef ocpnUSE_GL
+    
     int i;
     ObjRazRules *top;
     ObjRazRules *crnt;
@@ -1910,7 +1918,8 @@ bool s57chart::DoRenderRectOnGL( const wxGLContext &glc, const ViewPort& VPoint,
     glDisable( GL_STENCIL_TEST );
     glDisable( GL_DEPTH_TEST );
     glDisable( GL_SCISSOR_TEST );
-
+#endif          //#ifdef ocpnUSE_GL
+    
     return true;
 }
 
@@ -3887,8 +3896,7 @@ int s57chart::BuildSENCFile( const wxString& FullPath000, const wxString& SENCFi
     Title.append( SENCfile.GetFullPath() );
 
     s_ProgDialog = new wxProgressDialog( Title, Message, m_nGeoRecords, NULL,
-            wxPD_AUTO_HIDE | wxPD_ELAPSED_TIME | wxPD_ESTIMATED_TIME | wxPD_REMAINING_TIME
-                    | wxPD_SMOOTH | wxSTAY_ON_TOP );
+                                         wxPD_AUTO_HIDE | wxPD_SMOOTH | wxSTAY_ON_TOP | wxPD_APP_MODAL);
 
     //      Analyze Updates
     //      The OGR library will apply updates automatically, if enabled.
@@ -3936,7 +3944,7 @@ int s57chart::BuildSENCFile( const wxString& FullPath000, const wxString& SENCFi
     //      Open the OGRS57DataSource
     //      This will ingest the .000 file from the working dir, and apply updates
 
-    int open_return = poS57DS->Open( m_tmpup_array->Item( 0 ).mb_str(), TRUE, &s_ProgressCallBack ); ///172
+    int open_return = poS57DS->Open( m_tmpup_array->Item( 0 ).mb_str(), TRUE, NULL/*&s_ProgressCallBack*/ ); ///172
     if( open_return == BAD_UPDATE )         ///172
     bbad_update = true;
 
@@ -5700,7 +5708,8 @@ bool s57chart::IsPointInObjArea( float lat, float lon, float select_radius, S57O
     bool ret = false;
 
     if( obj->pPolyTessGeo ) {
-        if( !obj->pPolyTessGeo->IsOk() ) obj->pPolyTessGeo->BuildTessGL();
+        if( !obj->pPolyTessGeo->IsOk() )
+            obj->pPolyTessGeo->BuildDeferredTess();
 
         PolyTriGroup *ppg = obj->pPolyTessGeo->Get_PolyTriGroup_head();
 

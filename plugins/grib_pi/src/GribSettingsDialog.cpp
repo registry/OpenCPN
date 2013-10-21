@@ -30,20 +30,20 @@
 static const wxString units0_names[] = {_("Knots"), _("m/s"), _("mph"), _("km/h"), wxEmptyString};
 static const wxString units1_names[] = {_("MilliBars"), _("mmHG"), wxEmptyString};
 static const wxString units2_names[] = {_("Meters"), _("Feet"), wxEmptyString};
-static const wxString units3_names[] = {_("Celcius"), _("Fahrenheit"), wxEmptyString};
+static const wxString units3_names[] = {_("Celsius"), _("Fahrenheit"), wxEmptyString};
 static const wxString units4_names[] = {_("Millimeters"), _("Inches"), wxEmptyString};
 static const wxString units5_names[] = {_("Percentage"), wxEmptyString};
 static const wxString *unit_names[] = {units0_names, units1_names, units2_names,
                                        units3_names, units4_names, units5_names};
 
-static const wxString name_from_index[] = {_("Wind"), _("WindGust"), _("Pressure"),
-                                           _("Wave"), _("Current"),
-                                           _("Precipitation"), _("CloudCover"),
-                                           _("AirTemperature"), _("SeaTemperature")};
+static const wxString name_from_index[] = {_T("Wind"), _T("WindGust"), _T("Pressure"),
+                                           _T("Waves"), _T("Current"),
+                                           _T("Rainfall"), _T("CloudCover"),
+                                           _T("AirTemperature"), _T("SeaTemperature")};
 static const wxString tname_from_index[] = {_("Wind"), _("Wind Gust"),  _("Pressure"),
-                                            _("Wave"), _("Current"),
-                                            _("Precipitation"), _("Cloud Cover"),
-                                            _("Air Temperature"), _("Sea Temperature")};
+                                            _("Waves"), _("Current"),
+                                            _("Rainfall"), _("Cloud Cover"),
+                                            _("Air Temperature(2m)"), _("Sea Temperature(surf.)")};
 
 static const int unittype[GribOverlaySettings::SETTINGS_COUNT] = {0, 0, 1, 2, 0, 4, 5, 3, 3};
 
@@ -51,7 +51,7 @@ enum SettingsDisplay {B_ARROWS, ISO_LINES, D_ARROWS, OVERLAY};
 
 wxString GribOverlaySettings::NameFromIndex(int index)
 {
-    return tname_from_index[index];
+    return wxGetTranslation(tname_from_index[index]);
 }
 
 void GribOverlaySettings::Read()
@@ -138,7 +138,7 @@ double GribOverlaySettings::CalibrationOffset(int settings)
         case FAHRENHEIT: return -273.15 + 32*5/9.0;
         } break;
     }
-        
+
     return 0;
 }
 
@@ -169,7 +169,7 @@ double GribOverlaySettings::CalibrationFactor(int settings)
         } break;
     case 5: return 1;
     }
-        
+
     return 1;
 }
 
@@ -177,7 +177,7 @@ wxString GribOverlaySettings::GetUnitSymbol(int settings)
 {
     switch(unittype[settings]) {
         case 0: switch(Settings[settings].m_Units) {
-            case KNOTS:  return _T("kt");
+            case KNOTS:  return _T("kts");
             case M_S:    return _T("m/s");
             case MPH:    return _T("mph");
             case KPH:    return _T("km/h");
@@ -252,7 +252,7 @@ GribSettingsDialog::GribSettingsDialog(GRIBUIDialog &parent, GribOverlaySettings
     }
 
     for(int i=0; i<GribOverlaySettings::SETTINGS_COUNT; i++)
-        m_cDataType->Append(tname_from_index[i]);
+        m_cDataType->Append( wxGetTranslation(tname_from_index[i]) );
 
     m_cDataType->SetSelection(m_lastdatatype);
     PopulateUnits(m_lastdatatype);
@@ -266,7 +266,7 @@ void GribSettingsDialog::WriteSettings()
     if(m_Settings.m_bInterpolate != m_cInterpolate->GetValue()) {
         m_Settings.m_bInterpolate = m_cInterpolate->GetValue();
         if(m_cInterpolate->IsChecked()) {
-            wxMessageDialog mes(this, _("This file contains data for particular times and you have chosen to display data for different times.\nPlease consider that these values will be interpolated."),
+            wxMessageDialog mes(this, _("This file contains data for particular time intervals but you have chosen to display different intervals.\nPlease consider that the values will be interpolated."),
                 _("Warning!"), wxOK);
             mes.ShowModal();
         }
@@ -390,7 +390,7 @@ void GribSettingsDialog::PopulateUnits(int settings)
 {
     m_cDataUnits->Clear();
     for(int i=0; !unit_names[unittype[m_lastdatatype]][i].empty(); i++)
-        m_cDataUnits->Append(unit_names[unittype[m_lastdatatype]][i]);
+        m_cDataUnits->Append( wxGetTranslation((unit_names[unittype[m_lastdatatype]][i])));
 }
 
 void GribSettingsDialog::OnDataTypeChoice( wxCommandEvent& event )
@@ -424,7 +424,7 @@ void GribSettingsDialog::OnIntepolateChange( wxCommandEvent& event )
         m_sSlicesPerUpdate->Show();
         m_tHourDivider->Show();
         m_sHourDivider->Show();
-    } else {                                        //hide no suiting parameters 
+    } else {                                        //hide no suiting parameters
         m_tSlicesPerUpdate->Hide();
         m_sSlicesPerUpdate->Hide();
         m_tHourDivider->Hide();
