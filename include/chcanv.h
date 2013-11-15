@@ -46,10 +46,15 @@
 #include "CM93DSlide.h"
 #include "RolloverWin.h"
 #include "AISTargetQueryDialog.h"
-#include "glChartCanvas.h"
 #include "TCWin.h"
 #include "timers.h"
 #include "emboss_data.h"
+
+class wxGLContext;
+
+#ifdef ocpnUSE_GL
+#include "glChartCanvas.h"
+#endif
 
 //    Useful static routines
 void ShowAISTargetQueryDialog(wxWindow *parent, int mmsi);
@@ -196,7 +201,6 @@ public:
       ChartBase* GetChartAtCursor();
       ChartBase* GetOverlayChartAtCursor();
 
-      glChartCanvas *GetglCanvas(){ return m_glcc; }
       GSHHSChart* GetWorldBackgroundChart() { return pWorldBackgroundChart; }
 
       void  SetbTCUpdate(bool f){ m_bTCupdate = f;}
@@ -263,6 +267,9 @@ public:
 
       void RemovePointFromRoute( RoutePoint* point, Route* route );
 
+#ifdef ocpnUSE_GL
+      glChartCanvas *GetglCanvas(){ return m_glcc; }
+#endif      
 
 private:
       ViewPort    VPoint;
@@ -489,10 +496,14 @@ private:
       wxImage     m_os_image_grey_day;
       wxImage     m_os_image_grey_dusk;
       wxImage     m_os_image_grey_night;
-
+      wxImage     m_os_image_yellow_day;
+      wxImage     m_os_image_yellow_dusk;
+      wxImage     m_os_image_yellow_night;
+      
       wxImage     *m_pos_image_red;
       wxImage     *m_pos_image_grey;
-
+      wxImage     *m_pos_image_yellow;
+      
       wxImage     *m_pos_image_user;
       wxImage     *m_pos_image_user_grey;
 
@@ -531,8 +542,10 @@ private:
       bool        m_bzooming;
       IDX_entry   *m_pIDXCandidate;
 
+//#ifdef ocpnUSE_GL
       glChartCanvas *m_glcc;
       wxGLContext   *m_pGLcontext;
+//#endif
 
       //Smooth zoom member variables
       wxTimer     m_zoom_timer;
@@ -545,7 +558,8 @@ private:
       bool        m_benable_autopan;
       bool        m_b_paint_enable;
       
-
+      int         m_AISRollover_MMSI;
+      
 DECLARE_EVENT_TABLE()
 };
 

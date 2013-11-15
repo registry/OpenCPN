@@ -289,6 +289,8 @@ extern wxArrayOfConnPrm *g_pConnectionParams;
 
 extern OCPN_Sound        g_anchorwatch_sound;
 
+extern bool              g_bShowMag;
+
 //  TODO why are these static?
 static int mouse_x;
 static int mouse_y;
@@ -356,6 +358,7 @@ enum
     ID_RC_MENU_FINISH,
     ID_DEF_MENU_AIS_QUERY,
     ID_DEF_MENU_AIS_CPA,
+    ID_DEF_MENU_AISSHOWTRACK,
     ID_DEF_MENU_ACTIVATE_MEASURE,
     ID_DEF_MENU_DEACTIVATE_MEASURE,
 
@@ -919,6 +922,7 @@ BEGIN_EVENT_TABLE ( ChartCanvas, wxWindow )
     EVT_MENU ( ID_RC_MENU_FINISH,       ChartCanvas::PopupMenuHandler )
     EVT_MENU ( ID_DEF_MENU_AIS_QUERY,   ChartCanvas::PopupMenuHandler )
     EVT_MENU ( ID_DEF_MENU_AIS_CPA,     ChartCanvas::PopupMenuHandler )
+    EVT_MENU ( ID_DEF_MENU_AISSHOWTRACK, ChartCanvas::PopupMenuHandler )
 
     EVT_MENU ( ID_UNDO,                 ChartCanvas::PopupMenuHandler )
     EVT_MENU ( ID_REDO,                 ChartCanvas::PopupMenuHandler )
@@ -1013,8 +1017,13 @@ ChartCanvas::ChartCanvas ( wxFrame *frame ) :
 
     VPoint.Invalidate();
 
+    m_glcc = NULL;
+    m_pGLcontext = NULL;
+
+#ifdef ocpnUSE_GL    
     if ( !g_bdisable_opengl )
     {
+        wxLogMessage( _T("Creating glChartCanvas") );
         m_glcc = new glChartCanvas(this);
 
     #if wxCHECK_VERSION(2, 9, 0)
@@ -1024,6 +1033,7 @@ ChartCanvas::ChartCanvas ( wxFrame *frame ) :
         m_pGLcontext = m_glcc->GetContext();
     #endif
     }
+#endif
 
     singleClickEventIsValid = false;
 
@@ -1295,10 +1305,48 @@ ChartCanvas::ChartCanvas ( wxFrame *frame ) :
             }
         }
     }
-
+ 
+ 
+    // Yellow
+    m_os_image_yellow_day = m_os_image_red_day.Copy();
+    
+    gimg_width = m_os_image_yellow_day.GetWidth();
+    gimg_height = m_os_image_yellow_day.GetHeight();
+    
+    m_os_image_yellow_dusk = m_os_image_red_day.Copy();
+    m_os_image_yellow_night = m_os_image_red_day.Copy();
+    
+    for( int iy = 0; iy < gimg_height; iy++ ) {
+        for( int ix = 0; ix < gimg_width; ix++ ) {
+            if( !m_os_image_yellow_day.IsTransparent( ix, iy ) ) {
+                wxImage::RGBValue rgb( m_os_image_yellow_day.GetRed( ix, iy ),
+                                       m_os_image_yellow_day.GetGreen( ix, iy ),
+                                       m_os_image_yellow_day.GetBlue( ix, iy ) );
+                wxImage::HSVValue hsv = wxImage::RGBtoHSV( rgb );
+                hsv.hue += 60./360.;             //shift to yellow        
+                wxImage::RGBValue nrgb = wxImage::HSVtoRGB( hsv );
+                m_os_image_yellow_day.SetRGB( ix, iy, nrgb.red, nrgb.green, nrgb.blue );
+                
+                hsv = wxImage::RGBtoHSV( rgb );
+                hsv.value = hsv.value * factor_dusk;
+                hsv.hue += 60./360.;             // shift to yellow
+                nrgb = wxImage::HSVtoRGB( hsv );
+                m_os_image_yellow_dusk.SetRGB( ix, iy, nrgb.red, nrgb.green, nrgb.blue );
+                
+                hsv = wxImage::RGBtoHSV( rgb );
+                hsv.hue += 60./360.;             //shift to yellow
+                hsv.value = hsv.value * factor_night;
+                nrgb = wxImage::HSVtoRGB( hsv );
+                m_os_image_yellow_night.SetRGB( ix, iy, nrgb.red, nrgb.green, nrgb.blue );
+            }
+        }
+    }
+    
+    
     //  Set initial pointers to ownship images
     m_pos_image_red = &m_os_image_red_day;
-
+    m_pos_image_yellow = &m_os_image_yellow_day;
+    
     //  Look for user defined ownship image
     //  This may be found in the shared data location along with other user defined icons.
     //  and will be called "ownship.xpm" or "ownship.png"
@@ -1424,8 +1472,11 @@ ChartCanvas::~ChartCanvas()
     delete m_pos_image_user_grey_dusk;
     delete m_pos_image_user_grey_night;
     delete undo;
+#ifdef ocpnUSE_GL
     if( !g_bdisable_opengl )
         delete m_glcc;
+#endif
+        
 }
 
 int ChartCanvas::GetCanvasChartNativeScale()
@@ -1497,8 +1548,10 @@ int ChartCanvas::FindClosestCanvasChartdbIndex( int scale )
 void ChartCanvas::EnablePaint(bool b_enable)
 { 
     m_b_paint_enable = b_enable;
+#ifdef ocpnUSE_GL
     if(m_glcc)
         m_glcc->EnablePaint(b_enable);
+#endif    
 }
 
 bool ChartCanvas::IsQuiltDelta()
@@ -1718,8 +1771,8 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
         break;
 
     case WXK_F12: {
-        if( m_modkeys == wxMOD_ALT )
-            m_nMeasureState = *(int *)(0);          // generate a fault for testing
+//        if( m_modkeys == wxMOD_ALT )
+//            m_nMeasureState = *(int *)(0);          // generate a fault for testing
 
         parent_frame->ToggleChartOutlines();
         break;
@@ -1860,16 +1913,11 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
             }
             break;
 
-        case 13:             // Ctrl M // Drop Marker at cursor // Enter // Drop Marker at boat;
+        case 13:             // Ctrl M // Drop Marker at cursor 
         {
             double lat, lon;
-            if( m_modkeys == wxMOD_CONTROL ) {
-                lat = m_cursor_lat;
-                lon = m_cursor_lon;
-            } else {
-                lat = gLat;
-                lon = gLon;
-            }
+            lat = m_cursor_lat;
+            lon = m_cursor_lon;
             RoutePoint *pWP = new RoutePoint( lat, lon, g_default_wp_icon, wxEmptyString,
                                               GPX_EMPTY_STRING );
             pWP->m_bIsolatedMark = true;                      // This is an isolated mark
@@ -1895,7 +1943,7 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
             break;
         }
 
-        case 32:             // Space                      //    Drop Marker at boat's position;
+        case 15:             // Ctrl O - Drop Marker at boat's position
         {
             RoutePoint *pWP = new RoutePoint( gLat, gLon, g_default_wp_icon, wxEmptyString,
                                               GPX_EMPTY_STRING );
@@ -2074,24 +2122,28 @@ void ChartCanvas::SetColorScheme( ColorScheme cs )
     case GLOBAL_COLOR_SCHEME_DAY:
         m_pos_image_red = &m_os_image_red_day;
         m_pos_image_grey = &m_os_image_grey_day;
+        m_pos_image_yellow = &m_os_image_yellow_day;
         m_pos_image_user = m_pos_image_user_day;
         m_pos_image_user_grey = m_pos_image_user_grey_day;
         break;
     case GLOBAL_COLOR_SCHEME_DUSK:
         m_pos_image_red = &m_os_image_red_dusk;
         m_pos_image_grey = &m_os_image_grey_dusk;
+        m_pos_image_yellow = &m_os_image_yellow_dusk;
         m_pos_image_user = m_pos_image_user_dusk;
         m_pos_image_user_grey = m_pos_image_user_grey_dusk;
         break;
     case GLOBAL_COLOR_SCHEME_NIGHT:
         m_pos_image_red = &m_os_image_red_night;
         m_pos_image_grey = &m_os_image_grey_night;
+        m_pos_image_yellow = &m_os_image_yellow_night;
         m_pos_image_user = m_pos_image_user_night;
         m_pos_image_user_grey = m_pos_image_user_grey_night;
         break;
     default:
         m_pos_image_red = &m_os_image_red_day;
         m_pos_image_grey = &m_os_image_grey_day;
+        m_pos_image_yellow = &m_os_image_yellow_day;
         m_pos_image_user = m_pos_image_user_day;
         m_pos_image_user_grey = m_pos_image_user_grey_day;
         break;
@@ -2100,8 +2152,10 @@ void ChartCanvas::SetColorScheme( ColorScheme cs )
     CreateDepthUnitEmbossMaps( cs );
     CreateOZEmbossMapData( cs );
 
-    if( g_bopengl && m_glcc ) m_glcc->ClearAllRasterTextures();
-
+#ifdef ocpnUSE_GL
+    if( g_bopengl && m_glcc )
+        m_glcc->ClearAllRasterTextures();
+#endif
     SetbTCUpdate( true );                        // force re-render of tide/current locators
 
     ReloadVP();
@@ -2177,7 +2231,7 @@ void ChartCanvas::ShowBrightnessLevelTimedPopup( int brightness, int min, int ma
     
     m_pBrightPopup->SetBitmap( bmp );
     m_pBrightPopup->Show();
- //   m_pBrightPopup->Refresh();
+    m_pBrightPopup->Refresh();
     
     
 }
@@ -2210,7 +2264,22 @@ void ChartCanvas::OnRolloverPopupTimerEvent( wxTimerEvent& event )
                     m_pAISRolloverWin->IsActive( false );
                     b_need_refresh = true;
                 }
+
+                //      Sometimes the mouse moves fast enough to get over a new AIS target before
+                //      the one-shot has fired to remove the old target.
+                //      Result:  wrong target data is shown.
+                //      Detect this case,close the existing rollover ASAP, and restart the timer.
+                if( m_pAISRolloverWin && m_pAISRolloverWin->IsActive() &&
+                    m_AISRollover_MMSI && (m_AISRollover_MMSI != FoundAIS_MMSI) ){
+                    m_RolloverPopupTimer.Start( 50, wxTIMER_ONE_SHOT );
+                    m_pAISRolloverWin->IsActive( false );
+                    m_AISRollover_MMSI = 0;
+                    Refresh();
+                    return;
+                }
                 
+                m_AISRollover_MMSI = FoundAIS_MMSI;
+                   
                 if( !m_pAISRolloverWin->IsActive() ) {
                     
                     wxString s = ptarget->GetRolloverString();
@@ -2227,6 +2296,7 @@ void ChartCanvas::OnRolloverPopupTimerEvent( wxTimerEvent& event )
             }
         }
         else {
+            m_AISRollover_MMSI = 0;
             showAISRollover = false;
         }
     }
@@ -2234,6 +2304,7 @@ void ChartCanvas::OnRolloverPopupTimerEvent( wxTimerEvent& event )
     //  Maybe turn the rollover off
     if( m_pAISRolloverWin && m_pAISRolloverWin->IsActive() && !showAISRollover ) {
         m_pAISRolloverWin->IsActive( false );
+        m_AISRollover_MMSI = 0;
         b_need_refresh = true;
     }
     
@@ -2282,8 +2353,14 @@ void ChartCanvas::OnRolloverPopupTimerEvent( wxTimerEvent& event )
                     s << _T("\n") << _("Total Length: ") << FormatDistanceAdaptive( pr->m_route_length)
                     << _T("\n") << _("Leg: from ") << segShow_point_a->GetName()
                     << _(" to ") << segShow_point_b->GetName()
-                    << _T("\n") << wxString::Format( wxString( "%03d°  ", wxConvUTF8 ), (int) brg )
-                    << FormatDistanceAdaptive( dist );
+                    << _T("\n");
+
+                    if( g_bShowMag )
+                        s << wxString::Format( wxString("%03d°(M)  ", wxConvUTF8 ), (int)gFrame->GetTrueOrMag( brg ) );
+                    else
+                        s << wxString::Format( wxString("%03d°  ", wxConvUTF8 ), (int)gFrame->GetTrueOrMag( brg ) );
+                    
+                    s << FormatDistanceAdaptive( dist );
 
                     // Compute and display cumulative distance from route start point to current
                     // leg end point.
@@ -2382,9 +2459,13 @@ void ChartCanvas::OnCursorTrackTimerEvent( wxTimerEvent& event )
                 parent_frame->SetStatusText ( s1, STAT_FIELD_CURSOR_LL );
 
                 double brg, dist;
-                DistanceBearingMercator(cursor_lat, cursor_lon, gLat, gLon, &brg, &dist);
                 wxString s;
-                s.Printf( wxString("%03d° ", wxConvUTF8 ), (int)brg );
+                DistanceBearingMercator(cursor_lat, cursor_lon, gLat, gLon, &brg, &dist);
+                if( g_bShowMag )
+                    s.Printf( wxString("%03d°(M)  ", wxConvUTF8 ), (int)gFrame->GetTrueOrMag( brg ) );
+                else
+                    s.Printf( wxString("%03d°  ", wxConvUTF8 ), (int)gFrame->GetTrueOrMag( brg ) );
+                
                 s << FormatDistanceAdaptive( dist );
                 parent_frame->SetStatusText ( s, STAT_FIELD_CURSOR_BRGRNG );
             }
@@ -2785,11 +2866,15 @@ void ChartCanvas::ReloadVP( bool b_adjust )
 
 void ChartCanvas::LoadVP( ViewPort &vp, bool b_adjust )
 {
+#ifdef ocpnUSE_GL
     if( g_bopengl ) {
         m_glcc->Invalidate();
         if( m_glcc->GetSize().x != VPoint.pix_width || m_glcc->GetSize().y != VPoint.pix_height ) m_glcc->SetSize(
                 VPoint.pix_width, VPoint.pix_height );
-    } else {
+    }
+    else
+#endif        
+    {
         m_cache_vp.Invalidate();
         m_bm_cache_vp.Invalidate();
     }
@@ -2862,7 +2947,10 @@ bool ChartCanvas::SetViewPoint( double lat, double lon, double scale_ppm, double
     if( last_vp.view_scale_ppm != scale_ppm ) {
         m_cache_vp.Invalidate();
 
-        if( g_bopengl ) m_glcc->Invalidate();
+#ifdef ocpnUSE_GL        
+        if( g_bopengl )
+            m_glcc->Invalidate();
+#endif        
     }
 
     //  A preliminary value, may be tweaked below
@@ -3003,8 +3091,10 @@ bool ChartCanvas::SetViewPoint( double lat, double lon, double scale_ppm, double
 
                 if(m_pQuilt->GetXStackHash() != hash1) {
                     m_bm_cache_vp.Invalidate();
+#ifdef ocpnUSE_GL                    
                     if(g_bopengl)
                         m_glcc->Invalidate();
+#endif                    
                 }
 
                 ChartData->UnLockCache();
@@ -3218,9 +3308,11 @@ void ChartCanvas::ShipDraw( ocpnDC& dc )
         //     It changes color based on GPS and Chart accuracy/availability
         wxColour ship_color( GetGlobalColor( _T ( "URED" ) ) );         // default is OK
 
-        if( SHIP_NORMAL != m_ownship_state ) ship_color = GetGlobalColor( _T ( "GREY1" ) );
+        if( SHIP_NORMAL != m_ownship_state )
+            ship_color = GetGlobalColor( _T ( "GREY1" ) );
 
-        if( SHIP_LOWACCURACY == m_ownship_state ) ship_color = GetGlobalColor( _T ( "YELO1" ) );
+        if( SHIP_LOWACCURACY == m_ownship_state )
+            ship_color = GetGlobalColor( _T ( "YELO1" ) );
 
         if( GetVP().chart_scale > 300000 )             // According to S52, this should be 50,000
         {
@@ -3242,8 +3334,13 @@ void ChartCanvas::ShipDraw( ocpnDC& dc )
 
             wxImage pos_image;
             pos_image = m_pos_image_red->Copy();
-            if( SHIP_NORMAL != m_ownship_state ) pos_image = m_pos_image_grey->Copy();
+            
+            if( SHIP_LOWACCURACY == m_ownship_state )
+                pos_image = m_pos_image_yellow->Copy();
+            else if( SHIP_NORMAL != m_ownship_state )
+                pos_image = m_pos_image_grey->Copy();
 
+            
             //      Substitute user ownship image if found
             if( m_pos_image_user ) {
                 pos_image = m_pos_image_user->Copy();
@@ -3944,7 +4041,7 @@ void ChartCanvas::AISDrawTarget( AIS_Target_Data *td, ocpnDC& dc )
     if( td->n_alarm_state == AIS_ALARM_SET ) drawit++;
 
     //  If AIS tracks are shown, is the first point of the track on-screen?
-    if( g_bAISShowTracks ) {
+    if( g_bAISShowTracks && td->b_show_track ) {
         wxAISTargetTrackListNode *node = td->m_ptrack->GetFirst();
         if( node ) {
             AISTargetTrackPoint *ptrack_point = node->GetData();
@@ -4483,8 +4580,7 @@ void ChartCanvas::AISDrawTarget( AIS_Target_Data *td, ocpnDC& dc )
             double true_scale_display = floor( VPoint.chart_scale / 100. ) * 100.;
             if( true_scale_display < g_Show_Target_Name_Scale ) { // from which scale to display name
 
-                wxString tgt_name =wxString::FromUTF8( td->ShipName );
-                tgt_name = tgt_name.substr( 0, tgt_name.find( _T ( "@" ), 0 ) );
+                wxString tgt_name = td->GetFullName();
                 tgt_name = tgt_name.substr( 0, tgt_name.find( _T ( "Unknown" ), 0) );
 
                 if ( tgt_name != wxEmptyString ) {
@@ -4504,7 +4600,7 @@ void ChartCanvas::AISDrawTarget( AIS_Target_Data *td, ocpnDC& dc )
         }
 
         //  Draw tracks if enabled
-        if( g_bAISShowTracks ) {
+        if( g_bAISShowTracks && td->b_show_track ) {
             wxPoint TrackPointA;
             wxPoint TrackPointB;
 
@@ -4958,9 +5054,11 @@ void ChartCanvas::OnSize( wxSizeEvent& event )
     //  Rescale again, to capture all the changes for new canvas size
     SetVPScale( GetVPScale() );
 
+#ifdef ocpnUSE_GL
     if( g_bopengl && m_glcc ) {
         m_glcc->OnSize( event );
     }
+#endif    
     //  Invalidate the whole window
     ReloadVP();
 }
@@ -5329,7 +5427,11 @@ void ChartCanvas::MouseEvent( wxMouseEvent& event )
             double brg, dist;
             DistanceBearingMercator( m_cursor_lat, m_cursor_lon, gLat, gLon, &brg, &dist );
             wxString s;
-            s.Printf( wxString( "%03d°  ", wxConvUTF8 ), (int) brg );
+            if( g_bShowMag )
+                s.Printf( wxString("%03d°(M)  ", wxConvUTF8 ), (int)gFrame->GetTrueOrMag( brg ) );
+            else
+                s.Printf( wxString("%03d°  ", wxConvUTF8 ), (int)gFrame->GetTrueOrMag( brg ) );
+            
             s << FormatDistanceAdaptive( dist );
             parent_frame->SetStatusText( s, STAT_FIELD_CURSOR_BRGRNG );
         }
@@ -6406,6 +6508,12 @@ void ChartCanvas::CanvasPopupMenu( int x, int y, int seltype )
                     menuAIS->Append( ID_DEF_MENU_AIS_CPA, _( "Show Target CPA" ) );
             }
             menuAIS->Append( ID_DEF_MENU_AISTARGETLIST, _("Target List...") );
+            if ( g_bAISShowTracks ) {
+                if( myptarget && myptarget->b_show_track )
+                    menuAIS->Append( ID_DEF_MENU_AISSHOWTRACK, _("Hide Target Track") );
+                else
+                    menuAIS->Append( ID_DEF_MENU_AISSHOWTRACK, _("Show Target Track") );
+            }
             menuFocus = menuAIS;
         }
     }
@@ -6869,7 +6977,7 @@ void pupHandler_PasteWaypoint() {
         newPoint->m_bIsolatedMark = true;
         pSelect->AddSelectableRoutePoint( newPoint->m_lat, newPoint->m_lon, newPoint );
         pConfig->AddNewWayPoint( newPoint, -1 );
-        pWayPointMan->m_pWayPointList->Append( newPoint );
+        pWayPointMan->AddRoutePoint( newPoint );
         if( pRouteManagerDialog && pRouteManagerDialog->IsShown() ) pRouteManagerDialog->UpdateWptListCtrl();
     }
 
@@ -6969,7 +7077,7 @@ void pupHandler_PasteRoute() {
             newRoute->AddPoint( newPoint );
             pSelect->AddSelectableRoutePoint( newPoint->m_lat, newPoint->m_lon, newPoint );
             pConfig->AddNewWayPoint( newPoint, -1 );
-            pWayPointMan->m_pWayPointList->Append( newPoint );
+            pWayPointMan->AddRoutePoint( newPoint );
         }
         if( i > 1 && createNewRoute ) pSelect->AddSelectableRouteSegment( prevPoint->m_lat,
                 prevPoint->m_lon, curPoint->m_lat, curPoint->m_lon, prevPoint, newPoint, newRoute );
@@ -7213,7 +7321,7 @@ void ChartCanvas::PopupMenuHandler( wxCommandEvent& event )
                 pConfig->DeleteWayPoint( m_pFoundRoutePoint );
                 pSelect->DeleteSelectablePoint( m_pFoundRoutePoint, SELTYPE_ROUTEPOINT );
                 if( NULL != pWayPointMan )
-                    pWayPointMan->m_pWayPointList->DeleteObject( m_pFoundRoutePoint );
+                    pWayPointMan->RemoveRoutePoint( m_pFoundRoutePoint );
                 m_pFoundRoutePoint = NULL;
                 undo->AfterUndoableAction( NULL );
             }
@@ -7320,6 +7428,13 @@ void ChartCanvas::PopupMenuHandler( wxCommandEvent& event )
             myptarget->Toggle_AIS_CPA();     //TR 2012.06.28: Show AIS-CPA
         break;                              //TR 2012.06.28: Show AIS-CPA
     }
+    
+    case ID_DEF_MENU_AISSHOWTRACK: {
+        AIS_Target_Data *myptarget = g_pAIS->Get_Target_Data_From_MMSI(m_FoundAIS_MMSI);
+        if ( myptarget )
+            myptarget->ToggleShowTrack();
+        break;
+    }
 
     case ID_DEF_MENU_QUILTREMOVE: {
         if( VPoint.b_quilt ) {
@@ -7381,15 +7496,16 @@ void ChartCanvas::PopupMenuHandler( wxCommandEvent& event )
 
             pConfig->DeleteConfigRoute( m_pSelectedRoute );
             g_pRouteMan->DeleteRoute( m_pSelectedRoute );
+            if( pRoutePropDialog && ( pRoutePropDialog->IsShown()) && (m_pSelectedRoute == pRoutePropDialog->GetRoute()) ) {
+                pRoutePropDialog->Hide();
+            }
+
             m_pSelectedRoute = NULL;
             m_pFoundRoutePoint = NULL;
             m_pFoundRoutePointSecond = NULL;
-            if( pRoutePropDialog && ( pRoutePropDialog->IsShown() ) ) {
-                pRoutePropDialog->SetRouteAndUpdate( m_pSelectedRoute );
-                pRoutePropDialog->UpdateProperties();
-            }
-
-            if( pRouteManagerDialog && pRouteManagerDialog->IsShown() ) pRouteManagerDialog->UpdateRouteListCtrl();
+            
+            if( pRouteManagerDialog && pRouteManagerDialog->IsShown() )
+                pRouteManagerDialog->UpdateRouteListCtrl();
 
             if( pMarkPropDialog && pMarkPropDialog->IsShown() ) {
                 pMarkPropDialog->ValidateMark();
@@ -7536,11 +7652,20 @@ void ChartCanvas::PopupMenuHandler( wxCommandEvent& event )
             if( !g_pRouteMan->IsRouteValid( m_pSelectedRoute ) ) m_pSelectedRoute = NULL;
 
             if( pRoutePropDialog && ( pRoutePropDialog->IsShown() ) ) {
-                pRoutePropDialog->SetRouteAndUpdate( m_pSelectedRoute );
-                pRoutePropDialog->UpdateProperties();
+                if( m_pSelectedRoute ) { 
+                    pRoutePropDialog->SetRouteAndUpdate( m_pSelectedRoute );
+                    pRoutePropDialog->UpdateProperties();
+                }
+                else
+                    pRoutePropDialog->Hide();
+                    
             }
 
-            if( pRouteManagerDialog && pRouteManagerDialog->IsShown() ) pRouteManagerDialog->UpdateWptListCtrl();
+            if( pRouteManagerDialog && pRouteManagerDialog->IsShown() ) {
+                pRouteManagerDialog->UpdateWptListCtrl();
+                pRouteManagerDialog->UpdateRouteListCtrl();
+            }
+                
         }
 
         break;
@@ -7595,15 +7720,15 @@ void ChartCanvas::PopupMenuHandler( wxCommandEvent& event )
             pConfig->DeleteConfigRoute( m_pSelectedTrack );
 
             g_pRouteMan->DeleteTrack( m_pSelectedTrack );
+
+            if( pTrackPropDialog && ( pTrackPropDialog->IsShown()) && (m_pSelectedTrack == pTrackPropDialog->GetTrack()) ) {
+                pTrackPropDialog->Hide();
+            }
+
             m_pSelectedTrack = NULL;
             m_pFoundRoutePoint = NULL;
             m_pFoundRoutePointSecond = NULL;
-
-            if( pRoutePropDialog && ( pRoutePropDialog->IsShown() ) ) {
-                pRoutePropDialog->SetRouteAndUpdate( m_pSelectedTrack );
-                pRoutePropDialog->UpdateProperties();
-            }
-
+            
             if( pRouteManagerDialog && pRouteManagerDialog->IsShown() ) {
                 pRouteManagerDialog->UpdateTrkListCtrl();
                 pRouteManagerDialog->UpdateRouteListCtrl();
@@ -7952,7 +8077,10 @@ void ChartCanvas::RenderChartOutline( ocpnDC &dc, int dbIndex, ViewPort& vp )
 
 bool ChartCanvas::PurgeGLCanvasChartCache( ChartBase *pc )
 {
-    if( g_bopengl && m_glcc ) m_glcc->PurgeChartTextures( pc );
+#ifdef ocpnUSE_GL
+    if( g_bopengl && m_glcc )
+        m_glcc->PurgeChartTextures( pc );
+#endif    
     return true;
 }
 
@@ -8054,8 +8182,12 @@ void ChartCanvas::RenderRouteLegs( ocpnDC &dc )
         }
 
         wxString routeInfo;
-        routeInfo << wxString::Format( wxString( "%03d° ", wxConvUTF8 ), (int) brg )
-        << _T(" ") << FormatDistanceAdaptive( dist );
+        if( g_bShowMag )
+            routeInfo << wxString::Format( wxString("%03d°(M)  ", wxConvUTF8 ), (int)gFrame->GetTrueOrMag( brg ) );
+        else
+            routeInfo << wxString::Format( wxString("%03d°  ", wxConvUTF8 ), (int)gFrame->GetTrueOrMag( brg ) );
+        
+        routeInfo << _T(" ") << FormatDistanceAdaptive( dist );
 
         wxFont *dFont = FontMgr::Get().GetFont( _("RouteLegInfoRollover"), 12 );
         dc.SetFont( *dFont );
@@ -8100,13 +8232,17 @@ int spaint;
 int s_in_update;
 void ChartCanvas::OnPaint( wxPaintEvent& event )
 {
-//      CALLGRIND_START_INSTRUMENTATION
-    //  Paint updates may have been externally disabled (temporarily, to avoid Yield() recursion performance loss)
-    if(!m_b_paint_enable)
-        return;
-
     wxPaintDC dc( this );
 
+    //  Paint updates may have been externally disabled (temporarily, to avoid Yield() recursion performance loss)
+    //  It is important that the wxPaintDC is built, even if we elect to not process this paint message.
+    //  Otherwise, the paint message may not be removed from the message queue, esp on Windows. (FS#1213)
+    //  This would lead to a deadlock condition in ::wxYield()
+    
+    if(!m_b_paint_enable)
+        return;
+    
+#ifdef ocpnUSE_GL    
     if( !g_bdisable_opengl )
         m_glcc->Show( g_bopengl );
 
@@ -8119,6 +8255,7 @@ void ChartCanvas::OnPaint( wxPaintEvent& event )
 
         return;
     }
+#endif
 
     if( ( GetVP().pix_width == 0 ) || ( GetVP().pix_height == 0 ) ) return;
 
@@ -8699,8 +8836,11 @@ int ChartCanvas::GetNextContextMenuId()
 
 bool ChartCanvas::SetCursor( const wxCursor &c )
 {
-    if( g_bopengl ) return m_glcc->SetCursor( c );
+#ifdef ocpnUSE_GL
+    if( g_bopengl )
+        return m_glcc->SetCursor( c );
     else
+#endif        
         return wxWindow::SetCursor( c );
 }
 
@@ -8712,10 +8852,12 @@ void ChartCanvas::Refresh( bool eraseBackground, const wxRect *rect )
     //      Retrigger the route leg popup timer
     //      This handles the case when the chart is moving in auto-follow mode, but no user mouse input is made.
     //      The timer handler may Hide() the popup if the chart moved enough
+    //      n.b.  We use slightly longer oneshot value to allow this method's Refresh() to complete before 
+    //      ptentially getting another Refresh() in the popup timer handler.
     if( (m_pRouteRolloverWin && m_pRouteRolloverWin->IsActive()) || (m_pAISRolloverWin && m_pAISRolloverWin->IsActive()) )
-        m_RolloverPopupTimer.Start( 10, wxTIMER_ONE_SHOT ); 
+        m_RolloverPopupTimer.Start( 500, wxTIMER_ONE_SHOT ); 
          
-
+#ifdef ocpnUSE_GL
     if( g_bopengl ) {
 
         m_glcc->Refresh( eraseBackground, NULL ); // We always are going to render the entire screen anyway, so make
@@ -8725,18 +8867,21 @@ void ChartCanvas::Refresh( bool eraseBackground, const wxRect *rect )
         //  We need to selectively Refresh some child windows, if they are visible.
         //  Note that some children are refreshed elsewhere on timer ticks, so don't need attention here.
 
-        //      ChartInfo window
-        if( m_pCIWin && m_pCIWin->IsShown() ) {
-            m_pCIWin->Raise();
-            m_pCIWin->Refresh( false );
-        }
-
+        //      Thumbnail chart
         if( pthumbwin && pthumbwin->IsShown() ) {
             pthumbwin->Raise();
             pthumbwin->Refresh( false );
         }
 
+        //      ChartInfo window
+        if( m_pCIWin && m_pCIWin->IsShown() ) {
+            m_pCIWin->Raise();
+            m_pCIWin->Refresh( false );
+        }
+        
+        
     } else
+#endif        
         wxWindow::Refresh( eraseBackground, rect );
 
 }
@@ -8744,8 +8889,9 @@ void ChartCanvas::Refresh( bool eraseBackground, const wxRect *rect )
 void ChartCanvas::Update()
 {
     if( g_bopengl ) {
+#ifdef ocpnUSE_GL        
         m_glcc->Update();
-//          m_glcc->render(); /* for some reason repaint not triggered */
+#endif
     } else
         wxWindow::Update();
 }
@@ -8805,6 +8951,9 @@ void ChartCanvas::EmbossCanvas( ocpnDC &dc, emboss_data *pemboss, int x, int y )
 
         result_dc.SelectObject( wxNullBitmap );
     }
+
+#ifdef ocpnUSE_GL
+    
 #ifndef __WXMSW__
     else if(0/*b_useTexRect*/)
     {
@@ -8916,6 +9065,7 @@ void ChartCanvas::EmbossCanvas( ocpnDC &dc, emboss_data *pemboss, int x, int y )
         glDisable( GL_BLEND );
         glDisable( GL_TEXTURE_2D );
     }
+#endif    
 }
 
 void ChartCanvas::EmbossOverzoomIndicator( ocpnDC &dc )
@@ -9338,7 +9488,7 @@ void ChartCanvas::DrawAllWaypointsInBBox( ocpnDC& dc, LLBBox& BltBBox, const wxR
         wxDCClipper( *pdc, clipregion );
     }
 
-    wxRoutePointListNode *node = pWayPointMan->m_pWayPointList->GetFirst();
+    wxRoutePointListNode *node = pWayPointMan->GetWaypointList()->GetFirst();
 
     while( node ) {
         RoutePoint *pWP = node->GetData();

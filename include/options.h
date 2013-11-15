@@ -149,6 +149,8 @@ enum {
     ID_ZTCCHECKBOX,
     ID_DELETECHECKBOX,
     ID_NATIONALTEXTCHECKBOX,
+    ID_MAGSHOWCHECKBOX,
+    ID_MAGAPBCHECKBOX,
     xID_OK
 };
 
@@ -239,6 +241,8 @@ public:
     void OnXidOkClick( wxCommandEvent& event );
     void OnCancelClick( wxCommandEvent& event );
     void OnChooseFont( wxCommandEvent& event );
+    void OnCPAWarnClick( wxCommandEvent& event );
+    
 #ifdef __WXGTK__
     void OnChooseFontColor( wxCommandEvent& event );
 #endif
@@ -296,8 +300,12 @@ public:
     wxCheckBox              *pSmoothPanZoom;
     wxCheckBox              *pFullScreenQuilt;
     wxChoice                *m_pcTCDatasets;
+    wxCheckBox              *pCBMagShow;
+    wxTextCtrl              *pMagVar;
+    
     int                      k_tides;
 
+    
 //    For GPS Page
     wxListCtrl* m_lcSources;
     wxButton* m_buttonAdd;
@@ -346,6 +354,7 @@ public:
     wxButton* m_sdbSizerDlgButtonsCancel;
     wxStaticBoxSizer* sbSizerInFilter;
     wxStaticBoxSizer* sbSizerOutFilter;
+    wxCheckBox *m_cbAPBMagnetic;
 
     SentenceListDlg* m_stcdialog_in;
     SentenceListDlg* m_stcdialog_out;
@@ -540,9 +549,10 @@ private:
 
 
     void SetConnectionParams(ConnectionParams *cp);
+    void SetDefaultConnectionParams(void);
     void SetDSFormRWStates();
     void FillSourceList();
-    ConnectionParams *SaveConnectionParams();
+    ConnectionParams *CreateConnectionParamsFromSelectedItem();
 };
 
 class ChartGroupsUI: public wxScrolledWindow {
@@ -635,7 +645,7 @@ static int lang_list[] = {
             wxLANGUAGE_ARABIC_SUDAN,
             wxLANGUAGE_ARABIC_SYRIA,
             wxLANGUAGE_ARABIC_TUNISIA,
-            wxLANGUAGE_ARABIC_UAE,
+//            wxLANGUAGE_ARABIC_UAE,
             wxLANGUAGE_ARABIC_YEMEN,
             wxLANGUAGE_ARMENIAN,
             wxLANGUAGE_ASSAMESE,

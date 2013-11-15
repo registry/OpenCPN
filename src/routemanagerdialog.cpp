@@ -899,7 +899,8 @@ void RouteManagerDialog::UpdateRouteListCtrl()
         m_pRouteListCtrl->SetItemState( item, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED );
     }
 
-    if( m_lastRteItem >= 0 ) m_pRouteListCtrl->EnsureVisible( m_lastRteItem );
+    if( (m_lastRteItem >= 0) && (m_pRouteListCtrl->GetItemCount()) )
+        m_pRouteListCtrl->EnsureVisible( m_lastRteItem );
     UpdateRteButtons();
 }
 
@@ -1586,7 +1587,8 @@ void RouteManagerDialog::UpdateTrkListCtrl()
         m_pTrkListCtrl->SetItemState( item, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED );
     }
 
-    if( m_lastTrkItem >= 0 ) m_pTrkListCtrl->EnsureVisible( m_lastTrkItem );
+    if( (m_lastTrkItem >= 0 ) && (m_pTrkListCtrl->GetItemCount()) )
+        m_pTrkListCtrl->EnsureVisible( m_lastTrkItem );
     UpdateTrkButtons();
 }
 
@@ -1822,7 +1824,7 @@ void RouteManagerDialog::UpdateWptListCtrl( RoutePoint *rp_select, bool b_retain
     
     m_pWptListCtrl->DeleteAllItems();
 
-    wxRoutePointListNode *node = pWayPointMan->m_pWayPointList->GetFirst();
+    wxRoutePointListNode *node = pWayPointMan->GetWaypointList()->GetFirst();
 
     int index = 0;
     while( node ) {
@@ -1880,7 +1882,8 @@ void RouteManagerDialog::UpdateWptListCtrl( RoutePoint *rp_select, bool b_retain
         m_pWptListCtrl->SetItemState( item, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED );
     }
 
-    if( m_lastWptItem >= 0 ) m_pWptListCtrl->EnsureVisible( m_lastWptItem );
+    if( (m_lastWptItem >= 0) && (m_pWptListCtrl->GetItemCount()) )
+        m_pWptListCtrl->EnsureVisible( m_lastWptItem );
     UpdateWptButtons();
 }
 
@@ -2007,11 +2010,7 @@ void RouteManagerDialog::OnWptNewClick( wxCommandEvent &event )
     pMarkPropDialog->SetRoutePoint( pWP );
     pMarkPropDialog->UpdateProperties();
 
-    if( !pMarkPropDialog->IsShown() )
-        pMarkPropDialog->ShowModal();
-
-    // waypoint might have changed
-    UpdateWptListCtrl();
+    WptShowPropertiesDialog( pWP, GetParent() );
 }
 
 void RouteManagerDialog::OnWptPropertiesClick( wxCommandEvent &event )
@@ -2391,7 +2390,7 @@ void RouteManagerDialog::OnLayDeleteClick( wxCommandEvent &event )
     //}
 
     // Process waypoints in this layer
-    wxRoutePointListNode *node = pWayPointMan->m_pWayPointList->GetFirst();
+    wxRoutePointListNode *node = pWayPointMan->GetWaypointList()->GetFirst();
     wxRoutePointListNode *node3;
 
     while( node ) {
@@ -2459,7 +2458,7 @@ void RouteManagerDialog::ToggleLayerContentsOnChart( Layer *layer )
     }
 
     // Process waypoints in this layer
-    wxRoutePointListNode *node = pWayPointMan->m_pWayPointList->GetFirst();
+    wxRoutePointListNode *node = pWayPointMan->GetWaypointList()->GetFirst();
 
     while( node ) {
         RoutePoint *rp = node->GetData();
@@ -2513,7 +2512,7 @@ void RouteManagerDialog::ToggleLayerContentsNames( Layer *layer )
     }
 
     // Process waypoints in this layer
-    wxRoutePointListNode *node = pWayPointMan->m_pWayPointList->GetFirst();
+    wxRoutePointListNode *node = pWayPointMan->GetWaypointList()->GetFirst();
 
     while( node ) {
         RoutePoint *rp = node->GetData();
@@ -2568,7 +2567,7 @@ void RouteManagerDialog::ToggleLayerContentsOnListing( Layer *layer )
     //  n.b.  If the waypoint belongs to a track, and is not shared, then do not list it.
     //  This is a performance optimization, allowing large track support.
 
-    wxRoutePointListNode *node = pWayPointMan->m_pWayPointList->GetFirst();
+    wxRoutePointListNode *node = pWayPointMan->GetWaypointList()->GetFirst();
 
     while( node ) {
         RoutePoint *rp = node->GetData();

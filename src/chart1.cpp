@@ -45,15 +45,11 @@
 #include <wx/intl.h>
 #include <wx/listctrl.h>
 #include <wx/aui/aui.h>
-#include <version.h> //Gunther
+#include <wx/version.h> //Gunther
 #include <wx/dialog.h>
 #include <wx/progdlg.h>
 
-#if wxCHECK_VERSION(2, 9, 0)
 #include <wx/dialog.h>
-#else
-//  #include "scrollingdialog.h"
-#endif
 
 #include "dychart.h"
 
@@ -156,12 +152,14 @@ wxString                  glog_file;
 wxString                  gConfig_File;
 
 int                       g_unit_test_1;
+bool                      g_start_fullscreen;
 
 MyFrame                   *gFrame;
 
 ChartCanvas               *cc1;
 ConsoleCanvas             *console;
 StatWin                   *stats;
+wxWindowList              AppActivateList;
 
 MyConfig                  *pConfig;
 
@@ -442,6 +440,8 @@ struct sigaction          sa_all;
 struct sigaction          sa_all_old;
 #endif
 
+bool                      g_boptionsactive;
+
 bool GetMemoryStatus(int *mem_total, int *mem_used);
 
 #ifdef __WXMSW__
@@ -596,6 +596,11 @@ long                      g_toolbar_orient;
 wxRect                    g_last_tb_rect;
 
 MyDialogPtrArray          g_MacShowDialogArray;
+
+bool                      g_bShowMag;
+double                    g_UserVar;
+bool                      g_bMagneticAPB;
+
 
 //                        OpenGL Globals
 int                       g_GPU_MemSize;
@@ -757,10 +762,9 @@ void MyApp::OnInitCmdLine( wxCmdLineParser& parser )
 {
     //    Add some OpenCPN specific command line options
     parser.AddSwitch( _T("unit_test_1") );
-
     parser.AddSwitch( _T("p") );
-
     parser.AddSwitch( _T("no_opengl") );
+    parser.AddSwitch( _T("fullscreen") );
 }
 
 bool MyApp::OnCmdLineParsed( wxCmdLineParser& parser )
@@ -768,6 +772,7 @@ bool MyApp::OnCmdLineParsed( wxCmdLineParser& parser )
     g_unit_test_1 = parser.Found( _T("unit_test_1") );
     g_bportable = parser.Found( _T("p") );
     g_bdisable_opengl = parser.Found( _T("no_opengl") );
+    g_start_fullscreen = parser.Found( _T("fullscreen") );
 
     return true;
 }
@@ -794,6 +799,29 @@ void MyApp::OnActivateApp( wxActivateEvent& event )
                 g_FloatingToolbarDialog->Submerge();
         }
 
+
+        AppActivateList.Clear();
+        if(cc1){
+            for ( wxWindowList::iterator it = cc1->GetChildren().begin(); it != cc1->GetChildren().end(); ++it ) {
+                if( (*it)->IsShown() ) {
+                    (*it)->Hide();
+                    AppActivateList.Append(*it);
+                }
+            }
+        }
+            
+        if(gFrame){
+            for ( wxWindowList::iterator it = gFrame->GetChildren().begin(); it != gFrame->GetChildren().end(); ++it ) {
+                if( (*it)->IsShown() ) {
+                    if( !(*it)->IsKindOf( CLASSINFO(ChartCanvas) ) ) {
+                        (*it)->Hide();
+                        AppActivateList.Append(*it);
+                    }
+                }
+            }
+        }
+            
+#if 0            
         if(console && console->IsShown()) {
             console->Hide();
         }
@@ -805,7 +833,7 @@ void MyApp::OnActivateApp( wxActivateEvent& event )
         if(stats && stats->IsShown()) {
             stats->Hide();
         }
-
+#endif
     }
     else
     {
@@ -815,6 +843,19 @@ void MyApp::OnActivateApp( wxActivateEvent& event )
                                                 // reportedly not required for wx 2.9
         gFrame->SurfaceToolbar();
 
+        wxWindow *pOptions = NULL;
+        
+        wxWindowListNode *node = AppActivateList.GetFirst();
+        while (node) {
+            wxWindow *win = node->GetData();
+            win->Show();
+            if( win->IsKindOf( CLASSINFO(options) ) )
+                pOptions = win;
+                
+            node = node->GetNext();
+        }
+        
+#if 0        
         if(g_FloatingCompassDialog){
             g_FloatingCompassDialog->Hide();
             g_FloatingCompassDialog->Show();
@@ -831,8 +872,11 @@ void MyApp::OnActivateApp( wxActivateEvent& event )
                 console->Show();
             }
         }
-
-        gFrame->Raise();
+#endif
+        if( pOptions )
+            pOptions->Raise();
+        else
+            gFrame->Raise();
 
     }
 #endif
@@ -869,12 +913,15 @@ bool MyApp::OnInit()
 
     wxString version_crash = str_version_major + _T(".") + str_version_minor + _T(".") + str_version_patch;
     info.pszAppVersion = version_crash.c_str();
+    
+    info.uMiniDumpType = MiniDumpWithDataSegs;  // Include the data sections from all loaded modules.
+                                                // This results in the inclusion of global variables
 
     // URL for sending error reports over HTTP.
     info.pszEmailTo = _T("opencpn@bigdumboat.com");
     info.pszSmtpProxy = _T("mail.bigdumboat.com:587");
     info.pszUrl = _T("http://bigdumboat.com/crashrpt/ocpn_crashrpt.php");
-    info.uPriorities[CR_HTTP] = 3;  // First try send report over HTTP
+    info.uPriorities[CR_HTTP] = 1;  // First try send report over HTTP
     info.uPriorities[CR_SMTP] = CR_NEGATIVE_PRIORITY;  // Second try send report over SMTP
     info.uPriorities[CR_SMAPI] = CR_NEGATIVE_PRIORITY; //1; // Third try send report over Simple MAPI
 
@@ -1100,15 +1147,13 @@ bool MyApp::OnInit()
     glog_file.Append( _T("opencpn.log") );
 
     //  Constrain the size of the log file
+    wxString large_log_message;
     if( ::wxFileExists( glog_file ) ) {
         if( wxFileName::GetSize( glog_file ) > 1000000 ) {
             wxString oldlog = glog_file;                      // pjotrc 2010.02.09
             oldlog.Append( _T(".log") );
-            wxString msg1( _("Old log will be moved to opencpn.log.log") );
-            OCPNMessageBox ( NULL, msg1, wxString( _("OpenCPN Info") ),
-                    wxICON_INFORMATION | wxOK );
-//            int dlg_ret;
-//            dlg_ret = mdlg.ShowModal();
+            //  Defer the showing of this messagebox until the system locale is established.
+            large_log_message = ( _("Old log will be moved to opencpn.log.log") );
             ::wxRenameFile( glog_file, oldlog );
         }
     }
@@ -1403,6 +1448,32 @@ bool MyApp::OnInit()
 
     g_config_version_string = vs;
 
+    //  Show deferred log restart message, if it exists.
+    if( !large_log_message.IsEmpty() )
+        OCPNMessageBox ( NULL, large_log_message, wxString( _("OpenCPN Info") ), wxICON_INFORMATION | wxOK, 5 );
+    
+    //  Validate OpenGL functionality, if selected
+#ifdef ocpnUSE_GL
+        
+#ifdef __WXMSW__
+    if( /*g_bopengl &&*/ !g_bdisable_opengl ) {
+        wxFileName fn(std_path.GetExecutablePath());
+        bool b_test_result = TestGLCanvas(fn.GetPathWithSep() );
+        
+        if( !b_test_result )
+            wxLogMessage( _T("OpenGL disabled due to test app failure.") );
+        
+        g_bdisable_opengl = !b_test_result;
+    }
+#endif
+    
+#else
+    g_bdisable_opengl = true;;
+#endif
+
+
+    
+    
  #ifdef USE_S57
 
 //      Set up a useable CPL library error handler for S57 stuff
@@ -1738,7 +1809,7 @@ if( 0 == g_memCacheLimit )
 
     cc1 = new ChartCanvas( gFrame );                         // the chart display canvas
     gFrame->SetCanvasWindow( cc1 );
-
+    
     cc1->SetQuiltMode( g_bQuiltEnable );                     // set initial quilt mode
     cc1->m_bFollow = pConfig->st_bFollow;               // set initial state
     cc1->SetViewPoint( vLat, vLon, initial_scale_ppm, 0., 0. );
@@ -1752,7 +1823,7 @@ if( 0 == g_memCacheLimit )
     pthumbwin = new ThumbWin( cc1 );
 
     gFrame->ApplyGlobalSettings( 1, false );               // done once on init with resize
-
+    
     g_toolbar_x = wxMax(g_toolbar_x, 0);
     g_toolbar_y = wxMax(g_toolbar_y, 0);
 
@@ -1833,9 +1904,6 @@ if( 0 == g_memCacheLimit )
 
     //   Notify all the AUI PlugIns so that they may syncronize with the Perspective
     g_pi_manager->NotifyAuiPlugIns();
-
-    //   Initialize and Save the existing Screen Brightness
-//       InitScreenBrightness();
 
     bool b_SetInitialPoint = false;
 
@@ -2088,6 +2156,7 @@ if( 0 == g_memCacheLimit )
     //  We need a deferred resize to get glDrawPixels() to work right.
     //  So we set a trigger to generate a resize after 5 seconds....
     //  See the "UniChrome" hack elsewhere
+#ifdef ocpnUSE_GL    
     if ( !g_bdisable_opengl )
     {
         glChartCanvas *pgl = (glChartCanvas *) cc1->GetglCanvas();
@@ -2099,9 +2168,12 @@ if( 0 == g_memCacheLimit )
             gFrame->m_bdefer_resize = true;
         }
     }
-
+#endif
     g_pi_manager->CallLateInit();
-
+    
+    if ( g_start_fullscreen )
+        gFrame->ToggleFullScreen();
+    
     return TRUE;
 }
 
@@ -2341,6 +2413,9 @@ MyFrame::MyFrame( wxFrame *frame, const wxString& title, const wxPoint& pos, con
             dstr->SetOutputFilter(cp->OutputSentenceList);
             dstr->SetOutputFilterType(cp->OutputSentenceListType);
             dstr->SetChecksumCheck(cp->ChecksumCheck);
+            
+            cp->b_IsSetup = true;
+            
             g_pMUX->AddStream(dstr);
         }
     }
@@ -2431,6 +2506,15 @@ void MyFrame::OnActivate( wxActivateEvent& event )
     {
         SurfaceToolbar();
 
+        wxWindowListNode *node = AppActivateList.GetFirst();
+        while (node) {
+            wxWindow *win = node->GetData();
+            win->Show();
+           
+            node = node->GetNext();
+        }
+        
+#if 0
         if(g_FloatingCompassDialog)
             g_FloatingCompassDialog->Show();
 
@@ -2441,7 +2525,7 @@ void MyFrame::OnActivate( wxActivateEvent& event )
             if( g_pRouteMan->IsAnyRouteActive() )
                 console->Show();
         }
-
+#endif
         gFrame->Raise();
 
     }
@@ -2995,7 +3079,7 @@ void MyFrame::OnCloseWindow( wxCloseEvent& event )
             //    First, delete any single anchorage waypoint closer than 0.25 NM from this point
             //    This will prevent clutter and database congestion....
 
-            wxRoutePointListNode *node = pWayPointMan->m_pWayPointList->GetFirst();
+            wxRoutePointListNode *node = pWayPointMan->GetWaypointList()->GetFirst();
             while( node ) {
                 RoutePoint *pr = node->GetData();
                 if( pr->GetName().StartsWith( _T("Anchorage") ) ) {
@@ -3493,7 +3577,7 @@ void MyFrame::OnToolLeftClick( wxCommandEvent& event )
 
         case ID_ROUTEMANAGER: {
             if( NULL == pRouteManagerDialog )         // There is one global instance of the Dialog
-            pRouteManagerDialog = new RouteManagerDialog( this );
+            pRouteManagerDialog = new RouteManagerDialog( cc1 );
 
             pRouteManagerDialog->UpdateRouteListCtrl();
             pRouteManagerDialog->UpdateTrkListCtrl();
@@ -4004,6 +4088,8 @@ int MyFrame::DoOptionsDialog()
     static wxPoint lastWindowPos( 0,0 );
     static wxSize lastWindowSize( 0,0 );
 
+    g_boptionsactive = true;
+    
     ::wxBeginBusyCursor();
     options optionsDlg( this, -1, _("Options") );
     ::wxEndBusyCursor();
@@ -4088,6 +4174,9 @@ int MyFrame::DoOptionsDialog()
 #endif
 
     Refresh( false );
+    
+    g_boptionsactive = false;
+    
     return ret_val;
 }
 
@@ -4750,6 +4839,27 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
             g_FloatingToolbarDialog->Submerge();
         }
 
+        AppActivateList.Clear();
+        if(cc1){
+            for ( wxWindowList::iterator it = cc1->GetChildren().begin(); it != cc1->GetChildren().end(); ++it ) {
+                if( (*it)->IsShown() ) {
+                    (*it)->Hide();
+                    AppActivateList.Append(*it);
+                }
+            }
+        }
+        
+        if(gFrame){
+            for ( wxWindowList::iterator it = gFrame->GetChildren().begin(); it != gFrame->GetChildren().end(); ++it ) {
+                if( (*it)->IsShown() ) {
+                    if( !(*it)->IsKindOf( CLASSINFO(ChartCanvas) ) ) {
+                        (*it)->Hide();
+                        AppActivateList.Append(*it);
+                    }
+                }
+            }
+        }
+#if 0        
         if(console && console->IsShown()) {
             console->Hide();
         }
@@ -4761,6 +4871,7 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
         if(stats && stats->IsShown()) {
             stats->Hide();
         }
+#endif        
     }
 #endif
 
@@ -4878,6 +4989,9 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
     } else
         AnchorAlertOn2 = false;
 
+    if( (pAnchorWatchPoint1 || pAnchorWatchPoint2) && !bGPSValid )
+        AnchorAlertOn1 = true;
+        
 //  Send current nav status data to log file on every half hour   // pjotrc 2010.02.09
 
     wxDateTime lognow = wxDateTime::Now();   // pjotrc 2010.02.09
@@ -4969,7 +5083,10 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
         double brg, dist;
         DistanceBearingMercator( cursor_lat, cursor_lon, gLat, gLon, &brg, &dist );
         wxString s;
-        s.Printf( wxString("%03d°  ", wxConvUTF8 ), (int) brg );
+        if( g_bShowMag )
+            s.Printf( wxString("%03d°(M)  ", wxConvUTF8 ), (int)GetTrueOrMag( brg ) );
+        else
+            s.Printf( wxString("%03d°  ", wxConvUTF8 ), (int)GetTrueOrMag( brg ) );
         s << cc1->FormatDistanceAdaptive( dist );
         if( GetStatusBar() ) SetStatusText( s, STAT_FIELD_CURSOR_BRGRNG );
     }
@@ -5086,6 +5203,26 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
             m_bdefer_resize = false;
         }
     }
+}
+
+double MyFrame::GetTrueOrMag(double a)
+{
+    if( g_bShowMag ){
+        if(!wxIsNaN(gVar)){
+            if((a + gVar) >360.)
+                return (a + gVar - 360.);
+            else
+                return ((a + gVar) >= 0.) ? (a + gVar) : (a + gVar + 360.);
+        }
+        else{
+            if((a + g_UserVar) >360.)
+                return (a + g_UserVar - 360.);
+            else                
+                return ((a + g_UserVar) >= 0.) ? (a + g_UserVar) : (a + g_UserVar + 360.);
+        }
+    }
+    else
+        return a;
 }
 
 void MyFrame::TouchAISActive( void )
@@ -5287,7 +5424,10 @@ void MyFrame::UpdateGPSCompassStatusBox( bool b_force_new )
 
 int MyFrame::GetnChartStack( void )
 {
-    return pCurrentStack->nEntry;
+    if(pCurrentStack)
+        return pCurrentStack->nEntry;
+    else
+        return 0;
 }
 
 //    Application memory footprint management
@@ -5504,6 +5644,9 @@ void MyFrame::SelectQuiltRefdbChart( int db_index )
 void MyFrame::SelectChartFromStack( int index, bool bDir, ChartTypeEnum New_Type,
         ChartFamilyEnum New_Family )
 {
+    if( !pCurrentStack ) 
+        return;
+    
     if( index < pCurrentStack->nEntry ) {
 //      Open the new chart
         ChartBase *pTentative_Chart;
@@ -5554,6 +5697,9 @@ void MyFrame::SelectChartFromStack( int index, bool bDir, ChartTypeEnum New_Type
 
 void MyFrame::SelectdbChart( int dbindex )
 {
+    if( !pCurrentStack ) 
+        return;
+    
     if( dbindex >= 0 ) {
 //      Open the new chart
         ChartBase *pTentative_Chart;
@@ -6132,9 +6278,11 @@ bool MyFrame::DoChartUpdate( void )
     if( bNewPiano ) UpdateControlBar();
 
     //  Update the ownship position on thumbnail chart, if shown
-    if( pthumbwin->IsShown() ) {
-        if( pthumbwin->pThumbChart ) if( pthumbwin->pThumbChart->UpdateThumbData( gLat, gLon ) ) pthumbwin->Refresh(
-                TRUE );
+    if( pthumbwin && pthumbwin->IsShown() ) {
+        if( pthumbwin->pThumbChart ){
+            if( pthumbwin->pThumbChart->UpdateThumbData( gLat, gLon ) )
+                pthumbwin->Refresh( TRUE );
+        }
     }
 
     bFirstAuto = false;                           // Auto open on program start
@@ -6175,6 +6323,9 @@ static int menu_selected_index;
 
 void MyFrame::PianoPopupMenu( int x, int y, int selected_index, int selected_dbIndex )
 {
+    if( !pCurrentStack ) 
+        return;
+    
     //    No context menu if quilting is disabled
     if( !cc1->GetQuiltMode() ) return;
 
@@ -6237,6 +6388,9 @@ void MyFrame::OnPianoMenuEnableChart( wxCommandEvent& event )
 
 void MyFrame::OnPianoMenuDisableChart( wxCommandEvent& event )
 {
+    if( !pCurrentStack ) 
+        return;
+    
     RemoveChartFromQuilt( menu_selected_dbIndex );
 
 //      It could happen that the chart being disabled is the reference chart....
@@ -7240,9 +7394,14 @@ void MyFrame::PostProcessNNEA( bool pos_valid, const wxString &sfixtime )
             sogcog.Printf( _T("SOG %2.2f ") + getUsrSpeedUnit() + _T("  "), toUsrSpeed( gSog ) );
 
         wxString cogs;
-        if( wxIsNaN(gCog) ) cogs.Printf( wxString( "COG ---\u00B0", wxConvUTF8 ) );
-        else
-            cogs.Printf( wxString("COG %2.0f°", wxConvUTF8 ), gCog );
+        if( wxIsNaN(gCog) )
+            cogs.Printf( wxString( "COG ---\u00B0", wxConvUTF8 ) );
+        else {
+            if( g_bShowMag )
+                cogs << wxString::Format( wxString("COG %03d°(M)  ", wxConvUTF8 ), (int)gFrame->GetTrueOrMag( gCog ) );
+            else
+                cogs << wxString::Format( wxString("COG %03d°  ", wxConvUTF8 ), (int)gFrame->GetTrueOrMag( gCog ) );
+        }
 
         sogcog.Append( cogs );
         SetStatusText( sogcog, STAT_FIELD_SOGCOG );
@@ -7585,6 +7744,7 @@ void MyPrintout::DrawPageOne( wxDC *dc )
 //  Get the latest bitmap as rendered by the ChartCanvas
 
     if(g_bopengl) {
+#ifdef ocpnUSE_GL        
         int gsx = cc1->GetglCanvas()->GetSize().x;
         int gsy = cc1->GetglCanvas()->GetSize().y;
 
@@ -7598,6 +7758,7 @@ void MyPrintout::DrawPageOne( wxDC *dc )
         mdc.SelectObject( bmp );
         dc->Blit( 0, 0, bmp.GetWidth(), bmp.GetHeight(), &mdc, 0, 0 );
         mdc.SelectObject( wxNullBitmap );
+#endif        
     }
     else {
 
@@ -8042,11 +8203,11 @@ wxArrayString *EnumerateSerialPorts( void )
                     if( GetLastError() == 122)  //ERROR_INSUFFICIENT_BUFFER, OK in this case
                         bOk = true;
                 }
-#if 0
+//#if 0
                 //      We could get friendly name and/or description here
+                TCHAR fname[256] = {0};
+                TCHAR desc[256] ={0};
                 if (bOk) {
-                    TCHAR fname[256];
-                    TCHAR desc[256];
                     BOOL bSuccess = SetupDiGetDeviceRegistryProperty(
                         hDevInfo, &devdata, SPDRP_FRIENDLYNAME, NULL,
                         (PBYTE)fname, sizeof(fname), NULL);
@@ -8055,7 +8216,7 @@ wxArrayString *EnumerateSerialPorts( void )
                         hDevInfo, &devdata, SPDRP_DEVICEDESC, NULL,
                         (PBYTE)desc, sizeof(desc), NULL);
                 }
-#endif
+//#endif
                 //  Get the "COMn string from the registry key
                 if(bOk) {
                     bool bFoundCom = false;
@@ -8078,17 +8239,20 @@ wxArrayString *EnumerateSerialPorts( void )
 
                     if( bFoundCom ) {
                         wxString port( dname, wxConvUTF8 );
-                        bool b_dupl = false;
 
-                        //      Add it to the return set if it has not already been found
+                        //      If the port has already been found, remove the prior entry
+                        //      in favor of this entry, which will have descriptive information appended
                         for( unsigned int n=0 ; n < preturn->GetCount() ; n++ ) {
                             if((preturn->Item(n)).IsSameAs(port)){
-                                b_dupl = true;
+                                preturn->RemoveAt( n );
                                 break;
                             }
                         }
-                        if(!b_dupl)
-                            preturn->Add( port );
+                        wxString desc_name( desc, wxConvUTF8 );         // append "description"
+                        port += _T(" ");
+                        port += desc_name;
+                            
+                        preturn->Add( port );
                     }
                 }
             }
@@ -8502,8 +8666,189 @@ void SetSystemColors( ColorScheme cs )
 #endif
 }
 
+class  OCPNMessageDialog: public wxDialog
+{
+    
+public:
+    OCPNMessageDialog(wxWindow *parent, const wxString& message,
+                           const wxString& caption = wxMessageBoxCaptionStr,
+                           long style = wxOK|wxCENTRE, const wxPoint& pos = wxDefaultPosition);
+    
+    void OnYes(wxCommandEvent& event);
+    void OnNo(wxCommandEvent& event);
+    void OnCancel(wxCommandEvent& event);
+    
+private:
+    int m_style;
+    DECLARE_EVENT_TABLE()
+};
+
+BEGIN_EVENT_TABLE(OCPNMessageDialog, wxDialog)
+EVT_BUTTON(wxID_YES, OCPNMessageDialog::OnYes)
+EVT_BUTTON(wxID_NO, OCPNMessageDialog::OnNo)
+EVT_BUTTON(wxID_CANCEL, OCPNMessageDialog::OnCancel)
+END_EVENT_TABLE()
+
+
+OCPNMessageDialog::OCPNMessageDialog( wxWindow *parent,
+                                                const wxString& message,
+                                                const wxString& caption,
+                                                long style,
+                                                const wxPoint& pos)
+: wxDialog( parent, wxID_ANY, caption, pos, wxDefaultSize, wxDEFAULT_DIALOG_STYLE | wxSTAY_ON_TOP )
+{
+    m_style = style;
+    
+    wxBoxSizer *topsizer = new wxBoxSizer( wxVERTICAL );
+    
+    wxBoxSizer *icon_text = new wxBoxSizer( wxHORIZONTAL );
+    
+    #if wxUSE_STATBMP
+    // 1) icon
+    if (style & wxICON_MASK)
+    {
+        wxBitmap bitmap;
+        switch ( style & wxICON_MASK )
+        {
+            default:
+                wxFAIL_MSG(_T("incorrect log style"));
+                // fall through
+                
+            case wxICON_ERROR:
+                bitmap = wxArtProvider::GetIcon(wxART_ERROR, wxART_MESSAGE_BOX);
+                break;
+                
+            case wxICON_INFORMATION:
+                bitmap = wxArtProvider::GetIcon(wxART_INFORMATION, wxART_MESSAGE_BOX);
+                break;
+                
+            case wxICON_WARNING:
+                bitmap = wxArtProvider::GetIcon(wxART_WARNING, wxART_MESSAGE_BOX);
+                break;
+                
+            case wxICON_QUESTION:
+                bitmap = wxArtProvider::GetIcon(wxART_QUESTION, wxART_MESSAGE_BOX);
+                break;
+        }
+        wxStaticBitmap *icon = new wxStaticBitmap(this, wxID_ANY, bitmap);
+        icon_text->Add( icon, 0, wxCENTER );
+    }
+    #endif // wxUSE_STATBMP
+    
+    #if wxUSE_STATTEXT
+    // 2) text
+    icon_text->Add( CreateTextSizer( message ), 0, wxALIGN_CENTER | wxLEFT, 10 );
+    
+    topsizer->Add( icon_text, 1, wxCENTER | wxLEFT|wxRIGHT|wxTOP, 10 );
+    #endif // wxUSE_STATTEXT
+    
+    // 3) buttons
+    int AllButtonSizerFlags = wxOK|wxCANCEL|wxYES|wxNO|wxHELP|wxNO_DEFAULT;
+    int center_flag = wxEXPAND;
+    if (style & wxYES_NO)
+        center_flag = wxALIGN_CENTRE;
+    wxSizer *sizerBtn = CreateSeparatedButtonSizer(style & AllButtonSizerFlags);
+    if ( sizerBtn )
+        topsizer->Add(sizerBtn, 0, center_flag | wxALL, 10 );
+    
+    SetAutoLayout( true );
+    SetSizer( topsizer );
+    
+    topsizer->SetSizeHints( this );
+    topsizer->Fit( this );
+    wxSize size( GetSize() );
+    if (size.x < size.y*3/2)
+    {
+        size.x = size.y*3/2;
+        SetSize( size );
+    }
+    
+    Centre( wxBOTH | wxCENTER_FRAME);
+}
+
+void OCPNMessageDialog::OnYes(wxCommandEvent& WXUNUSED(event))
+{
+    EndModal( wxID_YES );
+}
+
+void OCPNMessageDialog::OnNo(wxCommandEvent& WXUNUSED(event))
+{
+    EndModal( wxID_NO );
+}
+
+void OCPNMessageDialog::OnCancel(wxCommandEvent& WXUNUSED(event))
+{
+    // Allow cancellation via ESC/Close button except if
+    // only YES and NO are specified.
+    if ( (m_style & wxYES_NO) != wxYES_NO || (m_style & wxCANCEL) )
+    {
+        EndModal( wxID_CANCEL );
+    }
+}
+
+
+
+
+
+class TimedMessageBox:wxEvtHandler
+{
+public:
+    TimedMessageBox(wxWindow* parent, const wxString& message,
+                    const wxString& caption = _T("Message box"), long style = wxOK | wxCANCEL,
+                    int timeout_sec = -1, const wxPoint& pos = wxDefaultPosition );
+    ~TimedMessageBox();
+    int GetRetVal(void){ return ret_val; }
+    void OnTimer(wxTimerEvent &evt);
+    
+    wxTimer     m_timer;
+    OCPNMessageDialog *dlg;
+    int         ret_val;
+
+    DECLARE_EVENT_TABLE()
+};
+
+BEGIN_EVENT_TABLE(TimedMessageBox, wxEvtHandler)
+EVT_TIMER(-1, TimedMessageBox::OnTimer)
+END_EVENT_TABLE()
+
+TimedMessageBox::TimedMessageBox(wxWindow* parent, const wxString& message,
+                                 const wxString& caption, long style, int timeout_sec, const wxPoint& pos )
+{
+    ret_val = 0;
+    m_timer.SetOwner( this, -1 );
+    
+    if(timeout_sec > 0)
+        m_timer.Start( timeout_sec * 1000, wxTIMER_ONE_SHOT );
+                              
+    dlg = new OCPNMessageDialog( parent, message, caption, style, pos );
+    int ret = dlg->ShowModal();
+    
+    int yyp = 5;
+    
+    delete dlg;
+    dlg = NULL;
+    
+    ret_val = ret;
+}
+
+
+TimedMessageBox::~TimedMessageBox()
+{
+}
+
+void TimedMessageBox::OnTimer(wxTimerEvent &evt)
+{
+    if( dlg )
+        dlg->EndModal( wxID_CANCEL );
+}
+
+
+    
+
+
+
 int OCPNMessageBox( wxWindow *parent, const wxString& message, const wxString& caption, int style,
-        int x, int y )
+                    int timeout_sec, int x, int y  )
 {
 
 #ifdef __WXOSX__
@@ -8516,8 +8861,14 @@ int OCPNMessageBox( wxWindow *parent, const wxString& message, const wxString& c
     if( stats )
         stats->Hide();
 #endif
-    wxMessageDialog dlg( parent, message, caption, style | wxSTAY_ON_TOP, wxPoint( x, y ) );
-    int ret = dlg.ShowModal();
+
+      int ret =  wxID_OK;  
+        
+      TimedMessageBox tbox(parent, message, caption, style, timeout_sec, wxPoint( x, y )  );
+      ret = tbox.GetRetVal() ;
+      
+//    wxMessageDialog dlg( parent, message, caption, style | wxSTAY_ON_TOP, wxPoint( x, y ) );
+//    int ret = dlg.ShowModal();
 
 #ifdef __WXOSX__
     if(gFrame)
@@ -8671,6 +9022,35 @@ void RedirectIOToConsole()
 
 //#endif
 #endif
+
+
+#ifdef __WXMSW__
+bool TestGLCanvas(wxString &prog_dir)
+{
+    wxString test_app = prog_dir;
+    test_app += _T("ocpn_gltest1.exe");
+    
+    if(::wxFileExists(test_app)){
+        long proc_return = ::wxExecute(test_app, wxEXEC_SYNC);
+        printf("OpenGL Test Process returned %0X\n", proc_return);
+        if(proc_return == 0)
+            printf("GLCanvas OK\n");
+        else
+            printf("GLCanvas failed to start, disabling OpenGL.\n");
+        
+        return (proc_return == 0);
+    }
+    else
+        return true;
+    
+    
+}
+#endif
+
+
+
+    
+
 
 #if 0
 /*************************************************************************

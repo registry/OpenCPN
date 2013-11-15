@@ -65,6 +65,7 @@ extern RouteManagerDialog *pRouteManagerDialog;
 extern Track              *g_pActiveTrack;
 extern RouteList          *pRouteList;
 extern PlugInManager      *g_pi_manager;
+extern bool                g_bShowMag;
 
 extern MyFrame            *gFrame;
 
@@ -94,16 +95,6 @@ extern RoutePrintSelection * pRoutePrintSelection;
 #define    EVTWILIGHT    5
 #define    NIGHT        6
 
-char daylight_status[][20] = {
-    "   ( - )",
-    "   (Twilight)",
-    "   (Sunrise)",
-    "   (Daytime)",
-    "   (Sunset)",
-    "   (Twilight)",
-    "   (Nighttime)"
-};
-
 /* Next high tide, low tide, transition of the mark level, or some
 combination.
 Bit      Meaning
@@ -132,6 +123,31 @@ char tide_status[][8] = {
 // adapted by author's permission from QBASIC source as published at
 //     http://www.stargazing.net/kepler
 
+wxString GetDaylightString(int index)
+{
+    switch (index)
+    {
+        case 0:
+            return      _T(" - ");
+        case 1:
+            return      _("MoTwilight");
+        case 2:
+            return      _("Sunrise");
+        case 3:
+            return      _("Daytime");
+        case 4:
+            return      _("Sunset");
+        case 5:
+            return      _("EvTwilight");
+        case 6:
+            return      _("Nighttime");
+            
+        default:
+            return      _T("");
+    }
+}
+
+            
 static double sign( double x )
 {
     if( x < 0. ) return -1.;
@@ -804,14 +820,22 @@ void RouteProp::CreateControls()
     m_wpList->InsertColumn( 0, _("Leg"), wxLIST_FORMAT_LEFT, 45 );
     m_wpList->InsertColumn( 1, _("To Waypoint"), wxLIST_FORMAT_LEFT, 120 );
     m_wpList->InsertColumn( 2, _("Distance"), wxLIST_FORMAT_RIGHT, 70 );
-    m_wpList->InsertColumn( 3, _("Bearing"), wxLIST_FORMAT_LEFT, 70 );
+    
+    if(g_bShowMag)
+        m_wpList->InsertColumn( 3, _("Bearing (M)"), wxLIST_FORMAT_LEFT, 80 );
+    else
+        m_wpList->InsertColumn( 3, _("Bearing"), wxLIST_FORMAT_LEFT, 80 );
+    
     m_wpList->InsertColumn( 4, _("Latitude"), wxLIST_FORMAT_LEFT, 85 );
     m_wpList->InsertColumn( 5, _("Longitude"), wxLIST_FORMAT_LEFT, 90 );
     m_wpList->InsertColumn( 6, _("ETE/ETD"), wxLIST_FORMAT_LEFT, 135 );
     m_wpList->InsertColumn( 7, _("Speed"), wxLIST_FORMAT_CENTER, 72 );
     m_wpList->InsertColumn( 8, _("Next tide event"), wxLIST_FORMAT_LEFT, 90 );
     m_wpList->InsertColumn( 9, _("Description"), wxLIST_FORMAT_LEFT, 90 );   // additional columt with WP description
-    m_wpList->InsertColumn( 10, _("Course"), wxLIST_FORMAT_LEFT, 70 );       // additional columt with WP new course. Is it same like "bearing" of the next WP.
+    if(g_bShowMag)
+        m_wpList->InsertColumn( 10, _("Course (M)"), wxLIST_FORMAT_LEFT, 80 );       // additional columt with WP new course. Is it same like "bearing" of the next WP.
+    else
+        m_wpList->InsertColumn( 10, _("Course"), wxLIST_FORMAT_LEFT, 80 );   // additional columt with WP new course. Is it same like "bearing" of the next WP.
     m_wpList->Hide();
 
     Connect( wxEVT_COMMAND_LIST_ITEM_RIGHT_CLICK,
@@ -1280,25 +1304,35 @@ bool RouteProp::UpdateProperties()
         // end of calculation
 
 
-            t.Printf( _T("%6.2f ") + getUsrDistanceUnit(), toUsrDistance( leg_dist ) );
-            if( arrival ) m_wpList->SetItem( item_line_index, 2, t );
-            if( !enroute ) m_wpList->SetItem( item_line_index, 2, nullify );
+        t.Printf( _T("%6.2f ") + getUsrDistanceUnit(), toUsrDistance( leg_dist ) );
+        if( arrival )
+            m_wpList->SetItem( item_line_index, 2, t );
+        if( !enroute )
+            m_wpList->SetItem( item_line_index, 2, nullify );
         prp->SetDistance(leg_dist); // save the course to the next waypoint for printing.
 
             //  Bearing
-            t.Printf( _T("%03.0f Deg. T"), brg );
-            if( arrival ) m_wpList->SetItem( item_line_index, 3, t );
-            if( !enroute ) m_wpList->SetItem( item_line_index, 3, nullify );
+        if( g_bShowMag )
+            t.Printf( _T("%03.0f Deg. M"), gFrame->GetTrueOrMag( brg ) );
+        else
+            t.Printf( _T("%03.0f Deg. T"), gFrame->GetTrueOrMag( brg ) );
+        
+        if( arrival )
+            m_wpList->SetItem( item_line_index, 3, t );
+        if( !enroute )
+            m_wpList->SetItem( item_line_index, 3, nullify );
 
         // Course (bearing of next )
-        if (_next_prp)
-        {
-        t.Printf( _T("%03.0f Deg. T"), course );
-        if( arrival ) m_wpList->SetItem( item_line_index, 10, t );
-        }else
-        {
-          m_wpList->SetItem( item_line_index, 10, nullify );
+        if (_next_prp){
+            if( g_bShowMag )
+                t.Printf( _T("%03.0f Deg. M"), gFrame->GetTrueOrMag( course ) );
+            else
+                t.Printf( _T("%03.0f Deg. T"), gFrame->GetTrueOrMag( course ) );
+            if( arrival )
+                m_wpList->SetItem( item_line_index, 10, t );
         }
+        else
+            m_wpList->SetItem( item_line_index, 10, nullify );
 
             //  Lat/Lon
             wxString tlat = toSDMM( 1, prp->m_lat, prp->m_bIsInTrack );  // low precision for routes
@@ -1331,8 +1365,10 @@ bool RouteProp::UpdateProperties()
                     wxString s = ts2s( act_starttime, tz_selection, (int) LMT_Offset,
                             DISPLAY_FORMAT );
                     time_form.Append( s );
-                    time_form.Append( wxString::From8BitData( &daylight_status[ds][0] ) );
-
+                    time_form.Append( _T("   (") );
+                    time_form.Append( GetDaylightString(ds) );
+                    time_form.Append( _T(")") );
+                    
                     if( ptcmgr ) {
                         int jx = 0;
                         if( prp->GetName().Find( _T("@~~") ) != wxNOT_FOUND ) {
@@ -1369,7 +1405,10 @@ bool RouteProp::UpdateProperties()
 
                         int ds = getDaylightStatus( prp->m_lat, prp->m_lon, ueta );
                         time_form = ts2s( ueta, tz_selection, LMT_Offset, DISPLAY_FORMAT );
-                        time_form.Append( wxString::From8BitData( &daylight_status[ds][0] ) );
+                        time_form.Append( _T("   (") );
+                        time_form.Append( GetDaylightString(ds) );
+                        time_form.Append( _T(")") );
+                        
 
                         if( ptcmgr ) {
                             int jx = 0;
@@ -2151,7 +2190,9 @@ bool MarkInfoImpl::UpdateProperties( bool positionOnly )
 
         m_textLatitude->SetValue( ::toSDMM( 1, m_pRoutePoint->m_lat ) );
         m_textLongitude->SetValue( ::toSDMM( 2, m_pRoutePoint->m_lon ) );
-
+        m_lat_save = m_pRoutePoint->m_lat;
+        m_lon_save = m_pRoutePoint->m_lon;
+        
         if( positionOnly ) return true;
 
         //Layer or not?
@@ -2703,7 +2744,7 @@ void MarkInfoImpl::ValidateMark( void )
 {
     //    Look in the master list of Waypoints to see if the currently selected waypoint is still valid
     //    It may have been deleted as part of a route
-    wxRoutePointListNode *node = pWayPointMan->m_pWayPointList->GetFirst();
+    wxRoutePointListNode *node = pWayPointMan->GetWaypointList()->GetFirst();
 
     bool b_found = false;
     while( node ) {

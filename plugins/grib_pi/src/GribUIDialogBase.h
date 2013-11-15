@@ -31,6 +31,7 @@
 #include <wx/stattext.h>
 #include <wx/spinctrl.h>
 #include <wx/choice.h>
+#include <wx/statline.h>
 #include <wx/radiobox.h>
 
 ///////////////////////////////////////////////////////////////////////////
@@ -61,9 +62,6 @@ class GRIBUIDialogBase : public wxDialog
 		wxFlexGridSizer* m_fgTrackingControls;
 		wxTextCtrl* m_tcWindSpeed;
 		wxTextCtrl* m_tcWindDirection;
-		wxCheckBox* m_cbWindScat;
-		wxTextCtrl* m_tcWindScatSpeed;
-		wxTextCtrl* m_tcWindScatDirection;
 		wxTextCtrl* m_tcWaveHeight;
 		wxTextCtrl* m_tcWaveDirection;
 		wxTextCtrl* m_tcCurrentVelocity;
@@ -74,6 +72,7 @@ class GRIBUIDialogBase : public wxDialog
 		wxTextCtrl* m_tcCloud;
 		wxTextCtrl* m_tcAirTemperature;
 		wxTextCtrl* m_tcSeaTemperature;
+		wxTextCtrl* m_tcCAPE;
 		
 		// Virtual event handlers, overide them in your derived class
 		virtual void OnClose( wxCloseEvent& event ) { event.Skip(); }
@@ -101,6 +100,7 @@ class GRIBUIDialogBase : public wxDialog
 		wxCheckBox* m_cbCloud;
 		wxCheckBox* m_cbAirTemperature;
 		wxCheckBox* m_cbSeaTemperature;
+		wxCheckBox* m_cbCAPE;
 		
 		GRIBUIDialogBase( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("GRIB Display Control"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( -1,-1 ), long style = wxCAPTION|wxCLOSE_BOX|wxDIALOG_NO_PARENT|wxRESIZE_BORDER|wxSYSTEM_MENU ); 
 		~GRIBUIDialogBase();
@@ -122,23 +122,29 @@ class GribSettingsDialogBase : public wxDialog
 		wxChoice* m_cDataType;
 		wxChoice* m_cDataUnits;
 		wxCheckBox* m_cbBarbedArrows;
+		wxStaticText* m_tBarbedRange;
 		wxSpinCtrl* m_sBarbedRange;
 		wxCheckBox* m_cbIsoBars;
+		wxStaticText* m_tIsoBarSpacing;
 		wxSpinCtrl* m_sIsoBarSpacing;
 		wxCheckBox* m_cbDirectionArrows;
+		wxStaticText* m_tDirectionArrowSize;
 		wxSpinCtrl* m_sDirectionArrowSize;
 		wxCheckBox* m_cbOverlayMap;
+		wxStaticText* m_tOverlayColors;
 		wxChoice* m_cOverlayColors;
 		wxCheckBox* m_cbNumbers;
 		wxSpinCtrl* m_sNumbersSpacing;
-		wxStdDialogButtonSizer* m_sButton;
-		wxButton* m_sButtonOK;
-		wxButton* m_sButtonApply;
-		wxButton* m_sButtonCancel;
+		wxStaticLine* m_staticline1;
+		wxStaticLine* m_staticline2;
+		wxStaticLine* m_staticline3;
+		wxStaticText* m_staticText24;
+		wxSlider* m_sTransparency;
 		
 		// Virtual event handlers, overide them in your derived class
 		virtual void OnIntepolateChange( wxCommandEvent& event ) { event.Skip(); }
 		virtual void OnDataTypeChoice( wxCommandEvent& event ) { event.Skip(); }
+		virtual void OnTransparencyChange( wxScrollEvent& event ) { event.Skip(); }
 		virtual void OnApply( wxCommandEvent& event ) { event.Skip(); }
 		
 	
@@ -146,6 +152,10 @@ class GribSettingsDialogBase : public wxDialog
 		wxCheckBox* m_cLoopMode;
 		wxCheckBox* m_cInterpolate;
 		wxSpinCtrl* m_sHourDivider;
+		wxStdDialogButtonSizer* m_sButton;
+		wxButton* m_sButtonOK;
+		wxButton* m_sButtonApply;
+		wxButton* m_sButtonCancel;
 		
 		GribSettingsDialogBase( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("Grib Settings"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( -1,-1 ), long style = wxDEFAULT_DIALOG_STYLE ); 
 		~GribSettingsDialogBase();
@@ -182,6 +192,11 @@ class GribRequestSettingBase : public wxDialog
 	private:
 	
 	protected:
+		wxStaticText* m_staticText25;
+		wxStaticLine* m_staticline4;
+		wxStaticLine* m_staticline5;
+		wxStaticLine* m_staticline6;
+		wxStaticLine* m_staticline7;
 		wxStaticText* m_tLogin;
 		wxStaticText* m_tCode;
 		wxStaticText* m_staticText21;
@@ -198,6 +213,7 @@ class GribRequestSettingBase : public wxDialog
 		
 	
 	public:
+		wxTextCtrl* m_pSenderAddress;
 		wxChoice* m_pMailTo;
 		wxChoice* m_pModel;
 		wxTextCtrl* m_pLogin;
@@ -214,6 +230,7 @@ class GribRequestSettingBase : public wxDialog
 		wxCheckBox* m_pAirTemp;
 		wxCheckBox* m_pSeaTemp;
 		wxCheckBox* m_pCurrent;
+		wxCheckBox* m_pCAPE;
 		wxCheckBox* m_pWaves;
 		wxChoice* m_pWModel;
 		wxStdDialogButtonSizer* m_rButton;
@@ -221,7 +238,7 @@ class GribRequestSettingBase : public wxDialog
 		wxButton* m_rButtonApply;
 		wxButton* m_rButtonCancel;
 		
-		GribRequestSettingBase( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("Write and send GRIB request setting"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( -1,-1 ), long style = wxDEFAULT_DIALOG_STYLE ); 
+		GribRequestSettingBase( wxWindow* parent, wxWindowID id = wxID_ANY, const wxString& title = _("Write and send eMail request"), const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxSize( -1,-1 ), long style = wxDEFAULT_DIALOG_STYLE ); 
 		~GribRequestSettingBase();
 	
 };

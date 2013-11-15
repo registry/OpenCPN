@@ -43,8 +43,9 @@ public:
     wxString GetRolloverString(void);
     wxString Get_vessel_type_string(bool b_short = false);
     wxString Get_class_string(bool b_short = false);
-	void Toggle_AIS_CPA(void); //TR 2012.06.28: Show AIS-CPA
-
+    wxString GetFullName( void );
+    void Toggle_AIS_CPA(void);
+    void ToggleShowTrack(void);
 
     int                       MID;
     int                       MMSI;
@@ -118,6 +119,8 @@ public:
     double                    CPA;                      // Nautical Miles
 
     bool                      b_show_AIS_CPA;           //TR 2012.06.28: Show AIS-CPA
+    
+    bool                      b_show_track;
 
     AISTargetTrackList        *m_ptrack;
 

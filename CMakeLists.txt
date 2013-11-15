@@ -130,7 +130,7 @@ MESSAGE (STATUS "*** Staging to build ${PACKAGE_NAME} ${PACKAGE_VERSION} ***")
 
 SET(wxWidgets_USE_LIBS base core net xml html adv aui)
 
-FIND_PACKAGE(OpenGL REQUIRED)
+FIND_PACKAGE(OpenGL)
 IF(OPENGL_GLU_FOUND)
 
     SET(wxWidgets_USE_LIBS ${wxWidgets_USE_LIBS} gl )
@@ -139,6 +139,8 @@ IF(OPENGL_GLU_FOUND)
     MESSAGE (STATUS "Found OpenGL..." )
     MESSAGE (STATUS "    Lib: " ${OPENGL_LIBRARIES})
     MESSAGE (STATUS "    Include: " ${OPENGL_INCLUDE_DIR})
+    ADD_DEFINITIONS(-DocpnUSE_GL)
+    ADD_DEFINITIONS(-DUSE_GLU_TESS)
 
 ELSE(OPENGL_GLU_FOUND)
     MESSAGE (STATUS "OpenGL not found..." )
@@ -201,7 +203,6 @@ IF(WIN32)
 ENDIF(WIN32)
 
 # Add some definitions to satisfy MS
-ADD_DEFINITIONS(-DUSE_GLU_TESS)
 IF(WIN32)
     ADD_DEFINITIONS(-D__MSVC__)
     ADD_DEFINITIONS(-D_CRT_NONSTDC_NO_DEPRECATE -D_CRT_SECURE_NO_DEPRECATE)
@@ -362,9 +363,7 @@ SET(HDRS
 		include/MarkIcon.h
 		include/SendToGpsDlg.h
 		include/TCWin.h
-		include/glTextureDescriptor.h
 		include/tide_time.h
-		include/glChartCanvas.h
 		include/ChInfoWin.h
 		include/ocpCursor.h
 		include/Quilt.h
@@ -451,8 +450,6 @@ SET(SRCS
 		src/GoToPositionDialog.cpp
 		src/CM93DSlide.cpp
 		src/RolloverWin.cpp
-		src/glChartCanvas.cpp
-		src/glTextureDescriptor.cpp
 		src/ChInfoWin.cpp
 		src/AISTargetQueryDialog.cpp
 		src/AIS_Bitstring.cpp
@@ -540,6 +537,16 @@ SET(SRC_TINYXML
             src/tinyxmlparser.cpp
             include/tinyxml.h
       )
+
+IF(OPENGL_GLU_FOUND)
+  SET(HDRS ${HDRS} include/glChartCanvas.h
+                   include/glTextureDescriptor.h
+        )
+  SET(SRCS ${SRCS} src/glChartCanvas.cpp
+                   src/glTextureDescriptor.cpp
+        )
+ENDIF(OPENGL_GLU_FOUND)
+
 
 IF(TINYXML_FOUND)
     message (STATUS "Building with tinyxml includes")
@@ -1099,7 +1106,7 @@ ENDIF(GETTEXT_MSGFMT_EXECUTABLE)
 
 
 
-# On Windows builds, copy the wxWidgets dlls and  to the executable directory
+# On Windows builds, copy the wxWidgets dlls and helpers to the executable directory
 IF(WIN32 AND NOT UNIX)
 INSTALL(DIRECTORY wxWidgets/ DESTINATION "." )
 INSTALL(DIRECTORY buildwin/vc10/ DESTINATION ".\\\\vc10" )
@@ -1110,6 +1117,7 @@ INSTALL(FILES ${CMAKE_SOURCE_DIR}/buildwin/crashrpt/CrashSender1401.exe DESTINAT
 INSTALL(FILES ${CMAKE_SOURCE_DIR}/buildwin/crashrpt/crashrpt_lang.ini DESTINATION ${PREFIX_PKGDATA} PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
 INSTALL(FILES ${CMAKE_SOURCE_DIR}/buildwin/crashrpt/dbghelp.dll DESTINATION ${PREFIX_PKGDATA} PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
 INSTALL(FILES ${CMAKE_SOURCE_DIR}/buildwin/crashrpt/PrivacyPolicy.txt DESTINATION ${PREFIX_PKGDATA} PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
+INSTALL(FILES ${CMAKE_SOURCE_DIR}/buildwin/ocpn_gltest1.exe DESTINATION ${PREFIX_PKGDATA} PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
 
 ENDIF(WIN32 AND NOT UNIX)
 
@@ -1254,7 +1262,9 @@ IF(WIN32 AND NOT UNIX)
  configure_file("${CMAKE_SOURCE_DIR}/buildwin/NSIS_Unicode/Language files/Langstrings_TURKISH.nsh.in" "${CMAKE_SOURCE_DIR}//buildwin/NSIS_Unicode/Include/Langstrings_TURKISH.nsh" @ONLY)
 ENDIF(WIN32 AND NOT UNIX)
 
-configure_file(version.h.in ${CMAKE_SOURCE_DIR}/include/version.h) #Gunther
+IF(NOT SKIP_VERSION_CONFIG)
+   configure_file(version.h.in ${CMAKE_SOURCE_DIR}/include/version.h)
+ENDIF(NOT SKIP_VERSION_CONFIG)
 
 # this dummy target is necessary to make sure the ADDITIONAL_MAKE_CLEAN_FILES directive is executed.
 # apparently, the base CMakeLists.txt file must have "some" target to activate all the clean steps.

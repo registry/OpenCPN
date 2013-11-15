@@ -23,6 +23,7 @@
  *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301,  USA.         *
  **************************************************************************/
 
+#include <typeinfo>
 #include <wx/wx.h>
 #include <wx/dir.h>
 #include <wx/filename.h>
@@ -50,6 +51,7 @@
 #include "georef.h"
 #include "routemanagerdialog.h"
 #include "NavObjectCollection.h"
+#include "OCPNRegion.h"
 
 extern MyConfig        *pConfig;
 extern wxString        g_SData_Locn;
@@ -500,6 +502,33 @@ bool PlugInManager::CheckPluginCompatibility(wxString plugin_file)
     return b_compat;
 }
 
+bool PlugInManager::CheckBlacklistedPlugin(opencpn_plugin* plugin)
+{
+    int len = sizeof(PluginBlacklist) / sizeof(BlackListedPlugin);
+    int major = plugin->GetPlugInVersionMajor();
+    int minor = plugin->GetPlugInVersionMinor();
+    wxString name = wxString::FromAscii(typeid(*plugin).name());
+    for (int i = 0; i < len; i++) {
+        if( ( PluginBlacklist[i].all_lower && name.EndsWith(PluginBlacklist[i].name) && PluginBlacklist[i].version_major >= major && PluginBlacklist[i].version_minor >= minor ) ||
+            ( !PluginBlacklist[i].all_lower && name.EndsWith(PluginBlacklist[i].name) && PluginBlacklist[i].version_major == major && PluginBlacklist[i].version_minor == minor ) )
+        {
+            wxString msg;
+            if ( PluginBlacklist[i].hard ){
+                msg = wxString::Format(_("PlugIn %s (%s), version %i.%i was detected.\n This version is known to be unstable and will not be loaded.\n Please update this PlugIn at the opencpn.org website."),
+                                              PluginBlacklist[i].name.c_str(), plugin->GetCommonName().c_str(), major, minor), _("Blacklisted plugin detected...");
+            }
+            else{
+                msg = wxString::Format(_("PlugIn %s (%s), version %i.%i was detected.\n This version is known to be unstable.\n Please update this PlugIn at the opencpn.org website."),
+                                              PluginBlacklist[i].name.c_str(), plugin->GetCommonName().c_str(), major, minor), _("Blacklisted plugin detected...");
+            }
+            
+            OCPNMessageBox ( NULL, msg, wxString( _("OpenCPN Info") ), wxICON_INFORMATION | wxOK, 5 );  // 5 second timeout
+            
+            return PluginBlacklist[i].hard;
+        }
+    }
+    return false;
+}
 
 PlugInContainer *PlugInManager::LoadPlugIn(wxString plugin_file)
 {
@@ -567,6 +596,11 @@ PlugInContainer *PlugInManager::LoadPlugIn(wxString plugin_file)
     int ver = (api_major * 100) + api_minor;
     pic->m_api_version = ver;
 
+    if ( CheckBlacklistedPlugin(plug_in) ) {
+        delete plugin;
+        delete pic;
+        return NULL;
+    }
 
     switch(ver)
     {
@@ -1108,15 +1142,16 @@ int PlugInManager::AddToolbarTool(wxString label, wxBitmap *bitmap, wxBitmap *bm
         pttc->bitmap_day = new wxBitmap( style->GetIcon( _T("default_pi") ));
     } else {
         //  Force a non-reference copy of the bitmap from the PlugIn
-        wxRect rb(0, 0, bitmap->GetWidth(), bitmap->GetHeight());
-        pttc->bitmap_day = new wxBitmap(rb.width, rb.height, -1);
-        *pttc->bitmap_day = bitmap->GetSubBitmap( rb );
+        pttc->bitmap_day = new wxBitmap(*bitmap);
+        pttc->bitmap_day->UnShare();
     }
+
+    pttc->bitmap_Rollover = new wxBitmap(*pttc->bitmap_day);
+    pttc->bitmap_Rollover->UnShare();
 
     pttc->bitmap_dusk = BuildDimmedToolBitmap(pttc->bitmap_day, 128);
     pttc->bitmap_night = BuildDimmedToolBitmap(pttc->bitmap_day, 32);
-    pttc->bitmap_Rollover = new wxBitmap(*pttc->bitmap_day);
-
+    
     pttc->kind = kind;
     pttc->shortHelp = shortHelp;
     pttc->longHelp = longHelp;
@@ -1206,14 +1241,21 @@ void PlugInManager::SetToolbarItemBitmaps(int item, wxBitmap *bitmap, wxBitmap *
                     pttc->bitmap_day = new wxBitmap( style->GetIcon( _T("default_pi") ));
                 } else {
                     //  Force a non-reference copy of the bitmap from the PlugIn
-                    wxRect rb(0, 0, bitmap->GetWidth(), bitmap->GetHeight());
-                    pttc->bitmap_day = new wxBitmap(rb.width, rb.height, -1);
-                    *pttc->bitmap_day = bitmap->GetSubBitmap( rb );
+                    pttc->bitmap_day = new wxBitmap(*bitmap);
+                    pttc->bitmap_day->UnShare();
                 }
 
-                pttc->bitmap_dusk = BuildDimmedToolBitmap(bitmap, 128);
-                pttc->bitmap_night = BuildDimmedToolBitmap(bitmap, 32);
-                pttc->bitmap_Rollover = new wxBitmap(*bmpRollover);
+                if( !bmpRollover->IsOk() ) {
+                    ocpnStyle::Style*style = g_StyleManager->GetCurrentStyle();
+                    pttc->bitmap_Rollover = new wxBitmap( style->GetIcon( _T("default_pi") ));
+                } else {
+                    //  Force a non-reference copy of the bitmap from the PlugIn
+                    pttc->bitmap_Rollover = new wxBitmap(*bmpRollover);
+                    pttc->bitmap_Rollover->UnShare();
+                }
+                
+                pttc->bitmap_dusk = BuildDimmedToolBitmap(pttc->bitmap_day, 128);
+                pttc->bitmap_night = BuildDimmedToolBitmap(pttc->bitmap_day, 32);
 
                 pParent->SetToolbarItemBitmaps(item, pttc->bitmap_day, pttc->bitmap_Rollover);
                 break;
@@ -1902,7 +1944,7 @@ bool AddSingleWaypoint( PlugIn_Waypoint *pwaypoint, bool b_permanent)
     //  GUID
     //  Make sure that this GUID is indeed unique in the Routepoint list
     bool b_unique = true;
-    wxRoutePointListNode *prpnode = pWayPointMan->m_pWayPointList->GetFirst();
+    wxRoutePointListNode *prpnode = pWayPointMan->GetWaypointList()->GetFirst();
     while( prpnode ) {
         RoutePoint *prp = prpnode->GetData();
 

@@ -34,6 +34,8 @@ include/mygeom.h
 include/cm93.h
 include/datastream.h
 include/multiplexer.h
+include/LinkPropDlg.h
+include/GoToPositionDialog.h
 src/chartdbs.cpp
 src/mygdal/ogrmultipolygon.cpp
 src/mygdal/cpl_csv.cpp
@@ -171,4 +173,6 @@ src/styles.cpp
 src/kml.cpp
 src/undo.cpp
 src/routeprintout.cpp
-
+src/TrackPropDlg.cpp
+src/LinkPropDlg.cpp
+src/GoToPositionDialog.cpp

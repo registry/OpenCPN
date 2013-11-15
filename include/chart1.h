@@ -57,6 +57,8 @@ int GetApplicationMemoryUse(void);
 // The point for anchor watch should really be a class...
 double AnchorDistFix( double const d, double const AnchorPointMinDist, double const AnchorPointMaxDist);   //  pjotrc 2010.02.22
 
+bool TestGLCanvas(wxString &prog_dir);
+
 class NMEA_Msg_Container;
 WX_DECLARE_STRING_HASH_MAP( NMEA_Msg_Container*, MsgPriorityHash );
 
@@ -296,6 +298,8 @@ class MyFrame: public wxFrame
     void ChartsRefresh(int dbi_hint, ViewPort &vp, bool b_purge = true);
 
     bool CheckGroup(int igroup);
+    double GetTrueOrMag(double a);
+    
 
     void TouchAISActive(void);
     void UpdateAISTool(void);
@@ -456,12 +460,12 @@ public:
 extern int OCPNMessageBox(wxWindow *parent,
                           const wxString& message,
                           const wxString& caption = _T("Message"),
-                          int style = wxOK, int x = -1, int y = -1);
+                          int style = wxOK,  int timout_sec = -1, int x = -1, int y = -1);
 
 
 //----------------------------------------------------------------------------
 // Generic Auto Timed Window
-// Belongs to the creator, not deleted automatically on applicaiton close
+// Belongs to the creator, not deleted automatically on application close
 //----------------------------------------------------------------------------
 
 class TimedPopupWin: public wxWindow
