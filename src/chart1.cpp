@@ -150,6 +150,7 @@ wxLog                     *Oldlogger;
 bool                      g_bFirstRun;
 wxString                  glog_file;
 wxString                  gConfig_File;
+wxString                  gExe_path;
 
 int                       g_unit_test_1;
 bool                      g_start_fullscreen;
@@ -702,6 +703,11 @@ catch_signals(int signo)
         case SIGSEGV:
         siglongjmp(env, 1);// jump back to the setjmp() point
         break;
+        
+        case SIGTERM:
+        LogMessageOnce(_T("Sigterm received"));
+        gFrame->Close();
+        break;
 
         default:
         break;
@@ -1058,6 +1064,9 @@ bool MyApp::OnInit()
     sigaction(SIGUSR1, &sa_all, NULL);
 
     sigaction(SIGUSR1, NULL, &sa_all_old);// inspect existing action for this signal
+    
+    sigaction(SIGTERM, &sa_all, NULL);
+    sigaction(SIGTERM, NULL, &sa_all_old);
 #endif
 
 //      Initialize memory tracer
@@ -1095,6 +1104,8 @@ bool MyApp::OnInit()
 //      Establish a "home" location
     wxStandardPathsBase& std_path = wxApp::GetTraits()->GetStandardPaths();
     std_path.Get();
+    
+    gExe_path = std_path.GetExecutablePath();
 
     pHome_Locn = new wxString;
 #ifdef __WXMSW__
@@ -2082,6 +2093,8 @@ if( 0 == g_memCacheLimit )
 
     stats->Show( true );
 
+    Yield();
+    
     gFrame->DoChartUpdate();
 
     g_FloatingToolbarDialog->LockPosition(false);
@@ -3161,7 +3174,7 @@ void MyFrame::OnCloseWindow( wxCloseEvent& event )
         g_pAISTargetList->Destroy();
     }
 
-    g_FloatingCompassDialog->Destroy();
+    if( g_FloatingCompassDialog ) g_FloatingCompassDialog->Destroy();
     g_FloatingCompassDialog = NULL;
 
     //      Delete all open charts in the cache
@@ -5638,6 +5651,9 @@ void MyFrame::SelectQuiltRefdbChart( int db_index )
         double best_scale = GetBestVPScale( pc );
         cc1->SetVPScale( best_scale );
     }
+    else
+        cc1->SetQuiltRefChart( -1 );
+    
 
 }
 
