@@ -7142,8 +7142,10 @@ void MyFrame::OnEvtOCPN_NMEA( OCPN_DataStreamEvent & event )
                             {
                                 if( m_NMEA0183.Parse() )
                                 {
-                                    gSog = m_NMEA0183.Vtg.SpeedKnots;
-                                    gCog = m_NMEA0183.Vtg.TrackDegreesTrue;
+                                    if( !wxIsNaN(m_NMEA0183.Vtg.SpeedKnots) )
+                                        gSog = m_NMEA0183.Vtg.SpeedKnots;
+                                    if( !wxIsNaN(m_NMEA0183.Vtg.TrackDegreesTrue) )
+                                        gCog = m_NMEA0183.Vtg.TrackDegreesTrue;
                                     if( !wxIsNaN(m_NMEA0183.Vtg.SpeedKnots) && !wxIsNaN(m_NMEA0183.Vtg.TrackDegreesTrue) )
                                         gGPS_Watchdog = gps_watchdog_timeout_ticks;
                                 }
@@ -8867,6 +8869,7 @@ int OCPNMessageBox( wxWindow *parent, const wxString& message, const wxString& c
                     int timeout_sec, int x, int y  )
 {
 
+    long parent_style;
 #ifdef __WXOSX__
     if(g_FloatingToolbarDialog)
         g_FloatingToolbarDialog->Hide();
@@ -8876,6 +8879,12 @@ int OCPNMessageBox( wxWindow *parent, const wxString& message, const wxString& c
 
     if( stats )
         stats->Hide();
+    
+    if(parent) {
+        parent_style = parent->GetWindowStyle();
+        parent->SetWindowStyle( parent_style & !wxSTAY_ON_TOP );
+    }
+    
 #endif
 
       int ret =  wxID_OK;  
@@ -8884,7 +8893,7 @@ int OCPNMessageBox( wxWindow *parent, const wxString& message, const wxString& c
       ret = tbox.GetRetVal() ;
       
 //    wxMessageDialog dlg( parent, message, caption, style | wxSTAY_ON_TOP, wxPoint( x, y ) );
-//    int ret = dlg.ShowModal();
+//    ret = dlg.ShowModal();
 
 #ifdef __WXOSX__
     if(gFrame)
@@ -8896,8 +8905,10 @@ int OCPNMessageBox( wxWindow *parent, const wxString& message, const wxString& c
     if( stats )
         stats->Show();
 
-    if(parent)
+    if(parent){
         parent->Raise();
+        parent->SetWindowStyle( parent_style );
+    }
 #endif
 
     return ret;
