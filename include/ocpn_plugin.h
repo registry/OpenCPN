@@ -84,6 +84,7 @@ class       wxAuiManager;
 #define     WANTS_OPENGL_OVERLAY_CALLBACK             0x00008000
 #define     WANTS_DYNAMIC_OPENGL_OVERLAY_CALLBACK     0x00010000
 #define     WANTS_LATE_INIT                           0x00020000
+#define     INSTALLS_PLUGIN_CHART_GL                  0x00040000
 
 //----------------------------------------------------------------------------------------------------------
 //    Some PlugIn API interface object class definitions
@@ -481,7 +482,7 @@ class DECL_EXP opencpn_plugin_111 : public opencpn_plugin_110
 public:
     opencpn_plugin_111(void *pmgr);
     virtual ~opencpn_plugin_111();
-    
+
 };
 
 //------------------------------------------------------------------
@@ -695,6 +696,8 @@ extern DECL_EXP wxString toSDMM_PlugIn(int NEflag, double a, bool hi_precision =
 
 extern "C"  DECL_EXP wxString *GetpPrivateApplicationDataLocation();
 extern  DECL_EXP wxString GetOCPN_ExePath( void );
+extern "C"  DECL_EXP wxString *GetpPlugInLocation();
+extern  DECL_EXP wxString GetPlugInPath(opencpn_plugin *pplugin);
 
 extern "C"  DECL_EXP int AddChartToDBInPlace( wxString &full_path, bool b_ProgressDialog );
 extern "C"  DECL_EXP int RemoveChartFromDBInPlace( wxString &full_path );
@@ -702,6 +705,40 @@ extern "C"  DECL_EXP int RemoveChartFromDBInPlace( wxString &full_path );
 
 //  API 1.11 adds access to S52 Presentation library
 //Types
+
+class PI_S57Obj;
+
+WX_DECLARE_LIST(PI_S57Obj, ListOfPI_S57Obj);
+
+// ----------------------------------------------------------------------------
+// PlugInChartBaseGL
+//  Derived from PlugInChartBase, add OpenGL Vector chart support
+// ----------------------------------------------------------------------------
+
+class DECL_EXP PlugInChartBaseGL : public PlugInChartBase
+{
+public:
+    PlugInChartBaseGL();
+    virtual ~PlugInChartBaseGL();
+
+    virtual int RenderRegionViewOnGL( const wxGLContext &glc, const PlugIn_ViewPort& VPoint,
+                                      const wxRegion &Region, bool b_use_stencil );
+
+    virtual ListOfPI_S57Obj *GetObjRuleListAtLatLon(float lat, float lon, float select_radius, PlugIn_ViewPort *VPoint);
+    virtual wxString CreateObjDescriptions( ListOfPI_S57Obj* obj_list );
+
+    virtual int GetNoCOVREntries();
+    virtual int GetNoCOVRTablePoints(int iTable);
+    virtual int  GetNoCOVRTablenPoints(int iTable);
+    virtual float *GetNoCOVRTableHead(int iTable);
+    
+};
+
+
+
+
+
+
 
 class wxArrayOfS57attVal;
 
@@ -738,7 +775,7 @@ typedef enum _PI_DisPrio{
     PI_PRIO_HAZARDS         = '8',                  // hazards
     PI_PRIO_MARINERS        = '9',                  // VRM, EBL, own ship
     PI_PRIO_NUM             = 10                    // number of priority levels
-    
+
 }PI_DisPrio;
 
 typedef enum PI_InitReturn
@@ -774,25 +811,25 @@ public:
       double                  y;
       double                  z;
       int                     npt;                    // number of points as needed by arrays
-      void /*pt*/                      *geoPt;                 // for LINE & AREA not described by PolyTessGeo
+      void                    *geoPt;                 // for LINE & AREA not described by PolyTessGeo
       double                  *geoPtz;                // an array[3] for MultiPoint, SM with Z, i.e. depth
       double                  *geoPtMulti;            // an array[2] for MultiPoint, lat/lon to make bbox
                                                       // of decomposed points
 
       void                    *pPolyTessGeo;
-                                                      
+
       double                  m_lat;                  // The lat/lon of the object's "reference" point
       double                  m_lon;
 
       double                  chart_ref_lat;
       double                  chart_ref_lon;
-      
+
       double                  lat_min;
       double                  lat_max;
       double                  lon_min;
       double                  lon_max;
       bool                    bBBObj_valid;
-      
+
       int                     Scamin;                 // SCAMIN attribute decoded during load
 
       bool                    bIsClone;
@@ -810,9 +847,9 @@ public:
 
       void *                  S52_Context;
       PI_S57Obj               *child;           // child list, used only for MultiPoint Soundings
-                    
+
       PI_S57Obj               *next;            //  List linkage
-      
+
 
                                                       // This transform converts from object geometry
                                                       // to SM coordinates.
@@ -824,29 +861,31 @@ public:
 
 
 
-wxString DECL_EXP PI_GetPLIBColorScheme();            //ps52plib->GetPLIBColorScheme()
-int DECL_EXP PI_GetPLIBDepthUnitInt();           //ps52plib->m_nDepthUnitDisplay
-int DECL_EXP PI_GetPLIBSymbolStyle();            //ps52plib->m_nSymbolStyle
-int DECL_EXP PI_GetPLIBBoundaryStyle();          //ps52plib->m_nBoundaryStyle
-bool DECL_EXP PI_PLIBObjectRenderCheck( PI_S57Obj *pObj, PlugIn_ViewPort *vp ); //ps52plib->ObjectRenderCheck
+wxString DECL_EXP PI_GetPLIBColorScheme();
+int DECL_EXP PI_GetPLIBDepthUnitInt();
+int DECL_EXP PI_GetPLIBSymbolStyle();
+int DECL_EXP PI_GetPLIBBoundaryStyle();
+int DECL_EXP PI_GetPLIBStateHash();
 
-int DECL_EXP PI_PLIBRenderObjectToDC( wxDC *pdc, PI_S57Obj *pObj, PlugIn_ViewPort *vp );  //ps52plib->RenderObjectToDC
-
-int DECL_EXP PI_PLIBRenderAreaToDC( wxDC *pdc, PI_S57Obj *pObj, PlugIn_ViewPort *vp, wxRect rect, unsigned char *pixbuf );
-
-bool DECL_EXP PI_PLIBSetContext( PI_S57Obj *pObj ); 
-
+bool DECL_EXP PI_PLIBObjectRenderCheck( PI_S57Obj *pObj, PlugIn_ViewPort *vp );
 PI_LUPname DECL_EXP PI_GetObjectLUPName( PI_S57Obj *pObj );
 PI_DisPrio DECL_EXP PI_GetObjectDisplayPriority( PI_S57Obj *pObj );
 PI_DisCat DECL_EXP PI_GetObjectDisplayCategory( PI_S57Obj *pObj );
+void DECL_EXP PI_PLIBSetLineFeaturePriority( PI_S57Obj *pObj, int prio );
+void DECL_EXP PI_PLIBPrepareForNewRender(void);
 
 
+bool DECL_EXP PI_PLIBSetContext( PI_S57Obj *pObj );
+
+int DECL_EXP PI_PLIBRenderObjectToDC( wxDC *pdc, PI_S57Obj *pObj, PlugIn_ViewPort *vp );
+int DECL_EXP PI_PLIBRenderAreaToDC( wxDC *pdc, PI_S57Obj *pObj, PlugIn_ViewPort *vp, wxRect rect, unsigned char *pixbuf );
 
 
+int DECL_EXP PI_PLIBRenderAreaToGL( const wxGLContext &glcc, PI_S57Obj *pObj,
+                                    PlugIn_ViewPort *vp, wxRect &render_rect );
+
+int DECL_EXP PI_PLIBRenderObjectToGL( const wxGLContext &glcc, PI_S57Obj *pObj,
+                                    PlugIn_ViewPort *vp, wxRect &render_rect );
 
 
-
-
-
-#endif            // _PLUGIN_H_
-
+#endif //_PLUGIN_H_

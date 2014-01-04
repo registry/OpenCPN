@@ -4270,7 +4270,9 @@ void ChartCanvas::AISDrawTarget( AIS_Target_Data *td, ocpnDC& dc )
             target_brush = wxBrush( GetGlobalColor( _T ( "CHYLW" ) ) );
         if( ( td->Class == AIS_DSC ) && ( td->ShipType == 12 ) )					// distress
             target_brush = wxBrush( GetGlobalColor( _T ( "URED" ) ) );
-
+        if( td->b_specialPosnReport )
+            target_brush = wxBrush( GetGlobalColor( _T ( "UINFG" ) ) );
+        
         if( ( td->n_alarm_state == AIS_ALARM_SET ) && ( td->bCPA_Valid ) ) target_brush = wxBrush(
                         GetGlobalColor( _T ( "URED" ) ) );
 
@@ -6795,8 +6797,15 @@ void ChartCanvas::CanvasPopupMenu( int x, int y, int seltype )
 
 void ChartCanvas::ShowObjectQueryWindow( int x, int y, float zlat, float zlon )
 {
+    ChartPlugInWrapper *target_plugin_chart = NULL;
+    s57chart *Chs57 = NULL;
+    
     ChartBase *target_chart = GetChartAtCursor();
-    s57chart *Chs57 = dynamic_cast<s57chart*>( target_chart );
+    if( target_chart->GetChartType() == CHART_TYPE_PLUGIN )
+        target_plugin_chart = dynamic_cast<ChartPlugInWrapper *>(target_chart);
+    else
+         Chs57 = dynamic_cast<s57chart*>( target_chart );
+    
     std::vector<Ais8_001_22*> area_notices;
 
     if( g_pAIS && g_bShowAIS && g_bShowAreaNotices ) {
@@ -6848,7 +6857,7 @@ void ChartCanvas::ShowObjectQueryWindow( int x, int y, float zlat, float zlon )
     }
 
 
-    if( Chs57 || !area_notices.empty() ) {
+    if( target_plugin_chart || Chs57 || !area_notices.empty() ) {
         // Go get the array of all objects at the cursor lat/lon
         int sel_rad_pix = 5;
         float SelectRadius = sel_rad_pix / ( GetVP().view_scale_ppm * 1852 * 60 );
@@ -6859,10 +6868,14 @@ void ChartCanvas::ShowObjectQueryWindow( int x, int y, float zlat, float zlon )
         SetCursor( wxCURSOR_WAIT );
         bool lightsVis = gFrame->ToggleLights( false );
         if( !lightsVis ) gFrame->ToggleLights( true, true );
+
         ListOfObjRazRules* rule_list = NULL;
+        ListOfPI_S57Obj* pi_rule_list = NULL;
         if( Chs57 )
             rule_list = Chs57->GetObjRuleListAtLatLon( zlat, zlon, SelectRadius, &GetVP() );
-
+        else if( target_plugin_chart )
+            pi_rule_list = g_pi_manager->GetPlugInObjRuleListAtLatLon( target_plugin_chart, zlat, zlon, SelectRadius, GetVP() );
+        
         ListOfObjRazRules* overlay_rule_list = NULL;
         ChartBase *overlay_chart = GetOverlayChartAtCursor();
         s57chart *CHs57_Overlay = dynamic_cast<s57chart*>( overlay_chart );
@@ -6912,6 +6925,8 @@ void ChartCanvas::ShowObjectQueryWindow( int x, int y, float zlat, float zlon )
 
         if( Chs57 )
             objText << Chs57->CreateObjDescriptions( rule_list );
+        else if( target_plugin_chart )
+            objText << g_pi_manager->CreateObjDescriptions( target_plugin_chart, pi_rule_list );
 
         objText << _T("</font></body></html>");
 
@@ -6927,6 +6942,10 @@ void ChartCanvas::ShowObjectQueryWindow( int x, int y, float zlat, float zlon )
             overlay_rule_list->Clear();
         delete overlay_rule_list;
 
+        if( pi_rule_list )
+            pi_rule_list->Clear();
+        delete pi_rule_list;
+        
         SetCursor( wxCURSOR_ARROW );
     }
 }
