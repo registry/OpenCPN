@@ -697,7 +697,7 @@ void dashboard_pi::SetNMEASentence( wxString &sentence )
 
                 SendSentenceToAllInstruments( OCPN_DBP_STC_MDA, m_NMEA0183.Mda.Pressure *1000,
 
-                       _T("hpa") ); //Convert to hpa befor sending to instruments.
+                       _T("hPa") ); //Convert to hpa befor sending to instruments.
 
 
             }
@@ -741,6 +741,8 @@ void dashboard_pi::SetNMEASentence( wxString &sentence )
                             _T("\u00B0M") );
                 }
 
+                SendSentenceToAllInstruments( OCPN_DBP_STC_TWS, toUsrSpeed_Plugin( m_NMEA0183.Mwd.WindSpeedKnots, g_iDashWindSpeedUnit ),
+                                              getUsrSpeedUnit_Plugin( g_iDashWindSpeedUnit ) );
                 SendSentenceToAllInstruments( OCPN_DBP_STC_TWS2, toUsrSpeed_Plugin( m_NMEA0183.Mwd.WindSpeedKnots, g_iDashWindSpeedUnit ),
                         getUsrSpeedUnit_Plugin( g_iDashWindSpeedUnit ) );
                 //m_NMEA0183.Mwd.WindSpeedms
