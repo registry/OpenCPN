@@ -954,6 +954,9 @@ void RouteProp::SetDialogTitle(const wxString & title)
 
 void RouteProp::SetRouteAndUpdate( Route *pR )
 {
+    if( NULL == pR )
+        return;
+    
     //  Fetch any config file values
 
     //      long LMT_Offset = 0;                    // offset in seconds from UTC for given location (-1 hr / 15 deg W)
@@ -1649,7 +1652,9 @@ void RouteProp::OnRoutepropCancelClick( wxCommandEvent& event )
     }
 
     if( b_found_route ) m_pRoute->ClearHighlights();
-
+    
+    m_bStartNow = false;
+    
     Hide();
     cc1->Refresh( false );
 
