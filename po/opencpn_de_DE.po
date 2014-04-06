@@ -4,10 +4,10 @@
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
 msgid ""
 msgstr ""
-"Project-Id-Version: OpenCPN 3.3.1302\n"
+"Project-Id-Version: OpenCPN 3.3.1419\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2014-02-18 23:59-0500\n"
-"PO-Revision-Date: 2014-01-02 19:16+0100\n"
+"POT-Creation-Date: 2014-04-05 11:43-0400\n"
+"PO-Revision-Date: 2014-02-21 18:56+0100\n"
 "Last-Translator: CarCode <carcode@me.com>\n"
 "Language-Team: Gerhard Mueller <carcode@me.com>\n"
 "Language: de_DE\n"
@@ -16,7 +16,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "X-Poedit-SourceCharset: utf-8\n"
 "X-Poedit-Basepath: F:\\GIT\\opencpn\n"
-"X-Generator: Poedit 1.6.3\n"
+"X-Generator: Poedit 1.6.4\n"
 #
 msgid ""
 "\n"
@@ -466,20 +466,8 @@ msgstr "AIS-Ziele"
 msgid "AIS target list"
 msgstr "Liste AIS-Ziele"
 #
-#
-#
-#
-#
-#
-#
 msgid "AISRollover"
 msgstr "AIS Kurzübersicht"
-#
-#
-#
-#
-#
-#
 #
 msgid "AISTargetQuery"
 msgstr "AIS-Zielabfrage"
@@ -622,6 +610,10 @@ msgstr "Sind Sie sicher, daß Sie <ALLE> Wegpunkte löschen wollen?"
 #
 msgid "Are you sure you want to delete the selected object(s)"
 msgstr "Sind Sie sicher, daß Sie die gewählten Objekte löschen wollen?"
+#
+#, fuzzy
+msgid "Are you sure you want to delete this layer and <ALL> of its contents?"
+msgstr "Sind Sie sicher, daß Sie <ALLE> Routen löschen wollen?"
 #
 msgid "Are you sure you want to delete this route?"
 msgstr "Sind Sie sicher, daß Sie diese Route löschen wollen?"
@@ -1284,6 +1276,9 @@ msgstr "\"Patchwork\" Kartenanzeige aktivieren"
 msgid "Enable Target Alert Acknowledge timeout (min)"
 msgstr "Aktiviere max. Zeitdauer für Ziel-Alarmquittierung (Minuten)"
 #
+msgid "Enable Touchscreen/Tablet Interface"
+msgstr ""
+#
 msgid "Enable Transparent Toolbar"
 msgstr "Transparente Symbolleiste "
 #
@@ -1327,11 +1322,10 @@ msgstr "Umweltbedingter Vorsichtsbereich: Sturm Warnung (Sturmgebiet)"
 msgid "Environmental Caution Area: Strong currents"
 msgstr "Umweltbedingter Vorsichtsbereich: Starke Strömungen"
 #
-#
-#
-#
-#
-#
+#, fuzzy
+msgid "Error on Waypoint Upload.  Garmin GPS not connected"
+msgstr ""
+"Fehler beim Hochladen der Wegpunkte. Bitte prüfen Sie die Log-Dateien..."
 #
 msgid "Error on Waypoint Upload.  Please check logfiles..."
 msgstr ""
@@ -1469,9 +1463,8 @@ msgstr "urspr. Position"
 msgid "Hide AIS Targets"
 msgstr "AIS-Ziele verstecken"
 #
-#, fuzzy
 msgid "Hide All Tracks"
-msgstr "Verstecke Ziel Track"
+msgstr "Verstecke alle Tracks"
 #
 msgid "Hide Target CPA"
 msgstr "Verstecke Ziel CPA"
@@ -1586,7 +1579,7 @@ msgid "LMT @ Location"
 msgstr "LMT Ort/Position"
 #
 msgid "LMT @ Track Start"
-msgstr ""
+msgstr "LMT @ Track Start"
 #
 msgid "Language"
 msgstr "Sprache"
@@ -1755,12 +1748,6 @@ msgstr "Benutzerdef. Auswahl"
 #
 msgid "Mark targets as lost after (min)"
 msgstr "Ziele als verloren markieren nach (Minuten)"
-#
-#
-#
-#
-#
-#
 #
 msgid "Marks"
 msgstr "Markierungen"
@@ -1975,6 +1962,20 @@ msgstr "OpenCPN kann nicht starten"
 #
 msgid "OpenCPN info"
 msgstr "OpenCPN info"
+#
+msgid ""
+"OpenCPN requires access to serial ports to use serial NMEA data.\n"
+"You currently do not have permission to access the serial ports on this "
+"system.\n"
+"\n"
+"It is suggested that you exit OpenCPN now,\n"
+"and add yourself to the correct group to enable serial port access.\n"
+"\n"
+"You may do so by executing the following command from the linux command "
+"line:\n"
+"\n"
+"                sudo usermod -a -G "
+msgstr ""
 #
 msgid "Options"
 msgstr "Optionen"
@@ -2335,7 +2336,7 @@ msgid "S/V"
 msgstr "S/V"
 #
 msgid "SAR Aircraft"
-msgstr ""
+msgstr "SAR Fluggerät"
 #
 msgid "SAR/V"
 msgstr "SAR/V"
@@ -2461,9 +2462,8 @@ msgstr "AIS-Ziele anzeigen"
 msgid "Show AIS targets real size"
 msgstr "Zeige reale Größe AIS-Ziele"
 #
-#, fuzzy
 msgid "Show All Tracks"
-msgstr "Zeige Ziel Track"
+msgstr "Zeige alle Tracks"
 #
 msgid "Show CPA/TCPA Alert Dialog"
 msgstr "CPA/TCPA-Alarmfenster anzeigen"
@@ -2751,10 +2751,12 @@ msgstr ""
 "Sollen die eingefügten Daten damit verbunden werden?\n"
 "\n"
 #
+#, fuzzy
 msgid ""
-"There are some waypoints used in routes or anchor alarms. Do you want to "
-"delete them as well? This will change the routes and disable the anchor "
-"alarms. Answering No keeps the waypoints used in routes or alarms."
+"There are some waypoints used in routes or anchor alarms.\n"
+" Do you want to delete them as well?\n"
+" This will change the routes and disable the anchor alarms.\n"
+" Answering No keeps the waypoints used in routes or alarms."
 msgstr ""
 "Es gibt einige Wegpunkte in Routen oder Ankeralarmen. Sollen die auch "
 "gelöscht werden? Damit werden die Routen geändert oder Ankeralarme gelöscht. "
@@ -2782,12 +2784,6 @@ msgstr "Abschn."
 msgid "This waypoint is part of a layer and can't be edited"
 msgstr "Dieser WP ist Teil eines Layer und kann nicht editiert werden"
 #
-#
-#
-#
-#
-#
-#
 msgid "TideCurrentGraphRollover"
 msgstr "Kurzinfo Gezeiten- und Strömungskurve"
 #
@@ -2800,7 +2796,6 @@ msgstr "Reisezeit"
 msgid "Time enroute"
 msgstr "Reisezeit"
 #
-#, fuzzy
 msgid "Time shown as"
 msgstr "Zeitangaben in"
 #
@@ -2822,9 +2817,8 @@ msgstr "Reisezeit"
 msgid "Toggle Tracking"
 msgstr "Tracking an-/ausschalten"
 #
-#, fuzzy
 msgid "Toggle track"
-msgstr "Tracking an-/ausschalten"
+msgstr "Tracking an/aus"
 #
 msgid "ToolTips"
 msgstr "Tool Tipps"
@@ -2875,7 +2869,6 @@ msgstr "transversale Mercator-Projektion"
 msgid "Treat WPL sentences as APRS position reports"
 msgstr "Behandele WPL Sequenzen als APRS Positionsberichte"
 #
-#, fuzzy
 msgid "Trk"
 msgstr "Track"
 #
@@ -2904,7 +2897,7 @@ msgid "Undefined (default)"
 msgstr "Undefiniert (Standard)"
 #
 msgid "Under way sailing"
-msgstr "in Fahrt (segelnd?)"
+msgstr "in Fahrt"
 #
 msgid "Underway"
 msgstr "in Fahrt befindlich"
@@ -3017,12 +3010,6 @@ msgstr "Wegpunkt-Eigenschaften"
 msgid "Waypoint Properties, Layer: "
 msgstr "Wegpunkt-Eigenschaften, Layer:"
 #
-#
-#
-#
-#
-#
-#
 msgid "Waypoint(s) Uploaded successfully."
 msgstr "Wegpunkt(e) erfolgreich hochgeladen."
 #
@@ -3116,18 +3103,20 @@ msgstr "_B"
 msgid "_plus"
 msgstr "_plus"
 #
-#, fuzzy
 msgid "cm"
-msgstr "m"
+msgstr "cm"
 #
 msgid "fa"
-msgstr ""
+msgstr "fa"
 #
-#, fuzzy
 msgid "ft"
-msgstr "Links"
+msgstr "Fuß"
 #
 msgid "in"
+msgstr "in"
+#
+#, fuzzy
+msgid "in "
 msgstr "in"
 #
 msgid "km"
