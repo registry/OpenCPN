@@ -76,6 +76,7 @@ IF (NOT WIN32)
     ELSE (CMAKE_SIZEOF_VOID_P MATCHES "8")
       SET (ARCH "i386")
     ENDIF (CMAKE_SIZEOF_VOID_P MATCHES "8")
+    SET(PREFIX "/usr/")
   ENDIF (EXISTS /etc/debian_version)
   IF (EXISTS /etc/redhat-release)
     SET (PACKAGE_FORMAT "RPM")
@@ -868,7 +869,11 @@ SET_SOURCE_FILES_PROPERTIES(
 SET_SOURCE_FILES_PROPERTIES(
            buildosx/MainMenu.xib PROPERTIES MACOSX_PACKAGE_LOCATION Resources/English.lproj )
 
+#  These variables get substituted into the Info.plist template file at build time
 SET(MACOSX_BUNDLE_ICON_FILE opencpn.icns)
+SET(MACOSX_BUNDLE_SHORT_VERSION_STRING "${PACKAGE_VERSION}")
+SET(MACOSX_BUNDLE_BUNDLE_NAME "OpenCPN")
+SET(MACOSX_BUNDLE_GUI_IDENTIFIER "org.opencpn")
 
 ADD_EXECUTABLE(${PACKAGE_NAME} MACOSX_BUNDLE
       ${HDRS}
@@ -898,6 +903,8 @@ TARGET_LINK_LIBRARIES(${PACKAGE_NAME}
       ${EXTRA_LIBS}
       )
 
+set_target_properties(${PACKAGE_NAME} PROPERTIES MACOSX_BUNDLE_INFO_PLIST
+                       "${CMAKE_SOURCE_DIR}/buildosx/Info.plist.in")
 
 ENDIF(APPLE)
 
@@ -1270,8 +1277,7 @@ INCLUDE(CPack)
 
 IF(APPLE)
 # -- Run the BundleUtilities cmake code
-  SET(CPACK_BUNDLE_PLIST "${CMAKE_SOURCE_DIR}/buildosx/Info.plist")
-  SET(MACOSX_BUNDLE_BUNDLE_NAME "OpenCPN")
+  SET(CPACK_BUNDLE_PLIST "${CMAKE_SOURCE_DIR}/buildosx/Info.plist.in")
 
   SET(APPS "\${CMAKE_INSTALL_PREFIX}/bin/OpenCPN.app")
   SET(DIRS "")
