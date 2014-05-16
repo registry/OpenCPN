@@ -76,11 +76,7 @@ IF (NOT WIN32)
     ELSE (CMAKE_SIZEOF_VOID_P MATCHES "8")
       SET (ARCH "i386")
     ENDIF (CMAKE_SIZEOF_VOID_P MATCHES "8")
-<<<<<<< HEAD
-#    SET(PREFIX "/usr/")
-=======
     SET(TENTATIVE_PREFIX "/usr/")
->>>>>>> 1d3606dedbc5c3a5a5486cb0324b5adeaa51b84b
   ENDIF (EXISTS /etc/debian_version)
   IF (EXISTS /etc/redhat-release)
     SET (PACKAGE_FORMAT "RPM")

@@ -44,7 +44,7 @@
 #include "chart1.h"
 #include "chcanv.h"
 #include "styles.h"
-#include "version.h"
+#include <version.h>
 
 
 wxString str_version_start = wxT("\n      Version ");
