@@ -611,7 +611,6 @@ bool                      g_bMagneticAPB;
 
 //                        OpenGL Globals
 int                       g_GPU_MemSize;
-bool                      g_b_useStencil;
 
 bool                      g_bserial_access_checked;
 
@@ -632,7 +631,7 @@ int               g_sticky_chart;
 
 extern wxString OpenCPNVersion; //Gunther
 
-double g_GLMinLineWidth;
+float g_GLMinLineWidth;
 
 int n_NavMessageShown;
 wxString g_config_version_string;
@@ -1893,7 +1892,11 @@ if( 0 == g_memCacheLimit )
     g_FloatingToolbarDialog->LockPosition(true);
 
     gFrame->SetAndApplyColorScheme( global_color_scheme );
-
+    
+    /*  Load initial symbol tables  */
+    if( ps52plib && ps52plib->m_bOK )
+        ps52plib->SetPLIBColorScheme( global_color_scheme );
+    
     //  The position and size of the static frame children (i.e. the canvas, and the status bar) are now set
     //  So now we can establish the AUI panes for them.
     //  It is important to have set the chartcanvas and status bar sizes before this point,
@@ -1908,7 +1911,7 @@ if( 0 == g_memCacheLimit )
 
 //      Load and initialize any PlugIns
     g_pi_manager = new PlugInManager( gFrame );
-    g_pi_manager->LoadAllPlugIns( g_Plugin_Dir );
+    g_pi_manager->LoadAllPlugIns( g_Plugin_Dir, true );
 
 // Show the frame
 
@@ -2203,9 +2206,6 @@ if( 0 == g_memCacheLimit )
     }
 
     cc1->ReloadVP();                  // once more, and good to go
-
-    g_FloatingCompassDialog = new ocpnFloatingCompassWindow( cc1 );
-    if( g_FloatingCompassDialog ) g_FloatingCompassDialog->UpdateStatus( true );
 
     g_FloatingToolbarDialog->Raise();
     g_FloatingToolbarDialog->Show();
@@ -2640,10 +2640,6 @@ void MyFrame::SetAndApplyColorScheme( ColorScheme cs )
 
     g_StyleManager->GetCurrentStyle()->SetColorScheme( cs );
     cc1->GetWorldBackgroundChart()->SetColorScheme( cs );
-
-#ifdef USE_S57
-    if( ps52plib ) ps52plib->SetPLIBColorScheme( SchemeName );
-#endif
 
     //Search the user color table array to find the proper hash table
     Usercolortable_index = 0;
@@ -3283,9 +3279,9 @@ void MyFrame::OnMove( wxMoveEvent& event )
 {
     if( g_FloatingToolbarDialog ) g_FloatingToolbarDialog->RePosition();
 
-    if( stats ) stats->RePosition();
+    if( stats && stats->IsVisible()) stats->RePosition();
 
-    UpdateGPSCompassStatusBox( true );
+    UpdateGPSCompassStatusBox( );
 
     if( console && console->IsShown() ) PositionConsole();
 
@@ -3312,7 +3308,7 @@ void MyFrame::ProcessCanvasResize( void )
 
     }
 
-    UpdateGPSCompassStatusBox( true );
+    UpdateGPSCompassStatusBox( );
 
     if( console->IsShown() ) PositionConsole();
 }
@@ -4087,6 +4083,10 @@ void MyFrame::ToggleChartOutlines( void )
 
     cc1->Refresh( false );
 
+#ifdef ocpnUSE_GL         // opengl renders chart outlines as part of the chart this needs a full refresh
+    if( g_bopengl ) 
+        cc1->GetglCanvas()->Invalidate();
+#endif
 }
 
 void MyFrame::SetToolbarItemState( int tool_id, bool state )
@@ -4112,7 +4112,7 @@ void MyFrame::ApplyGlobalSettings( bool bFlyingUpdate, bool bnewtoolbar )
     UseNativeStatusBar( false );              // better for MSW, undocumented in frame.cpp
 #endif
 
-    if( pConfig->m_bShowDebugWindows ) {
+    if( pConfig->m_bShowStatusBar ) {
         if( !m_pStatusBar ) {
             m_pStatusBar = CreateStatusBar( m_StatusBarFieldCount, 0 );   // No wxST_SIZEGRIP needed
             ApplyGlobalColorSchemetoStatusBar();
@@ -4129,6 +4129,17 @@ void MyFrame::ApplyGlobalSettings( bool bFlyingUpdate, bool bnewtoolbar )
             Refresh( false );
         }
     }
+
+    if( pConfig->m_bShowCompassWin ) {
+        if(!g_FloatingCompassDialog) {
+            g_FloatingCompassDialog = new ocpnFloatingCompassWindow( cc1 );
+            if( g_FloatingCompassDialog ) g_FloatingCompassDialog->UpdateStatus( true );
+        }
+    } else if(g_FloatingCompassDialog) {
+        g_FloatingCompassDialog->Destroy();
+        g_FloatingCompassDialog = NULL;
+    }
+
 
     if( bnewtoolbar ) UpdateToolbar( global_color_scheme );
 
@@ -4324,6 +4335,13 @@ int MyFrame::ProcessOptionsDialog( int rr, options* dialog )
        UpdateChartDatabaseInplace( *pWorkDirArray, ( ( rr & FORCE_UPDATE ) == FORCE_UPDATE ),
                 true, *pChartListFileName );
 
+#ifdef ocpnUSE_GL
+        extern ocpnGLOptions g_GLOptions;
+
+        if(g_bopengl && g_GLOptions.m_bTextureCompression &&
+           g_GLOptions.m_bTextureCompressionCaching)
+            BuildCompressedCache();
+#endif
         //    Re-open the last open chart
         int dbii = ChartData->FinddbIndex( chart_file_name );
         ChartsRefresh( dbii, cc1->GetVP() );
@@ -4396,7 +4414,7 @@ int MyFrame::ProcessOptionsDialog( int rr, options* dialog )
         SetChartUpdatePeriod( cc1->GetVP() );              // Pick up changes to skew compensator
 
      if(rr & GL_CHANGED){    
-        //    Refreseh the chart display, after flushing cache.
+        //    Refresh the chart display, after flushing cache.
         //      This will allow all charts to recognise new OpenGL configuration, if any
         int dbii = ChartData->FinddbIndex( chart_file_name );
         ChartsRefresh( dbii, cc1->GetVP(), true );
@@ -4514,6 +4532,7 @@ void MyFrame::ChartsRefresh( int dbi_hint, ViewPort &vp, bool b_purge )
             pTentative_Chart = ChartData->OpenChartFromDB( dbi_hint, FULL_INIT );
 
             if( pTentative_Chart ) {
+                /* Current_Ch is always NULL here, (set above) should this go before that? */
                 if( Current_Ch ) Current_Ch->Deactivate();
 
                 Current_Ch = pTentative_Chart;
@@ -4551,7 +4570,7 @@ void MyFrame::ChartsRefresh( int dbi_hint, ViewPort &vp, bool b_purge )
 
     UpdateControlBar();
 
-    UpdateGPSCompassStatusBox( true );
+    UpdateGPSCompassStatusBox( );
 
     cc1->SetCursor( wxCURSOR_ARROW );
 
@@ -5236,27 +5255,12 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
     }
 
     if( cc1 ) {
+#ifndef __WXGTK__
         double cursor_lat, cursor_lon;
         cc1->GetCursorLatLon( &cursor_lat, &cursor_lon );
-
-        wxString s1;
-        s1 += _T(" ");
-        s1 += toSDMM( 1, cursor_lat );
-        s1 += _T("   ");
-        s1 += toSDMM( 2, cursor_lon );
-        if( GetStatusBar() ) SetStatusText( s1, STAT_FIELD_CURSOR_LL );
-
-        double brg, dist;
-        DistanceBearingMercator( cursor_lat, cursor_lon, gLat, gLon, &brg, &dist );
-        wxString s;
-        if( g_bShowMag )
-            s.Printf( wxString("%03d°(M)  ", wxConvUTF8 ), (int)GetTrueOrMag( brg ) );
-        else
-            s.Printf( wxString("%03d°  ", wxConvUTF8 ), (int)GetTrueOrMag( brg ) );
-        s << cc1->FormatDistanceAdaptive( dist );
-        if( GetStatusBar() ) SetStatusText( s, STAT_FIELD_CURSOR_BRGRNG );
+        cc1->SetCursorStatus(cursor_lat, cursor_lon);
+#endif
     }
-
 //      Update the chart database and displayed chart
     bool bnew_view = false;
 
@@ -5273,12 +5277,13 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
         //    This RefreshRect will cause any active routepoint to blink
         if( g_pRouteMan->GetpActiveRoute() ) cc1->RefreshRect( g_blink_rect, false );
     }
-
-//  Possibly save the current configuration
+#if 0 // too slow, my computer hiccups, this takes nearly a second on some machines.
+//  Instead we should save the current configuration only when it needs to be saved.
     if( 0 == ( g_tick % ( g_nautosave_interval_seconds ) ) ) {
         pConfig->UpdateSettings();
         pConfig->UpdateNavObj();
     }
+#endif
 
 //  Force own-ship drawing parameters
     cc1->SetOwnShipState( SHIP_NORMAL );
@@ -5293,13 +5298,13 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
         }
     }
 
-    if( !bGPSValid ) {
+    if( !bGPSValid )
         cc1->SetOwnShipState( SHIP_INVALID );
-        if( cc1->m_bFollow ) cc1->UpdateShips();
-    }
 
     if( bGPSValid != m_last_bGPSValid ) {
-        cc1->UpdateShips();
+        if(!g_bopengl)
+            cc1->UpdateShips();
+
         bnew_view = true;                  // force a full Refresh()
         m_last_bGPSValid = bGPSValid;
     }
@@ -5318,28 +5323,37 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
                 }
             }
         }
-    }
 
-    if( brq_dynamic ) {
-        cc1->Refresh();
-        bnew_view = true;
+        if( brq_dynamic )
+            bnew_view = true;
     }
 
     FrameTimer1.Start( TIMER_GFRAME_1, wxTIMER_CONTINUOUS );
 
+    if(g_bopengl) {
+#ifdef ocpnUSE_GL
+        if(m_fixtime - cc1->GetglCanvas()->m_last_render_time > 0)
+            bnew_view = true;
+
+        if(bnew_view) /* full frame in opengl mode */
+            cc1->Refresh(false);
+#endif
+    } else {
 //  Invalidate the ChartCanvas window appropriately
 //    In non-follow mode, invalidate the rectangles containing the AIS targets and the ownship, etc...
 //    In follow mode, if there has already been a full screen refresh, there is no need to check ownship or AIS,
 //       since they will be always drawn on the full screen paint.
-    if( ( !cc1->m_bFollow ) || g_bCourseUp ) {
-        cc1->UpdateShips();
-        cc1->UpdateAIS();
-        cc1->UpdateAlerts();
-    } else {
-        if( !bnew_view )                    // There has not been a Refresh() yet.....
-        {
+        
+        if( ( !cc1->m_bFollow ) || g_bCourseUp ) {
+            cc1->UpdateShips();
             cc1->UpdateAIS();
             cc1->UpdateAlerts();
+        } else {
+            if( !bnew_view )                    // There has not been a Refresh() yet.....
+            {
+                cc1->UpdateAIS();
+                cc1->UpdateAlerts();
+            }
         }
     }
 
@@ -5554,30 +5568,29 @@ void MyFrame::UpdateGPSCompassStatusBox( bool b_force_new )
         
         tentative_rect = wxRect( tentative_pt_in_screen.x, tentative_pt_in_screen.y, size_x, size_y );
 
-    }
-
-    //  If the toolbar location has changed, or the proposed compassDialog location has changed
-    if( (g_FloatingToolbarDialog->GetScreenRect() != g_last_tb_rect) ||
-        (tentative_rect != g_FloatingCompassDialog->GetScreenRect()) ) {
+        //  If the toolbar location has changed, or the proposed compassDialog location has changed
+        if( (g_FloatingToolbarDialog->GetScreenRect() != g_last_tb_rect) ||
+            (tentative_rect != g_FloatingCompassDialog->GetScreenRect()) ) {
     
-        wxRect tb_rect = g_FloatingToolbarDialog->GetScreenRect();
+            wxRect tb_rect = g_FloatingToolbarDialog->GetScreenRect();
     
-        //    if they would not intersect, go ahead and move it to the upper right
-        //      Else it has to be on lower right
-        if( !tb_rect.Intersects( tentative_rect ) ) {
-            g_FloatingCompassDialog->Move( tentative_pt_in_screen );
-        }
-        else {
-            wxPoint posn_in_canvas =
-                wxPoint( cc1->GetSize().x - size_x - x_offset - cc1_edge_comp,
-                    cc1->GetSize().y - ( size_y + y_offset + cc1_edge_comp ) );
-            g_FloatingCompassDialog->Move( cc1->ClientToScreen( posn_in_canvas ) );
-        }
-
-        b_update = true;
+            //    if they would not intersect, go ahead and move it to the upper right
+            //      Else it has to be on lower right
+            if( !tb_rect.Intersects( tentative_rect ) ) {
+                g_FloatingCompassDialog->Move( tentative_pt_in_screen );
+            }
+            else {
+                wxPoint posn_in_canvas =
+                    wxPoint( cc1->GetSize().x - size_x - x_offset - cc1_edge_comp,
+                             cc1->GetSize().y - ( size_y + y_offset + cc1_edge_comp ) );
+                g_FloatingCompassDialog->Move( cc1->ClientToScreen( posn_in_canvas ) );
+            }
+            
+            b_update = true;
         
-        g_last_tb_rect = tb_rect;
+            g_last_tb_rect = tb_rect;
         
+        }
     }
 
     if( g_FloatingCompassDialog && g_FloatingCompassDialog->IsShown()) {
@@ -6287,7 +6300,7 @@ bool MyFrame::DoChartUpdate( void )
 
 //    If the current viewpoint is invalid, set the default scale to something reasonable.
         double set_scale = cc1->GetVPScale();
-        if( !cc1->GetVP().IsValid() ) set_scale = 1. / 200000.;
+        if( !cc1->GetVP().IsValid() ) set_scale = 1. / 20000.;
 
         bNewView |= cc1->SetViewPoint( tLat, tLon, set_scale, 0, cc1->GetVPRotation() );
 
@@ -6402,7 +6415,7 @@ bool MyFrame::DoChartUpdate( void )
 
 //    If the current viewpoint is invalid, set the default scale to something reasonable.
             if( !cc1->GetVP().IsValid() )
-                set_scale = 1. / 200000.;
+                set_scale = 1. / 20000.;
             else {                                    // otherwise, match scale if elected.
                 double proposed_scale_onscreen;
 
@@ -6469,6 +6482,13 @@ bool MyFrame::DoChartUpdate( void )
     //  If we need a Refresh(), do it here...
     //  But don't duplicate a Refresh() done by SetViewPoint()
     if( bNewChart && !bNewView ) cc1->Refresh( false );
+
+#ifdef ocpnUSE_GL
+    // If a new chart, need to invalidate gl viewport for refresh
+    // so the fbo gets flushed
+    if(g_bopengl & bNewChart)
+        cc1->GetglCanvas()->Invalidate();
+#endif
 
     return bNewChart | bNewView;
 }
@@ -7141,7 +7161,7 @@ void MyFrame::OnEvtOCPN_NMEA( OCPN_DataStreamEvent & event )
 
     if( event.GetStream() )
     {
-        if(!event.GetStream()->ChecksumOK(str_buf) )
+        if(!event.GetStream()->ChecksumOK(event.GetNMEAString()) )
         {
             if( g_nNMEADebug && ( g_total_NMEAerror_messages < g_nNMEADebug ) )
             {
@@ -8259,6 +8279,8 @@ wxArrayString *EnumerateSerialPorts( void )
         preturn->Add( _T("/dev/ttyS1"));
         preturn->Add( _T("/dev/ttyUSB0"));
         preturn->Add( _T("/dev/ttyUSB1"));
+        preturn->Add( _T("/dev/ttyACM0"));
+        preturn->Add( _T("/dev/ttyACM1"));
     }
 
 //    Clean up the temporary files created by helper.
@@ -8542,25 +8564,42 @@ bool CheckSerialAccess( void )
 #endif
 
     //  Who owns /dev/ttyS0?
+    bret = false;
     
     wxArrayString result1;
     wxExecute(_T("stat -c %G /dev/ttyS0"), result1);
-    
-    wxString group = result1[0];
-    
+    if(!result1.size())
+        wxExecute(_T("stat -c %G /dev/ttyUSB0"), result1);
+
+    if(!result1.size())
+        wxExecute(_T("stat -c %G /dev/ttyACM0"), result1);
+
+    wxString msg1 = _("OpenCPN requires access to serial ports to use serial NMEA data.\n");
+    if(!result1.size()) {
+        wxString msg = msg1 + _("No Serial Ports can be found on this system.\n\
+You must install a serial port (modprobe correct kernel module) or plug in a usb serial device.\n");
+            
+        OCPNMessageBox ( NULL, msg, wxString( _("OpenCPN Info") ), wxICON_INFORMATION | wxOK, 30 );
+        return false;
+    }
+
     //  Is the current user in this group?
-    wxString user = wxGetUserId();
+    wxString user = wxGetUserId(), group = result1[0];
+
     wxArrayString result2;
     wxExecute(_T("groups ") + user, result2);
     
-    wxString user_groups = result2[0];
+    if(result2.size()) {
+        wxString user_groups = result2[0];
 
-    if(user_groups.Find(group) == wxNOT_FOUND)
-        bret = false;
+        if(user_groups.Find(group) != wxNOT_FOUND)
+            bret = true;
+    }
  
     if(!bret){
-        wxString msg = _("OpenCPN requires access to serial ports to use serial NMEA data.\n\
-You currently do not have permission to access the serial ports on this system.\n\n\
+
+        wxString msg = msg1 + _("\
+You do currently not have permission to access the serial ports on this system.\n\n\
 It is suggested that you exit OpenCPN now,\n\
 and add yourself to the correct group to enable serial port access.\n\n\
 You may do so by executing the following command from the linux command line:\n\n\
