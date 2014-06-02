@@ -1531,6 +1531,11 @@ int MyConfig::LoadMyConfig( int iteration )
     for (size_t i = 0; i < confs.Count(); i++)
     {
         ConnectionParams * prm = new ConnectionParams(confs[i]);
+        if (!prm->Valid) {
+            wxLogMessage( _T( "Skipped invalid DataStream config") );
+            delete prm;
+            continue;
+        }
         g_pConnectionParams->Add(prm);
     }
 
@@ -1653,12 +1658,12 @@ int MyConfig::LoadMyConfig( int iteration )
                 prm->Port = port;
                 prm->OutputSentenceListType = WHITELIST;
                 prm->OutputSentenceList.Add( _T("RMB") );
-                prm->Output = true;
+                prm->IOSelect = DS_TYPE_INPUT_OUTPUT;
 
                 g_pConnectionParams->Add(prm);
             }
             else {                                  // port was found, so make sure it is set for output
-                cp->Output = true;
+                cp->IOSelect = DS_TYPE_INPUT_OUTPUT;
                 cp->OutputSentenceListType = WHITELIST;
                 cp->OutputSentenceList.Add( _T("RMB") );
             }
@@ -1947,7 +1952,7 @@ int MyConfig::LoadMyConfig( int iteration )
     Read( _T ( "NavObjectFileName" ), m_sNavObjSetFile );
 
     Read( _T ( "RouteLineWidth" ), &g_route_line_width, 2 );
-    Read( _T ( "TrackLineWidth" ), &g_track_line_width, 3 );
+    Read( _T ( "TrackLineWidth" ), &g_track_line_width, 2 );
     Read( _T ( "CurrentArrowScale" ), &g_current_arrow_scale, 100 );
     Read( _T ( "DefaultWPIcon" ), &g_default_wp_icon, _T("triangle") );
 
@@ -2660,7 +2665,9 @@ void MyConfig::UpdateNavObj( void )
 
     delete pNavObjectSet;
 
-    wxRemoveFile( m_sNavObjSetChangesFile );
+    if( ::wxFileExists( m_sNavObjSetChangesFile ) )
+        wxRemoveFile( m_sNavObjSetChangesFile );
+    
     delete m_pNavObjectChangesSet;
     m_pNavObjectChangesSet = new NavObjectChanges();
 
