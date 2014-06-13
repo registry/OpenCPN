@@ -582,6 +582,7 @@ int                       g_AisTargetList_sortColumn;
 bool                      g_bAisTargetList_sortReverse;
 wxString                  g_AisTargetList_column_spec;
 int                       g_AisTargetList_count;
+bool                      g_bAisTargetList_autosort;
 
 bool                      g_bGarminHostUpload;
 
@@ -1749,18 +1750,32 @@ if( 0 == g_memCacheLimit )
 
     //  Check the global Tide/Current data source array
     //  If empty, preset one default (US) Ascii data source
+    wxString default_tcdata =  ( g_SData_Locn + _T("tcdata") +
+             wxFileName::GetPathSeparator() + _T("HARMONIC.IDX"));
+    wxFileName fdefault( default_tcdata );
+    
     if(!TideCurrentDataSet.GetCount()) {
-        wxString default_tcdata =  ( g_SData_Locn + _T("tcdata") +
-            wxFileName::GetPathSeparator() +
-            _T("HARMONIC.IDX"));
-
         if( g_bportable ) {
-            wxFileName f( default_tcdata );
-            f.MakeRelativeTo( g_PrivateDataDir );
-            TideCurrentDataSet.Add( f.GetFullPath() );
+            fdefault.MakeRelativeTo( g_PrivateDataDir );
+            TideCurrentDataSet.Add( fdefault.GetFullPath() );
         }
         else
             TideCurrentDataSet.Add( default_tcdata );
+    }
+    else {
+        wxString first_tide = TideCurrentDataSet.Item(0);
+        wxFileName ft(first_tide);
+        if(!ft.FileExists()){
+            TideCurrentDataSet.RemoveAt(0);
+            TideCurrentDataSet.Insert( default_tcdata, 0 );
+        }
+        else {
+            wxString first_path(ft.GetPath());
+            if(fdefault.GetPath() != first_path){
+                TideCurrentDataSet.RemoveAt(0);
+                TideCurrentDataSet.Insert( default_tcdata, 0 );
+            }
+        }
     }
 
 
@@ -3222,7 +3237,8 @@ void MyFrame::OnCloseWindow( wxCloseEvent& event )
     }
 
     FrameTimer1.Stop();
-
+    FrameCOGTimer.Stop();
+    
     g_bframemax = IsMaximized();
 
     //    Record the current state of tracking
@@ -3555,13 +3571,13 @@ void MyFrame::OnToolLeftClick( wxCommandEvent& event )
             break;
 
         case ID_ZOOMIN: {
-            cc1->DoZoomCanvas( 2.0 );
+            cc1->DoZoomCanvas( 2.0, false );
             DoChartUpdate();
             break;
         }
 
         case ID_ZOOMOUT: {
-            cc1->DoZoomCanvas( 0.5 );
+            cc1->DoZoomCanvas( 0.5, false );
             DoChartUpdate();
             break;
         }
@@ -5558,15 +5574,19 @@ void MyFrame::DoCOGSet( void )
     if( !g_bCourseUp )
         return;
  
+    if(!cc1)
+        return;
+    
     double old_VPRotate = g_VPRotate;
     g_VPRotate = -g_COGAvg * PI / 180.;
     if(!g_bskew_comp)
         g_VPRotate += cc1->GetVPSkew();
 
-    if( cc1 ) cc1->SetVPRotation( g_VPRotate );
+    cc1->SetVPRotation( g_VPRotate );
     bool bnew_chart = DoChartUpdate();
 
-    if( ( bnew_chart ) || ( old_VPRotate != g_VPRotate ) ) if( cc1 ) cc1->ReloadVP();
+    if( ( bnew_chart ) || ( old_VPRotate != g_VPRotate ) )
+        cc1->ReloadVP();
 }
 
 void RenderShadowText( wxDC *pdc, wxFont *pFont, wxString& str, int x, int y )
