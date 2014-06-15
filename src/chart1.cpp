@@ -38,6 +38,10 @@
 #include "CrashRpt.h"
 #endif
 
+#ifdef LINUX_CRASHRPT
+#include "crashprint.h"
+#endif
+
 #include "wx/print.h"
 #include "wx/printdlg.h"
 #include "wx/artprov.h"
@@ -641,6 +645,10 @@ wxString g_config_version_string;
 bool             g_btouch;
 bool             g_bresponsive;
 
+#ifdef LINUX_CRASHRPT
+wxCrashPrint g_crashprint;
+#endif
+
 #ifndef __WXMSW__
 sigjmp_buf env;                    // the context saved by sigsetjmp();
 #endif
@@ -998,6 +1006,11 @@ bool MyApp::OnInit()
 #endif
 #endif
 
+#ifdef LINUX_CRASHRPT
+    // fatal exceptions handling
+    wxHandleFatalExceptions (true);
+#endif
+
     //  Seed the random number generator
     wxDateTime x = wxDateTime::UNow();
     long seed = x.GetMillisecond();
@@ -1133,6 +1146,10 @@ bool MyApp::OnInit()
 
 //      Establish a "home" location
     wxStandardPaths& std_path = *dynamic_cast<wxStandardPaths*>(&wxApp::GetTraits()->GetStandardPaths());
+    
+    //TODO  Why is the following preferred?  Will not compile with gcc...
+//    wxStandardPaths& std_path = wxApp::GetTraits()->GetStandardPaths();
+    
 #ifdef __WXGTK__
     std_path.SetInstallPrefix(wxString(PREFIX, wxConvUTF8));
 #endif
@@ -2256,7 +2273,7 @@ if( 0 == g_memCacheLimit )
     
     if ( g_start_fullscreen )
         gFrame->ToggleFullScreen();
-    
+
     return TRUE;
 }
 
@@ -2386,6 +2403,12 @@ int MyApp::OnExit()
 
     return TRUE;
 }
+
+#ifdef LINUX_CRASHRPT
+void MyApp::OnFatalException () {
+    g_crashprint.Report();
+}
+#endif
 
 void MyApp::TrackOff( void )
 {

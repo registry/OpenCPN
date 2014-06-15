@@ -326,6 +326,11 @@ extern bool             g_bresponsive;
 extern ocpnGLOptions g_GLOptions;
 #endif
 
+#if !defined(NAN)
+static const long long lNaN = 0xfff8000000000000;
+#define NAN (*(double*)&lNaN)
+#endif
+
 //---------------------------------------------------------------------------------
 //    Track Implementation
 //---------------------------------------------------------------------------------
@@ -2026,7 +2031,7 @@ bool MyConfig::LoadLayers(wxString &path)
                         l->m_NoOfItems += nItems;
 
                         wxString objmsg;
-                        objmsg.Printf( wxT("Loaded GPX file %s with %d items."), file_path.c_str(), nItems );
+                        objmsg.Printf( wxT("Loaded GPX file %s with %ld items."), file_path.c_str(), nItems );
                         wxLogMessage( objmsg );
 
                         delete pSet;
@@ -3943,7 +3948,7 @@ bool LogMessageOnce(const wxString &msg)
 /**************************************************************************/
 double toUsrDistance( double nm_distance, int unit  )
 {
-    double ret;
+    double ret = NAN;
     if ( unit == -1 )
         unit = g_iDistanceFormat;
     switch( unit ){
@@ -3980,7 +3985,7 @@ double toUsrDistance( double nm_distance, int unit  )
 /**************************************************************************/
 double fromUsrDistance( double usr_distance, int unit )
 {
-    double ret;
+    double ret = NAN;
     if ( unit == -1 )
         unit = g_iDistanceFormat;
     switch( unit ){
@@ -4042,7 +4047,7 @@ wxString getUsrDistanceUnit( int unit )
 /**************************************************************************/
 double toUsrSpeed( double kts_speed, int unit )
 {
-    double ret;
+    double ret = NAN;
     if ( unit == -1 )
         unit = g_iSpeedFormat;
     switch( unit )
@@ -4068,7 +4073,7 @@ double toUsrSpeed( double kts_speed, int unit )
 /**************************************************************************/
 double fromUsrSpeed( double usr_speed, int unit )
 {
-    double ret;
+    double ret = NAN;
     if ( unit == -1 )
         unit = g_iSpeedFormat;
     switch( unit )

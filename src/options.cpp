@@ -264,6 +264,8 @@ BEGIN_EVENT_TABLE( options, wxDialog )
     EVT_BUTTON( xID_OK, options::OnXidOkClick )
     EVT_BUTTON( wxID_CANCEL, options::OnCancelClick )
     EVT_BUTTON( ID_BUTTONFONTCHOOSE, options::OnChooseFont )
+    EVT_CLOSE( options::OnClose)
+    
 #ifdef __WXGTK__
     EVT_BUTTON( ID_BUTTONFONTCOLOR, options::OnChooseFontColor )
 #endif
@@ -2828,7 +2830,7 @@ void options::OnApplyClick( wxCommandEvent& event )
     //  If the stream selected exists, capture some of its existing parameters
     //  to facility identification and allow stop and restart of the stream
     wxString lastAddr;
-    int lastPort;
+    int lastPort = 0;
     if(itemIndex >=0){
         int params_index = m_lcSources->GetItemData( itemIndex );
         ConnectionParams *cpo = g_pConnectionParams->Item(params_index);
@@ -3153,6 +3155,27 @@ void options::OnCancelClick( wxCommandEvent& event )
     lastWindowSize = GetSize();
     EndModal(0);
 }
+
+void options::OnClose( wxCloseEvent& event )
+{
+    //      PlugIns may have added panels
+    if( g_pi_manager )
+        g_pi_manager->CloseAllPlugInPanels( (int) wxOK );
+    
+    //  Required to avoid intermittent crash on wxGTK
+    if(m_groupsPage)
+        m_groupsPage->Disconnect( wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGED, wxListbookEventHandler( options::OnChartsPageChange ), NULL, this );
+    
+    m_pListbook->ChangeSelection(0);
+    delete pActiveChartsList;
+    delete ps57CtlListBox;
+    
+    lastWindowPos = GetPosition();
+    lastWindowSize = GetSize();
+    
+    EndModal(0);
+}
+
 
 void options::OnChooseFont( wxCommandEvent& event )
 {
