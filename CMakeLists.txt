@@ -582,9 +582,11 @@ SET(SRC_TINYXML
 IF(OPENGL_GLU_FOUND)
   SET(HDRS ${HDRS} include/glChartCanvas.h
                    include/glTextureDescriptor.h
+                   include/glTexCache.h
         )
   SET(SRCS ${SRCS} src/glChartCanvas.cpp
                    src/glTextureDescriptor.cpp
+                   src/glTexCache.cpp
         )
 ENDIF(OPENGL_GLU_FOUND)
 
@@ -789,7 +791,15 @@ IF (OPENGL_GLU_FOUND)
         # use standard optimizations for other architectures
         set_property(TARGET TEXCMP PROPERTY COMPILE_FLAGS "-O3")
       ENDIF ()
-  ENDIF ()
+  ELSE (NOT MSVC)
+        # try to use sse on x86 based systems
+      IF ( ARCH MATCHES "i386" OR ARCH MATCHES "amd64" OR ARCH MATCHES "x86_64")
+        # using sse which makes the compression run about 50% faster
+        message (STATUS "Compiling texture compression library with sse support")
+        set_property(TARGET TEXCMP PROPERTY COMPILE_FLAGS "/O2 /arch:SSE2 -DSQUISH_USE_SSE=2")
+      ENDIF ()
+  ENDIF (NOT MSVC)
+  
 ENDIF (OPENGL_GLU_FOUND)
 
 #TODO
