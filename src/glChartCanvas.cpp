@@ -115,6 +115,9 @@ extern bool             b_inCompressAllCharts;
 
 ocpnGLOptions g_GLOptions;
 
+//    For VBO(s)
+bool         g_b_EnableVBO;
+
 
 PFNGLGENFRAMEBUFFERSEXTPROC         s_glGenFramebuffers;
 PFNGLGENRENDERBUFFERSEXTPROC        s_glGenRenderbuffers;
@@ -131,6 +134,12 @@ PFNGLGENERATEMIPMAPEXTPROC          s_glGenerateMipmap;
 
 PFNGLCOMPRESSEDTEXIMAGE2DPROC s_glCompressedTexImage2D;
 PFNGLGETCOMPRESSEDTEXIMAGEPROC s_glGetCompressedTexImage;
+
+//      Vertex Buffer Object (VBO) support
+PFNGLGENBUFFERSPROC                 s_glGenBuffers;
+PFNGLBINDBUFFERPROC                 s_glBindBuffer;
+PFNGLBUFFERDATAPROC                 s_glBufferData;
+PFNGLDELETEBUFFERSPROC              s_glDeleteBuffers;
 
 #include <wx/arrimpl.cpp>
 //WX_DEFINE_OBJARRAY( ArrayOfTexDescriptors );
@@ -427,6 +436,9 @@ void BuildCompressedCache()
         msg.Printf( _("Distance from Ownship:  %4.0f NMi      Chart: "), distance);
         msg += pchart->GetFullPath();
         
+        pprog->Update(count-1, _T("0000/0000 \n") + msg, &skip );
+        if(skip)
+            break;
 
         if(ramonly) {
             int t = 0;
@@ -576,6 +588,17 @@ static void GetglEntryPoints( void )
             ocpnGetProcAddress( "glDeleteRenderbuffers", extensions[i]);
         s_glGenerateMipmap = (PFNGLGENERATEMIPMAPEXTPROC)
             ocpnGetProcAddress( "glGenerateMipmap", extensions[i]);
+            
+        //VBO
+        s_glGenBuffers = (PFNGLGENBUFFERSPROC)
+            ocpnGetProcAddress( "glGenBuffers", extensions[i]);
+        s_glBindBuffer = (PFNGLBINDBUFFERPROC)
+            ocpnGetProcAddress( "glBindBuffer", extensions[i]);
+        s_glBufferData = (PFNGLBUFFERDATAPROC)
+            ocpnGetProcAddress( "glBufferData", extensions[i]);
+        s_glDeleteBuffers = (PFNGLDELETEBUFFERSPROC)
+            ocpnGetProcAddress( "glDeleteBuffers", extensions[i]);
+            
     }
 
     for(i=0; i<(sizeof extensions) / (sizeof *extensions); i++) {
@@ -811,6 +834,16 @@ void glChartCanvas::SetupOpenGL()
         !s_glDeleteRenderbuffers )
         m_b_DisableFBO = true;
 
+    g_b_EnableVBO = true;
+    if( !s_glBindBuffer || !s_glBufferData || !s_glGenBuffers || !s_glDeleteBuffers )
+        g_b_EnableVBO = false;
+
+    if(g_b_EnableVBO)
+        wxLogMessage( _T("OpenGL-> Using Vetexbuffer Objects") );
+    else
+        wxLogMessage( _T("OpenGL-> Vertexbuffer Objects unavailable") );
+    
+    
     //      Can we use the stencil buffer in a FBO?
 #ifdef ocpnUSE_GLES /* gles requires all levels */
     m_b_useFBOStencil = QueryExtension( "GL_OES_packed_depth_stencil" );
@@ -2592,9 +2625,14 @@ void glChartCanvas::Render()
             bool accelerated_pan = false;
             if(g_GLOptions.m_bUseAcceleratedPanning && m_cache_vp.IsValid()
                // only works for mercator without rotation
-                && VPoint.m_projection_type == PROJECTION_MERCATOR &&
-               (fabs( VPoint.rotation ) == 0.0 &&
-                (!g_bskew_comp || fabs( VPoint.skew ) == 0.0 ))) {
+               && VPoint.m_projection_type == PROJECTION_MERCATOR
+               && fabs( VPoint.rotation ) == 0.0
+               // since single chart mode for raster charts uses the chart coordinates,
+               // we can't use the viewport to compute then panning offsets.
+               // For now, just don't do hardware accelerated panning,
+               // (fortunately this case is least in need of it)
+               && (!Current_Ch || ( Current_Ch->GetChartFamily() != CHART_FAMILY_RASTER))
+               /* && (!g_bskew_comp || fabs( VPoint.skew ) == 0.0 )*/) {
                     wxPoint c_old = VPoint.GetPixFromLL( VPoint.clat, VPoint.clon );
                     wxPoint c_new = m_cache_vp.GetPixFromLL( VPoint.clat, VPoint.clon );
 

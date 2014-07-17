@@ -164,6 +164,8 @@ S57Obj::S57Obj()
     y_rate = 1.0;
     x_origin = 0.0;
     y_origin = 0.0;
+    
+    Parm0 = 0;
 }
 
 //----------------------------------------------------------------------------------
@@ -208,6 +210,7 @@ S57Obj::S57Obj( char *first_line, wxInputStream *pfpx, double dummy, double dumm
     att_array = NULL;
     attVal = NULL;
     n_attr = 0;
+    Parm0 = 0;
     
     pPolyTessGeo = NULL;
     pPolyTrapGeo = NULL;
@@ -1298,6 +1301,9 @@ void s57chart::SetVPParms( const ViewPort &vpt )
     m_view_scale_ppm = vpt.view_scale_ppm;
 
     toSM( vpt.clat, vpt.clon, ref_lat, ref_lon, &m_easting_vp_center, &m_northing_vp_center );
+    
+    vp_transform.easting_vp_center = m_easting_vp_center;
+    vp_transform.northing_vp_center = m_northing_vp_center;
 }
 
 bool s57chart::AdjustVP( ViewPort &vp_last, ViewPort &vp_proposed )
@@ -1585,8 +1591,14 @@ bool s57chart::DoRenderRegionViewOnGL( const wxGLContext &glc, const ViewPort& V
                     (ViewPort *) &VPoint );
 
             if( temp_lon_right < temp_lon_left )        // presumably crossing Greenwich
-            temp_lon_right += 360.;
-
+                temp_lon_right += 360.;
+            else if(temp_vp.GetBBox().GetMaxX() > 360){
+                if(temp_lon_left < 180.) {
+                    temp_lon_left += 360.;
+                    temp_lon_right += 360.;
+                }
+            }
+            
             temp_vp.GetBBox().SetMin( temp_lon_left, temp_lat_bot );
             temp_vp.GetBBox().SetMax( temp_lon_right, temp_lat_top );
 
@@ -1621,8 +1633,14 @@ bool s57chart::DoRenderRegionViewOnGL( const wxGLContext &glc, const ViewPort& V
                 (ViewPort *) &VPoint );
 
         if( temp_lon_right < temp_lon_left )        // presumably crossing Greenwich
-        temp_lon_right += 360.;
-
+            temp_lon_right += 360.;
+        else if(temp_vp.GetBBox().GetMaxX() > 360){
+            if(temp_lon_left < 180.) {
+                temp_lon_left += 360.;
+                temp_lon_right += 360.;
+            }
+        }
+        
         temp_vp.GetBBox().SetMin( temp_lon_left, temp_lat_bot );
         temp_vp.GetBBox().SetMax( temp_lon_right, temp_lat_top );
 
@@ -1666,6 +1684,7 @@ bool s57chart::DoRenderRectOnGL( const wxGLContext &glc, const ViewPort& VPoint,
         while( top != NULL ) {
             crnt = top;
             top = top->next;               // next object
+            crnt->sm_transform_parms = &vp_transform;
             ps52plib->RenderAreaToGL( glc, crnt, &tvp, rect );
         }
     }
@@ -1678,6 +1697,7 @@ bool s57chart::DoRenderRectOnGL( const wxGLContext &glc, const ViewPort& VPoint,
         while( top != NULL ) {
             crnt = top;
             top = top->next;               // next object
+            crnt->sm_transform_parms = &vp_transform;
             ps52plib->RenderObjectToGL( glc, crnt, &tvp, rect );
         }
 
@@ -1685,6 +1705,7 @@ bool s57chart::DoRenderRectOnGL( const wxGLContext &glc, const ViewPort& VPoint,
         while( top != NULL ) {
             ObjRazRules *crnt = top;
             top = top->next;
+            crnt->sm_transform_parms = &vp_transform;
             ps52plib->RenderObjectToGL( glc, crnt, &tvp, rect );
         }
 
@@ -1695,6 +1716,7 @@ bool s57chart::DoRenderRectOnGL( const wxGLContext &glc, const ViewPort& VPoint,
         while( top != NULL ) {
             crnt = top;
             top = top->next;
+            crnt->sm_transform_parms = &vp_transform;
             ps52plib->RenderObjectToGL( glc, crnt, &tvp, rect );
         }
 
@@ -2110,6 +2132,7 @@ int s57chart::DCRenderRect( wxMemoryDC& dcinput, const ViewPort& vp, wxRect* rec
         while( top != NULL ) {
             crnt = top;
             top = top->next;               // next object
+            crnt->sm_transform_parms = &vp_transform;
             ps52plib->RenderAreaToDC( &dcinput, crnt, &tvp, &pb_spec );
         }
     }
@@ -2171,6 +2194,7 @@ bool s57chart::DCRenderLPB( wxMemoryDC& dcinput, const ViewPort& vp, wxRect* rec
         while( top != NULL ) {
             crnt = top;
             top = top->next;               // next object
+            crnt->sm_transform_parms = &vp_transform;
             ps52plib->RenderObjectToDC( &dcinput, crnt, &tvp );
         }
 
@@ -2178,6 +2202,7 @@ bool s57chart::DCRenderLPB( wxMemoryDC& dcinput, const ViewPort& vp, wxRect* rec
         while( top != NULL ) {
             ObjRazRules *crnt = top;
             top = top->next;
+            crnt->sm_transform_parms = &vp_transform;
             ps52plib->RenderObjectToDC( &dcinput, crnt, &tvp );
         }
 
@@ -2188,6 +2213,7 @@ bool s57chart::DCRenderLPB( wxMemoryDC& dcinput, const ViewPort& vp, wxRect* rec
         while( top != NULL ) {
             crnt = top;
             top = top->next;
+            crnt->sm_transform_parms = &vp_transform;
             ps52plib->RenderObjectToDC( &dcinput, crnt, &tvp );
         }
 
@@ -4464,17 +4490,19 @@ void s57chart::ResetPointBBoxes( const ViewPort &vp_last, const ViewPort &vp_thi
                         double minx = top->obj->BBObj.GetMinX();
                         double maxx = top->obj->BBObj.GetMaxX();
 
+                        //      Not sure what problems these longitude adjustments are trying to fix
+                        //      but certainly breaks point object display in western hemisphere S57 ENCs
                         if(lon - minx > 180) {
-                            minx += 360;
-                            maxx += 360;
+//                            minx += 360;
+//                            maxx += 360;
                         }
 
                         double lon1 = (lon - minx) * d;
                         double lon2 = (lon - maxx) * d;
                         
                         if(lon - lon1 < 0) {
-                            lon1 -= 360;
-                            lon2 -= 360;
+//                            lon1 -= 360;
+//                            lon2 -= 360;
                         }
 
                         top->obj->BBObj.SetMin( lon - lon1, lat - lat1 );
@@ -5367,6 +5395,8 @@ bool s57chart::DoesLatLonSelectObject( float lat, float lon, float select_radius
         //  For single Point objects, the integral object bounding box contains the lat/lon of the object,
         //  possibly expanded by text or symbol rendering
         case GEO_POINT: {
+            if( !obj->bBBObj_valid ) return false;
+            
             if( 1 == obj->npt ) {
                 //  Special case for LIGHTS
                 //  Sector lights have had their BBObj expanded to include the entire drawn sector
