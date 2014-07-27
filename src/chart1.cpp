@@ -252,7 +252,7 @@ wxArrayOfConnPrm          *g_pConnectionParams;
 
 wxDateTime                g_start_time;
 wxDateTime                g_loglast_time;
-OCPN_Sound                bells_sound[8];
+OCPN_Sound                bells_sound[2];
 
 OCPN_Sound                g_anchorwatch_sound;
 
@@ -522,6 +522,7 @@ bool                      g_bEnableZoomToCursor;
 
 bool                      g_bTrackActive;
 bool                      g_bTrackCarryOver;
+bool                      g_bDeferredStartTrack;
 bool                      g_bTrackDaily;
 bool                      g_bHighliteTracks;
 int                       g_route_line_width;
@@ -626,12 +627,7 @@ int                       g_GPU_MemSize;
 bool                      g_bserial_access_checked;
 
 
-char bells_sound_file_name[8][12] =    // pjotrc 2010.02.09
-
-        { "1bells.wav", "2bells.wav", "3bells.wav", "4bells.wav", "5bells.wav", "6bells.wav",
-                "7bells.wav", "8bells.wav"   // pjotrc 2010.02.09
-
-        };
+char bells_sound_file_name[2][12] = { "1bells.wav", "2bells.wav" };
 
 int                       portaudio_initialized;
 
@@ -2201,8 +2197,8 @@ extern ocpnGLOptions g_GLOptions;
     g_bVAR_Rx = false;
 
 //  Start up a new track if enabled in config file
-//        test this
-    if( g_bTrackCarryOver ) gFrame->TrackOn();
+    if( g_bTrackCarryOver )
+        g_bDeferredStartTrack = true;
 
 //    Re-enable anchor watches if set in config file
     if( !g_AW1GUID.IsEmpty() ) {
@@ -2477,6 +2473,7 @@ EVT_TIMER(FRAME_TIMER_1, MyFrame::OnFrameTimer1)
 EVT_TIMER(FRAME_TC_TIMER, MyFrame::OnFrameTCTimer)
 EVT_TIMER(FRAME_COG_TIMER, MyFrame::OnFrameCOGTimer)
 EVT_TIMER(MEMORY_FOOTPRINT_TIMER, MyFrame::OnMemFootTimer)
+EVT_TIMER(BELLS_TIMER, MyFrame::OnBellsTimer)
 EVT_ACTIVATE(MyFrame::OnActivate)
 EVT_MAXIMIZE(MyFrame::OnMaximize)
 EVT_COMMAND(wxID_ANY, wxEVT_COMMAND_TOOL_RCLICKED, MyFrame::RequestNewToolbarArgEvent)
@@ -2506,6 +2503,9 @@ MyFrame::MyFrame( wxFrame *frame, const wxString& title, const wxPoint& pos, con
 
     //      Redirect the Memory Footprint Management timer to this frame
     MemFootTimer.SetOwner( this, MEMORY_FOOTPRINT_TIMER );
+
+    //      Redirect the Bells timer to this frame
+    BellsTimer.SetOwner( this, BELLS_TIMER );
 
     //      Set up some assorted member variables
     nRoute_State = 0;
@@ -3965,8 +3965,11 @@ void MyFrame::TrackOn( void )
     g_pActiveTrack = new Track();
 
     pRouteList->Append( g_pActiveTrack );
+    if(pConfig)
+        pConfig->AddNewRoute( g_pActiveTrack, 0 );
+    
     g_pActiveTrack->Start();
-
+    
     if( g_toolbar )
         g_toolbar->ToggleTool( ID_TRACK, g_bTrackActive );
 
@@ -5115,6 +5118,37 @@ void MyFrame::OnMemFootTimer( wxTimerEvent& event )
     MemFootTimer.Start( 9000, wxTIMER_CONTINUOUS );
 }
 
+// play an arbitrary number of bells by using 1 and 2 bell sounds
+void MyFrame::OnBellsTimer(wxTimerEvent& event)
+{
+    int bells = wxMin(m_BellsToPlay, 2);
+
+    if(bells <= 0)
+        return;
+
+    if( !bells_sound[bells - 1].IsOk() )            // load the bells sound
+    {
+        wxString soundfile = _T("sounds");
+        appendOSDirSlash( &soundfile );
+        soundfile += wxString( bells_sound_file_name[bells - 1], wxConvUTF8 );
+        soundfile.Prepend( g_SData_Locn );
+        bells_sound[bells - 1].Create( soundfile );
+        if( !bells_sound[bells - 1].IsOk() ) {
+            wxLogMessage( _T("Failed to load bells sound file: ") + soundfile );
+            return;
+        }
+
+        wxLogMessage( _T("Using bells sound file: ") + soundfile );
+    }
+
+    if(!bells_sound[bells - 1].IsPlaying()) {
+        bells_sound[bells - 1].Play();
+        m_BellsToPlay -= bells;
+    }
+
+    BellsTimer.Start(20, wxTIMER_ONE_SHOT);
+}
+
 int ut_index;
 
 void MyFrame::OnFrameTimer1( wxTimerEvent& event )
@@ -5219,6 +5253,20 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
 
     FrameTimer1.Stop();
 
+    //  If tracking carryover was found in config file, enable tracking as soon as
+    //  GPS become valid
+    if(g_bDeferredStartTrack){
+        if(!g_bTrackActive){
+            if(bGPSValid){
+                gFrame->TrackOn();
+                g_bDeferredStartTrack = false;
+            }
+        }
+        else {                                  // tracking has been manually activated
+            g_bDeferredStartTrack = false;
+        }            
+    }
+        
 //  Update and check watchdog timer for GPS data source
     gGPS_Watchdog--;
     if( gGPS_Watchdog <= 0 ) {
@@ -5377,18 +5425,8 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
             if( !bells ) bells = 8;     // 0 is 8 bells
 
             if( g_bPlayShipsBells && ( ( minute == 0 ) || ( minute == 30 ) ) ) {
-                if( !bells_sound[bells - 1].IsOk() )            // load the bells sound
-                {
-                    wxString soundfile = _T("sounds");
-                    appendOSDirSlash( &soundfile );
-                    soundfile += wxString( bells_sound_file_name[bells - 1], wxConvUTF8 );
-                    soundfile.Prepend( g_SData_Locn );
-                    bells_sound[bells - 1].Create( soundfile );
-                    wxLogMessage( _T("Using bells sound file: ") + soundfile );
-
-                }
-
-                if( bells_sound[bells - 1].IsOk() ) bells_sound[bells - 1].Play();
+                m_BellsToPlay = bells;
+                BellsTimer.Start(0, wxTIMER_ONE_SHOT);
             }
         }
     }

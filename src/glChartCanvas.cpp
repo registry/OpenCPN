@@ -48,6 +48,7 @@
 #include "TexFont.h"
 #include "glTexCache.h"
 #include "gshhs.h"
+#include "ais.h"
 
 #ifndef GL_ETC1_RGB8_OES
 #define GL_ETC1_RGB8_OES                                        0x8D64
@@ -791,6 +792,9 @@ void glChartCanvas::SetupOpenGL()
     if( GetRendererString().Find( _T("RADEON X600") ) != wxNOT_FOUND )
         s_b_useScissorTest = false;
 
+    if(s_b_useScissorTest && s_b_useStencil)
+        wxLogMessage( _T("OpenGL-> Using Scissor Clipping") );
+    
     //  This little hack fixes a problem seen with some Intel 945 graphics chips
     //  We need to not do anything that requires (some) complicated stencil operations.
     // TODO: arrange this to use stencil, but depth for s52plib and eliminate display list
@@ -846,7 +850,7 @@ void glChartCanvas::SetupOpenGL()
         g_b_EnableVBO = false;
 
     if(g_b_EnableVBO)
-        wxLogMessage( _T("OpenGL-> Using Vetexbuffer Objects") );
+        wxLogMessage( _T("OpenGL-> Using Vertexbuffer Objects") );
     else
         wxLogMessage( _T("OpenGL-> Vertexbuffer Objects unavailable") );
     
@@ -896,6 +900,9 @@ void glChartCanvas::SetupOpenGL()
     else
         wxLogMessage( _T("OpenGL-> Using Depth buffer clipping") );
 
+    if(s_b_useScissorTest && s_b_useStencil)
+        wxLogMessage( _T("OpenGL-> Using Scissor Clipping") );
+    
     /* we upload non-aligned memory */
     glPixelStorei( GL_UNPACK_ALIGNMENT, 1 );
 
@@ -1758,12 +1765,12 @@ void glChartCanvas::DrawFloatingOverlayObjects( ocpnDC &dc, OCPNRegion &region )
     }
 
     // all functions called with cc1-> are still slow because they go through ocpndc
-    cc1->AISDrawAreaNotices( dc );
+    AISDrawAreaNotices( dc );
     DrawEmboss(cc1->EmbossDepthScale() );
     DrawEmboss(cc1->EmbossOverzoomIndicator( dc ) );
 
     cc1->DrawAnchorWatchPoints( dc );
-    cc1->AISDraw( dc );
+    AISDraw( dc );
     ShipDraw( dc );
     cc1->AlertDraw( dc );
 
