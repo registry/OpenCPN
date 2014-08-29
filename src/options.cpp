@@ -4816,9 +4816,19 @@ void SentenceListDlg::OnOkClick( wxCommandEvent& event ) { event.Skip(); }
  
 //OpenGLOptionsDlg
 
-OpenGLOptionsDlg::OpenGLOptionsDlg( wxWindow* parent ) :
-    wxDialog( parent, wxID_ANY, _T("OpenGL Options"), wxDefaultPosition )
+OpenGLOptionsDlg::OpenGLOptionsDlg( wxWindow* parent )
 {
+    long style = wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER;
+#ifdef __WXOSX__
+    style |= wxSTAY_ON_TOP;
+#endif
+    
+    wxDialog::Create( parent, wxID_ANY, _T("OpenGL Options"), wxDefaultPosition, wxDefaultSize,
+                      style );
+    
+    wxFont *qFont = GetOCPNScaledFont(_("Dialog"), 10);
+    SetFont( *qFont );
+    
 #ifdef ocpnUSE_GL
     m_bSizer1 = new wxFlexGridSizer( 2 );
     this->SetSizeHints( wxDefaultSize, wxDefaultSize );
@@ -4848,7 +4858,7 @@ OpenGLOptionsDlg::OpenGLOptionsDlg( wxWindow* parent ) :
         /* disable caching if unsupported */
         extern PFNGLCOMPRESSEDTEXIMAGE2DPROC s_glCompressedTexImage2D;
         if(!s_glCompressedTexImage2D) {
-            g_GLOptions.m_bTextureCompressionCaching = false;
+            g_GLOptions.m_bTextureCompression = false;
             m_cbTextureCompressionCaching->Disable();
         }
         
@@ -4861,7 +4871,13 @@ OpenGLOptionsDlg::OpenGLOptionsDlg( wxWindow* parent ) :
     }
         
 
-    
+        /* disable caching if unsupported */
+    extern PFNGLCOMPRESSEDTEXIMAGE2DPROC s_glCompressedTexImage2D;
+    if(!s_glCompressedTexImage2D) {
+        g_GLOptions.m_bTextureCompressionCaching = false;
+        m_cbTextureCompression->Disable();
+    }
+        
  
     if(g_bexpert){
         wxStaticText* stTextureMemorySize =
@@ -4878,9 +4894,11 @@ OpenGLOptionsDlg::OpenGLOptionsDlg( wxWindow* parent ) :
     
     m_cbRebuildTextureCache = new wxCheckBox(this, wxID_ANY, _("Rebuild Texture Cache") );
     m_bSizer1->Add(m_cbRebuildTextureCache, 0, wxALL | wxEXPAND, 5);
+    m_cbRebuildTextureCache->Enable(g_GLOptions.m_bTextureCompressionCaching);
     
     m_cbClearTextureCache = new wxCheckBox(this, wxID_ANY, _("Clear Texture Cache") );
     m_bSizer1->Add(m_cbClearTextureCache, 0, wxALL | wxEXPAND, 5);
+    m_cbClearTextureCache->Enable(g_GLOptions.m_bTextureCompressionCaching);
     
     wxStdDialogButtonSizer * m_sdbSizer4 = new wxStdDialogButtonSizer();
     wxButton *bOK = new wxButton( this, wxID_OK );

@@ -861,7 +861,7 @@ void glChartCanvas::SetupOpenGL()
 
     bool bad_stencil_code = false;
     if( GetRendererString().Find( _T("Intel") ) != wxNOT_FOUND ) {
-        wxLogMessage( _T("OpenGL-> Detected Intel renderer, disabling complex stencil buffer") );
+        wxLogMessage( _T("OpenGL-> Detected Intel renderer, disabling stencil buffer") );
         bad_stencil_code = true;
     }
 
@@ -927,6 +927,11 @@ void glChartCanvas::SetupOpenGL()
     m_b_useFBOStencil = QueryExtension( "GL_EXT_packed_depth_stencil" ) == GL_TRUE;
 #endif
 
+    //  On Intel Graphics platforms, don't use stencil buffer at all
+    if( bad_stencil_code)    
+        s_b_useStencil = false;
+    
+    
     //      Maybe build FBO(s)
 
     BuildFBO();
@@ -956,7 +961,7 @@ void glChartCanvas::SetupOpenGL()
     if( m_b_BuiltFBO ) {
         wxLogMessage( _T("OpenGL-> Using Framebuffer Objects") );
 
-        if( m_b_useFBOStencil && s_b_useStencil)
+        if( m_b_useFBOStencil )
             wxLogMessage( _T("OpenGL-> Using FBO Stencil buffer") );
         else
             wxLogMessage( _T("OpenGL-> FBO Stencil buffer unavailable") );
@@ -1056,6 +1061,8 @@ void glChartCanvas::SetupCompression()
     } else
     if(!g_GLOptions.m_bTextureCompression) {
     no_compression:
+        g_GLOptions.m_bTextureCompression = false;
+        
         g_tile_size = g_uncompressed_tile_size;
         g_raster_format = GL_RGB;
         wxLogMessage( wxString::Format( _T("OpenGL-> Not Using compression")));
