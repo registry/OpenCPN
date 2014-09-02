@@ -266,7 +266,6 @@ s52plib::s52plib( const wxString& PLib, bool b_forceLegacy )
 
     HPGL = new RenderFromHPGL( this );
 
-    g_GLMinLineWidth = 0.;
 }
 
 s52plib::~s52plib()
@@ -374,10 +373,6 @@ void s52plib::DestroyRulesChain( Rules *top )
 
 void s52plib::SetGLRendererString(const wxString &renderer)
 {
-    //    Some GL renderers do a poor job of Anti-aliasing very narrow line widths.
-    //    Detect this case, and adjust the render parameters.
-
-    if( renderer.Upper().Find( _T("MESA") ) != wxNOT_FOUND ) g_GLMinLineWidth = 1.2f;
 }
 
 /*
@@ -2692,7 +2687,8 @@ int s52plib::RenderGLLS( ObjRazRules *rzRules, Rules *rules, ViewPort *vp )
         if( w > 1 ) {
             GLint parms[2];
             glGetIntegerv( GL_ALIASED_LINE_WIDTH_RANGE, &parms[0] );
-            if( w > parms[1] ) glLineWidth( wxMax(g_GLMinLineWidth, parms[1]) );
+            if( w > parms[1] )
+                glLineWidth( wxMax(g_GLMinLineWidth, parms[1]) );
             else
                 glLineWidth( wxMax(g_GLMinLineWidth, w) );
         } else
@@ -2857,7 +2853,8 @@ int s52plib::RenderLS( ObjRazRules *rzRules, Rules *rules, ViewPort *vp )
         if( w > 1 ) {
             GLint parms[2];
             glGetIntegerv( GL_ALIASED_LINE_WIDTH_RANGE, &parms[0] );
-            if( w > parms[1] ) glLineWidth( wxMax(g_GLMinLineWidth, parms[1]) );
+            if( w > parms[1] )
+                glLineWidth( wxMax(g_GLMinLineWidth, parms[1]) );
             else
                 glLineWidth( wxMax(g_GLMinLineWidth, w) );
         } else
@@ -4063,7 +4060,7 @@ int s52plib::RenderCARC( ObjRazRules *rzRules, Rules *rules, ViewPort *vp )
             if( sectr1 > sectr2 ) sectr2 += 360;
 
             /* to ensure that the final segment lands exactly on sectr2 */
-            float step = 12 * (sectr2 - sectr1) * M_PI / 180 / 360; /* 12 degree steps */
+            float step = 12 * (sectr2 - sectr1) * M_PI / 180. / 360.; /* 12 degree steps */
 
             glBegin( GL_LINE_STRIP );
             for( float a = sectr1 * M_PI / 180.0; a <= (sectr2+1) * M_PI / 180.; a += step )
@@ -4092,14 +4089,14 @@ int s52plib::RenderCARC( ObjRazRules *rzRules, Rules *rules, ViewPort *vp )
                 glLineStipple( 1, 0x3F3F );
                 glEnable( GL_LINE_STIPPLE );
 #endif
-                float a = ( sectr1 - 90 ) * PI / 180;
+                float a = ( sectr1 - 90 ) * PI / 180.;
                 int x = (int) ( leg_len * cosf( a ) );
                 int y = (int) ( leg_len * sinf( a ) );
                 glBegin( GL_LINES );
                 glVertex2i( 0, 0 );
                 glVertex2i( x, y );
 
-                a = ( sectr2 - 90 ) * PI / 180;
+                a = ( sectr2 - 90 ) * PI / 180.;
                 x = (int) ( leg_len * cosf( a ) );
                 y = (int) ( leg_len * sinf( a ) );
                 glVertex2i( 0, 0 );
@@ -4178,7 +4175,7 @@ int s52plib::RenderCARC( ObjRazRules *rzRules, Rules *rules, ViewPort *vp )
             int y = r.y + (int) ( leg_len * sinf( a ) );
             DrawAALine( m_pdc, r.x, r.y, x, y, c, dash1[0], dash1[1] );
 
-            a = ( sectr2 - 90 ) * PI / 180;
+            a = ( sectr2 - 90 ) * PI / 180.;
             x = r.x + (int) ( leg_len * cosf( a ) );
             y = r.y + (int) ( leg_len * sinf( a ) );
             DrawAALine( m_pdc, r.x, r.y, x, y, c, dash1[0], dash1[1] );

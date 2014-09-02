@@ -117,6 +117,7 @@ extern WayPointman      *pWayPointMan;
 extern RouteList        *pRouteList;
 extern bool             b_inCompressAllCharts;
 extern bool             g_bexpert;
+extern float            g_GLMinLineWidth;
 
 ocpnGLOptions g_GLOptions;
 
@@ -848,6 +849,22 @@ void glChartCanvas::SetupOpenGL()
 
     if( ps52plib ) ps52plib->SetGLRendererString( m_renderer );
 
+    //  Set the minimum line width
+    GLint parms[2];
+    glGetIntegerv( GL_SMOOTH_LINE_WIDTH_RANGE, &parms[0] );
+    g_GLMinLineWidth = parms[0];
+    
+    
+    //    Some GL renderers do a poor job of Anti-aliasing very narrow line widths.
+    //    Detect this case, and adjust the render parameters.
+    
+    if( m_renderer.Upper().Find( _T("MESA") ) != wxNOT_FOUND ){
+        GLfloat parf;
+        glGetFloatv(  GL_SMOOTH_LINE_WIDTH_GRANULARITY, &parf );
+        
+        g_GLMinLineWidth = (float)parms[0] + parf;
+    }
+    
     s_b_useScissorTest = true;
     // the radeon x600 driver has buggy scissor test
     if( GetRendererString().Find( _T("RADEON X600") ) != wxNOT_FOUND )
@@ -1067,6 +1084,10 @@ void glChartCanvas::SetupCompression()
         g_raster_format = GL_RGB;
         wxLogMessage( wxString::Format( _T("OpenGL-> Not Using compression")));
     }
+    
+    wxString lwmsg;
+    lwmsg.Printf(_T("OpenGL-> Minimum useable line width: %4.1f"), g_GLMinLineWidth);
+    wxLogMessage(lwmsg);
 }
 
 void glChartCanvas::OnPaint( wxPaintEvent &event )
@@ -1822,7 +1843,7 @@ void glChartCanvas::ShipDraw(ocpnDC& dc)
         float r = circle_rad+1;
         glColor4ub(0, 0, 0, 255);
         glBegin(GL_POLYGON);
-        for( float a = 0; a <= 2 * (float)PI; a += 2 * (float)PI / 12 )
+        for( float a = 0; a <= 2 * (float)PI; a += 2 * (float)PI / 12. )
             glVertex2f( cx + r * sinf( a ), cy + r * cosf( a ) );
         glEnd();
 
@@ -1830,7 +1851,7 @@ void glChartCanvas::ShipDraw(ocpnDC& dc)
         glColor4ub(255, 255, 255, 255);
         
         glBegin(GL_POLYGON);
-        for( float a = 0; a <= 2 * (float)M_PI; a += 2 * (float)M_PI / 12 )
+        for( float a = 0; a <= 2 * (float)M_PI; a += 2 * (float)M_PI / 12. )
             glVertex2f( cx + r * sinf( a ), cy + r * cosf( a ) );
         glEnd();       
         glPopAttrib();            // restore state
@@ -2075,10 +2096,7 @@ void glChartCanvas::DisableClipRegion()
 
 void glChartCanvas::SetSmoothLineWidth()
 {
-    GLfloat parf;
-    glGetFloatv(  GL_SMOOTH_LINE_WIDTH_GRANULARITY, &parf );
-    float width = wxMax(1.5, 1.0 + parf);
-    glLineWidth(width);
+    glLineWidth(g_GLMinLineWidth);
 }
 
 
@@ -2770,7 +2788,7 @@ bool glChartCanvas::FactoryCrunch(double factor)
        }                
     }
     
-    int mem_now;
+//    int mem_now;
 //    GetMemoryStatus(0, &mem_now);
 //    printf(">>>>FactoryCrunch  was: %d  is:%d \n", mem_start, mem_now);
     
