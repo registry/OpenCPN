@@ -2951,10 +2951,13 @@ ocpnToolBarSimple *MyFrame::CreateAToolbar()
 
     CheckAndAddPlugInTool( tb );
     tipString = wxString( _("Change Color Scheme") ) << _T(" (F5)");
-    if( _toolbarConfigMenuUtil( ID_COLSCHEME, tipString ) )
+    if( _toolbarConfigMenuUtil( ID_COLSCHEME, tipString ) ){
         tb->AddTool( ID_COLSCHEME,
             _T("colorscheme"), style->GetToolIcon( _T("colorscheme"), TOOLICON_NORMAL ),
             tipString, wxITEM_NORMAL );
+        tb->SetToolTooltipHiViz( ID_COLSCHEME, true );  // cause the Tooltip to always be visible, whatever
+                                                        //  the colorscheme
+    }
 
     CheckAndAddPlugInTool( tb );
     tipString = _("About OpenCPN");
@@ -3124,6 +3127,7 @@ void MyFrame::RequestNewToolbar()
 
         g_toolbar = CreateAToolbar();
         g_FloatingToolbarDialog->RePosition();
+        g_FloatingToolbarDialog->SetColorScheme( global_color_scheme );
         g_FloatingToolbarDialog->Show( b_reshow );
     }
 }
@@ -3323,7 +3327,7 @@ void MyFrame::OnCloseWindow( wxCloseEvent& event )
     g_bframemax = IsMaximized();
 
     //    Record the current state of tracking
-    g_bTrackCarryOver = g_bTrackActive;
+//    g_bTrackCarryOver = g_bTrackActive;
 
     TrackOff();
 
@@ -3846,12 +3850,16 @@ void MyFrame::OnToolLeftClick( wxCommandEvent& event )
         }
 
         case ID_TRACK: {
-            if( !g_bTrackActive ) TrackOn();
-            else
+            if( !g_bTrackActive ) {
+                TrackOn();
+                g_bTrackCarryOver = true;
+            } else {
                 TrackOff( true );
+                g_bTrackCarryOver = false;
+            }
             break;
         }
-
+        
         case ID_TBSTATBOX: {
             ToggleCourseUp();
             break;
