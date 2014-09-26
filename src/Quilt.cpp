@@ -121,30 +121,31 @@ OCPNRegion &QuiltCandidate::GetCandidateVPRegion( ViewPort &vp )
     }
     
     //  Remove the NoCovr regions
-    int nNoCovrPlyEntries = cte.GetnNoCovrPlyEntries();
-    if( nNoCovrPlyEntries ) {
-        for( int ip = 0; ip < nNoCovrPlyEntries; ip++ ) {
-            float *pfp = cte.GetpNoCovrPlyTableEntry( ip );
-            int nNoCovrPly = cte.GetNoCovrCntTableEntry( ip );
-            
-            OCPNRegion t_region = vp.GetVPRegionIntersect( screen_region, nNoCovrPly, pfp,
-                                                           cte.GetScale() );
-            
-            //  We do a test removal of the NoCovr region.
-            //  If the result iz empty, it must be that the NoCovr region is
-            //  the full extent M_COVR(CATCOV=2) feature found in NOAA ENCs.
-            //  We ignore it.
-            
-            if(!t_region.IsEmpty()) {
-                OCPNRegion test_region = candidate_region;
-                test_region.Subtract( t_region );
+    if( candidate_region.IsOk() ){              // don't bother if the region is already empty
+        int nNoCovrPlyEntries = cte.GetnNoCovrPlyEntries();
+        if( nNoCovrPlyEntries ) {
+            for( int ip = 0; ip < nNoCovrPlyEntries; ip++ ) {
+                float *pfp = cte.GetpNoCovrPlyTableEntry( ip );
+                int nNoCovrPly = cte.GetNoCovrCntTableEntry( ip );
                 
-                if( !test_region.IsEmpty())
-                    candidate_region = test_region;
+                OCPNRegion t_region = vp.GetVPRegionIntersect( screen_region, nNoCovrPly, pfp,
+                                                            cte.GetScale() );
+                
+                //  We do a test removal of the NoCovr region.
+                //  If the result iz empty, it must be that the NoCovr region is
+                //  the full extent M_COVR(CATCOV=2) feature found in NOAA ENCs.
+                //  We ignore it.
+                
+                if(!t_region.IsEmpty()) {
+                    OCPNRegion test_region = candidate_region;
+                    test_region.Subtract( t_region );
+                    
+                    if( !test_region.IsEmpty())
+                        candidate_region = test_region;
+                }
             }
         }
     }
-    
     
     //    Another superbad hack....
     //    Super small scale raster charts like bluemarble.kap usually cross the prime meridian
@@ -155,9 +156,10 @@ OCPNRegion &QuiltCandidate::GetCandidateVPRegion( ViewPort &vp )
     
     //    Clip the region to the current viewport
         candidate_region.Intersect( vp.rv_rect );
-        
-        if( !candidate_region.IsOk() ) 
-            candidate_region = OCPNRegion( 0, 0, 100, 100 );
+
+        //      It is OK to return an empty region....
+//        if( !candidate_region.IsOk() ) 
+//            candidate_region = OCPNRegion( 0, 0, 100, 100 );
         
         return candidate_region;
 }
@@ -894,7 +896,7 @@ int Quilt::AdjustRefOnZoom( bool b_zin, ChartFamilyEnum family,  ChartTypeEnum t
             int test_db_index = index_array.Item( i-1 );
             if( type == ChartData->GetDBChartType( test_db_index ) ){
                 int smallest_min_scale = min_scale.Item(i-1);
-                min_scale.Item(i-1) = wxMax(smallest_min_scale, 200000);
+                min_scale.Item(i-1) = smallest_min_scale * 80; //wxMax(smallest_min_scale, 200000);
                 break;
             }
         }
@@ -907,13 +909,7 @@ int Quilt::AdjustRefOnZoom( bool b_zin, ChartFamilyEnum family,  ChartTypeEnum t
     // the next smaller scale chart.  Makes a nicer image...
     if(index_array.GetCount() > 1){
         for(size_t i=0 ; i < index_array.GetCount()-1 ; i++){
-            int a = min_scale.Item(i);
-            int b = max_scale.Item(i);
-
-            int c = min_scale.Item(i + 1);
-            int d = max_scale.Item(i + 1);
-
-            min_scale.Item(i) = wxMax(min_scale.Item(i), max_scale.Item(i+1) + 1);
+              min_scale.Item(i) = wxMax(min_scale.Item(i), max_scale.Item(i+1) + 1);
         }
     }
     
@@ -925,7 +921,7 @@ int Quilt::AdjustRefOnZoom( bool b_zin, ChartFamilyEnum family,  ChartTypeEnum t
         int a = min_scale.Item(i);
         int b = max_scale.Item(i);
 
-        if( ( proposed_scale_onscreen < min_scale.Item(i)) &&
+        if( ( proposed_scale_onscreen < min_scale.Item(i) * 1.05) &&   // 5 percent leeway to allow for roundoff errors
             (proposed_scale_onscreen > max_scale.Item(i)) ) {
             new_ref_dbIndex = index_array.Item(i);
             break;

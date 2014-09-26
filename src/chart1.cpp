@@ -552,7 +552,6 @@ wxString                  g_AW1GUID;
 wxString                  g_AW2GUID;
 
 bool                      g_b_overzoom_x; // Allow high overzoom
-bool                      g_bshow_overzoom_emboss;
 
 int                       g_OwnShipIconType;
 double                    g_n_ownship_length_meters;
@@ -2477,6 +2476,8 @@ void MyApp::TrackOff( void )
 //------------------------------------------------------------------------------
 // MyFrame
 //------------------------------------------------------------------------------
+wxMenuBar *osx_menuBar;
+
 //      Frame implementation
 BEGIN_EVENT_TABLE(MyFrame, wxFrame) EVT_CLOSE(MyFrame::OnCloseWindow)
 EVT_MENU(wxID_EXIT, MyFrame::OnExit)
@@ -2500,6 +2501,16 @@ MyFrame::MyFrame( wxFrame *frame, const wxString& title, const wxPoint& pos, con
         wxFrame( frame, -1, title, pos, size, style ) //wxSIMPLE_BORDER | wxCLIP_CHILDREN | wxRESIZE_BORDER)
 //wxCAPTION | wxSYSTEM_MENU | wxRESIZE_BORDER
 {
+
+    // wxWidgets 3.0.X seems to require that the main app wxFrame have some menubar in order to
+    // popuplate the Mac default menu items, like "Hide", "Quit". etc.
+    // Its OK if this menubar is devoid of OCPN specific items, however.
+    // Just needs to be there, empty or not...
+#ifdef __WXOSX__
+    osx_menuBar = new wxMenuBar();
+    SetMenuBar(osx_menuBar);
+#endif    
+    
     m_ulLastNEMATicktime = 0;
     m_pStatusBar = NULL;
 
@@ -5956,17 +5967,19 @@ void MyFrame::HandlePianoClick( int selected_index, int selected_dbIndex )
             if( ChartData ) ChartData->PurgeCache();
             
             
-            //  This odd logic is designed to cover the case of Inland ENCs, which often
-            //  are of large scale, with no other smaller scale charts to make a nice quilt.
-            bool auto_rescale = true;
+            //  If the chart is a vector chart, and of very large scale,
+            //  then we had better set the new scale directly to avoid excessive underzoom
+            //  on, eg, Inland ENCs
+            bool set_scale = false;
             if(ChartData){
                 if( CHART_TYPE_S57 == ChartData->GetDBChartType( selected_dbIndex ) ){
-                    if( 1 == pCurrentStack->nEntry)
-                        auto_rescale = false;
+                    if( ChartData->GetDBChartScale(selected_dbIndex) < 5000){
+                        set_scale = true;
+                    }
                 }
             }
             
-            if(auto_rescale){
+            if(!set_scale){
                 SelectQuiltRefdbChart( selected_dbIndex, true );  // autoscale
             }
             else {
@@ -5977,10 +5990,18 @@ void MyFrame::HandlePianoClick( int selected_index, int selected_dbIndex )
                 ChartBase *pc = ChartData->OpenChartFromDB( selected_dbIndex, FULL_INIT );
                 if( pc ) {
                     double proposed_scale_onscreen = cc1->GetCanvasScaleFactor() / cc1->GetVPScale();
-                    proposed_scale_onscreen = wxMin(proposed_scale_onscreen,
-                                                20 * pc->GetNormalScaleMax(cc1->GetCanvasScaleFactor(), cc1->GetCanvasWidth()));
-                    proposed_scale_onscreen = wxMax(proposed_scale_onscreen,
+                    
+                    if(g_bPreserveScaleOnX){
+                        proposed_scale_onscreen = wxMin(proposed_scale_onscreen,
+                                                100 * pc->GetNormalScaleMax(cc1->GetCanvasScaleFactor(), cc1->GetCanvasWidth()));
+                    }
+                    else{
+                        proposed_scale_onscreen = wxMin(proposed_scale_onscreen,
+                                                        20 * pc->GetNormalScaleMax(cc1->GetCanvasScaleFactor(), cc1->GetCanvasWidth()));
+                        
+                        proposed_scale_onscreen = wxMax(proposed_scale_onscreen,
                                                 pc->GetNormalScaleMin(cc1->GetCanvasScaleFactor(), g_b_overzoom_x));
+                    }
                 
                     cc1->SetVPScale( cc1->GetCanvasScaleFactor() / proposed_scale_onscreen );
                 }
@@ -6080,10 +6101,10 @@ double MyFrame::GetBestVPScale( ChartBase *pchart )
             proposed_scale_onscreen = cc1->GetCanvasScaleFactor() / new_scale_ppm;
         }
 
-        proposed_scale_onscreen =
-                wxMin(proposed_scale_onscreen, pchart->GetNormalScaleMax(cc1->GetCanvasScaleFactor(), cc1->GetCanvasWidth()));
-        proposed_scale_onscreen =
-                wxMax(proposed_scale_onscreen, pchart->GetNormalScaleMin(cc1->GetCanvasScaleFactor(), g_b_overzoom_x));
+//        proposed_scale_onscreen =
+ //               wxMin(proposed_scale_onscreen, pchart->GetNormalScaleMax(cc1->GetCanvasScaleFactor(), cc1->GetCanvasWidth()));
+//        proposed_scale_onscreen =
+//                wxMax(proposed_scale_onscreen, pchart->GetNormalScaleMin(cc1->GetCanvasScaleFactor(), g_b_overzoom_x));
 
         return cc1->GetCanvasScaleFactor() / proposed_scale_onscreen;
     } else
