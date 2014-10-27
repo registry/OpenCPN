@@ -224,7 +224,7 @@ void Route::CloneAddedTrackPoint( RoutePoint *ptargetpoint, RoutePoint *psourcep
     //}
 }
 
-void Route::AddPoint( RoutePoint *pNewPoint, bool b_rename_in_sequence, bool b_deferBoxCalc )
+void Route::AddPoint( RoutePoint *pNewPoint, bool b_rename_in_sequence, bool b_deferBoxCalc, bool b_isLoading )
 {
     if( pNewPoint->m_bIsolatedMark ) {
         pNewPoint->m_bKeepXRoute = true;
@@ -236,13 +236,11 @@ void Route::AddPoint( RoutePoint *pNewPoint, bool b_rename_in_sequence, bool b_d
 
     m_nPoints++;
 
-    if( !b_deferBoxCalc ) FinalizeForRendering();
+    if( !b_deferBoxCalc )
+        FinalizeForRendering();
 
-    if( m_pLastAddedPoint ) pNewPoint->m_seg_len = DistGreatCircle( m_pLastAddedPoint->m_lat,
-            m_pLastAddedPoint->m_lon, pNewPoint->m_lat, pNewPoint->m_lon );
-
-    m_route_length += pNewPoint->m_seg_len;
-
+    if (!b_isLoading)
+        UpdateSegmentDistances();
     m_pLastAddedPoint = pNewPoint;
 
     if( b_rename_in_sequence && pNewPoint->GetName().IsEmpty() && !pNewPoint->m_bKeepXRoute ) {
