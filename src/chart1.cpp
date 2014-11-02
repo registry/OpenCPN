@@ -1457,7 +1457,7 @@ bool MyApp::OnInit()
     //    Manage internationalization of embedded messages
     //    using wxWidgets/gettext methodology....
 
-//        wxLog::SetVerbose(true);            // log all messages for debugging
+    wxLog::SetVerbose(true);            // log all messages for debugging language stuff
 
     if( lang_list[0] ) {
     };                 // silly way to avoid compiler warnings
@@ -1498,7 +1498,7 @@ bool MyApp::OnInit()
     plocale_def_lang = new wxLocale;
 
     if( pli ) {
-        b_initok = plocale_def_lang->Init( pli->Language, 0 );
+        b_initok = plocale_def_lang->Init( pli->Language, 1 );
         loc_lang_canonical = pli->CanonicalName;
     }
 
@@ -1526,7 +1526,7 @@ bool MyApp::OnInit()
     //    Always use dot as decimal
     setlocale( LC_NUMERIC, "C" );
 
-    wxLog::SetVerbose( false );           // log no verbose messages
+    wxLog::SetVerbose( false );           // log no more verbose messages
 
     //  French language locale is assumed to include the AZERTY keyboard
     //  This applies to either the system language, or to OpenCPN language selection
@@ -4447,8 +4447,19 @@ void MyFrame::JumpToPosition( double lat, double lon, double scale )
     vLat = lat;
     vLon = lon;
     cc1->m_bFollow = false;
-    DoChartUpdate();
 
+    //  is the current chart available at the target location?
+    int currently_selected_index = pCurrentStack->GetCurrentEntrydbIndex();
+    
+    //  If not, then select the smallest scale chart at the target location (may be empty)
+    ChartData->BuildChartStack( pCurrentStack, lat, lon );
+    if(!pCurrentStack->DoesStackContaindbIndex(currently_selected_index)){
+        pCurrentStack->CurrentStackEntry = pCurrentStack->nEntry - 1;
+        int selected_index = pCurrentStack->GetCurrentEntrydbIndex();
+        if( cc1->GetQuiltMode() )
+            cc1->SetQuiltRefChart( selected_index );
+    }
+    
     if( !cc1->GetQuiltMode() ) {
         cc1->SetViewPoint( lat, lon, scale, Current_Ch->GetChartSkew() * PI / 180., cc1->GetVPRotation() );
     } else {
