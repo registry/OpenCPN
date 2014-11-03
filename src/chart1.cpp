@@ -3247,6 +3247,9 @@ void MyFrame::OnCloseWindow( wxCloseEvent& event )
     if( b_inCompressAllCharts ) {
         return;
     }
+
+    if( bDBUpdateInProgress )
+        return;
     
     b_inCloseWindow = true;
 
@@ -4994,8 +4997,9 @@ void MyFrame::SetupQuiltMode( void )
 
         Current_Ch = NULL;                  // Bye....
         
+        SetChartThumbnail( -1 );            //Turn off thumbnails for sure
+
         //  Re-qualify the quilt reference chart selection
-//        cc1->ReloadVP();
         cc1->AdjustQuiltRefChart(  );
         
     } else                                                  // going to SC Mode
@@ -6056,7 +6060,6 @@ void MyFrame::HandlePianoClick( int selected_index, int selected_dbIndex )
                     cc1->SetVPScale( cc1->GetCanvasScaleFactor() / proposed_scale_onscreen );
                 }
             }
-                    
         }
         else {
             ToggleQuiltMode();
@@ -8318,21 +8321,23 @@ void MyFrame::UpdateAISMOBRoute( AIS_Target_Data *ptarget )
 
     cc1->Refresh( false );
  
-    wxDateTime mob_time = wxDateTime::Now();
-    
-    wxString mob_message( _( "AIS MAN OVERBOARD UPDATE" ) );
-    mob_message += _T(" Time: ");
-    mob_message += mob_time.Format();
-    mob_message += _T("  Ownship Position: ");
-    mob_message += toSDMM( 1, gLat );
-    mob_message += _T("   ");
-    mob_message += toSDMM( 2, gLon );
-    mob_message += _T("  MOB Position: ");
-    mob_message += toSDMM( 1, ptarget->Lat );
-    mob_message += _T("   ");
-    mob_message += toSDMM( 2, ptarget->Lon );
-    
-    wxLogMessage( mob_message );
+    if( ptarget ){
+        wxDateTime mob_time = wxDateTime::Now();
+        
+        wxString mob_message( _( "AIS MAN OVERBOARD UPDATE" ) );
+        mob_message += _T(" Time: ");
+        mob_message += mob_time.Format();
+        mob_message += _T("  Ownship Position: ");
+        mob_message += toSDMM( 1, gLat );
+        mob_message += _T("   ");
+        mob_message += toSDMM( 2, gLon );
+        mob_message += _T("  MOB Position: ");
+        mob_message += toSDMM( 1, ptarget->Lat );
+        mob_message += _T("   ");
+        mob_message += toSDMM( 2, ptarget->Lon );
+        
+        wxLogMessage( mob_message );
+    }
     
 }
 
