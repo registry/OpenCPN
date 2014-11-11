@@ -2114,17 +2114,22 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
                 ZoomCanvas( 0.5 );
                 break;
 
+#ifdef __WXMAC__
+            // On other platforms these are handled in OnKeyChar, which (apparently) works better in some locales.
+            // On OS X it is better to handle them here, since pressing Alt (which should change the rotation speed)
+            // changes the key char and so prevents the keys from working.
             case ']':
-//                RotateCanvas( 1 );
+                RotateCanvas( 1 );
                 break;
                 
             case '[':
-//                RotateCanvas( -1 );
+                RotateCanvas( -1 );
                 break;
                 
             case '\\':
-//                DoRotateCanvas(0);
+                DoRotateCanvas(0);
                 break;
+#endif
             }
         } else {
             switch( key_char ) {
@@ -2360,6 +2365,8 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
     }
 
 #ifndef __WXMAC__
+    // Allow OnKeyChar to catch the key events too.
+    // On OS X this is unnecessary since we handle all key events here.
     event.Skip();
 #endif
 }
@@ -5432,7 +5439,7 @@ void ChartCanvas::MouseEvent( wxMouseEvent& event )
             } else if( !pMarkPropDialog->IsShown() && g_bWayPointPreventDragging ) DraggingAllowed =
                     false;
 
-            if( m_pRoutePointEditTarget && ( m_pRoutePointEditTarget->m_IconName == _T("mob") ) ) DraggingAllowed =
+            if( m_pRoutePointEditTarget && ( m_pRoutePointEditTarget->GetIconName() == _T("mob") ) ) DraggingAllowed =
                     false;
 
             if( m_pRoutePointEditTarget->m_bIsInLayer ) DraggingAllowed = false;
@@ -5516,7 +5523,7 @@ void ChartCanvas::MouseEvent( wxMouseEvent& event )
                     false;
 
             if( m_pRoutePointEditTarget
-                    && ( m_pRoutePointEditTarget->m_IconName == _T("mob") ) ) DraggingAllowed =
+                    && ( m_pRoutePointEditTarget->GetIconName() == _T("mob") ) ) DraggingAllowed =
                             false;
 
             if( m_pRoutePointEditTarget->m_bIsInLayer ) DraggingAllowed = false;
@@ -6809,7 +6816,7 @@ void ChartCanvas::CanvasPopupMenu( int x, int y, int seltype )
 
             MenuAppend( menuWaypoint, ID_WPT_MENU_COPY, _( "Copy as KML" ) );
 
-            if( m_pFoundRoutePoint->m_IconName != _T("mob") )
+            if( m_pFoundRoutePoint->GetIconName() != _T("mob") )
                 MenuAppend( menuWaypoint, ID_RT_MENU_DELPOINT,  _( "Delete" ) );
 
             wxString port = FindValidUploadPort();
@@ -6851,7 +6858,7 @@ void ChartCanvas::CanvasPopupMenu( int x, int y, int seltype )
 
             MenuAppend( menuWaypoint, ID_WPT_MENU_COPY, _( "Copy as KML" ) );
 
-            if( m_pFoundRoutePoint->m_IconName != _T("mob") )
+            if( m_pFoundRoutePoint->GetIconName() != _T("mob") )
                 MenuAppend( menuWaypoint, ID_WP_MENU_DELPOINT, _( "Delete" ) );
 
             wxString port = FindValidUploadPort();
@@ -7364,7 +7371,7 @@ void pupHandler_PasteRoute() {
 
             newPoint = new RoutePoint( curPoint );
             newPoint->m_bIsolatedMark = false;
-            newPoint->m_IconName = _T("circle");
+            newPoint->SetIconName( _T("circle") );
             newPoint->m_bIsVisible = true;
             newPoint->m_bShowName = false;
             newPoint->m_bKeepXRoute = false;
@@ -7607,7 +7614,7 @@ void ChartCanvas::PopupMenuHandler( wxCommandEvent& event )
         }
 
         if( m_pFoundRoutePoint && !( m_pFoundRoutePoint->m_bIsInLayer )
-                && ( m_pFoundRoutePoint->m_IconName != _T("mob") ) ) {
+                && ( m_pFoundRoutePoint->GetIconName() != _T("mob") ) ) {
 
             // If the WP belongs to an invisible route, we come here instead of to ID_RT_MENU_DELPOINT
             //  Check it, and if so then remove the point from its routes

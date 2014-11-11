@@ -72,6 +72,11 @@ public:
       void CalculateApproachNameExtents(void);
       BouyPassingSide GetBouyPassingSide() { return m_BouyPassingSide; }
       void SetBouyPassingSide ( BouyPassingSide side=BOUY_NONE  ) { m_BouyPassingSide = side; };  
+      
+      wxString GetIconName(void){ return m_IconName; }
+      wxBitmap *GetIconBitmap(){ return m_pbmIcon; }
+      void SetIconName( wxString name ){ m_IconName = name; }
+      
       void *GetSelectNode(void) { return m_SelectNode; }
       void SetSelectNode(void* node) { m_SelectNode = node; }
 
@@ -114,14 +119,12 @@ public:
       bool              m_bIsActive;
       wxString          m_MarkDescription;
       wxString          m_GUID;
-      wxString          m_IconName;
 
       wxFont            *m_pMarkFont;
       wxColour          m_FontColor;
 
       wxSize            m_NameExtents;
 
-      wxBitmap          *m_pbmIcon;
       bool              m_bBlink;
       bool              m_bDynamicName;
       bool              m_bShowName;
@@ -159,6 +162,8 @@ public:
 private:
       wxString          m_MarkName;
       wxDateTime        m_CreateTimeX;
+      wxBitmap          *m_pbmIcon;
+      wxString          m_IconName;
       
       void              *m_SelectNode;
       void              *m_ManagerNode;
