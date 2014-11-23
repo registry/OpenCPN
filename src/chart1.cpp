@@ -220,6 +220,7 @@ bool                      bDrawCurrentValues;
 wxString                  g_PrivateDataDir;
 wxString                  g_SData_Locn;
 wxString                  *pChartListFileName;
+wxString                  *pAISTargetNameFileName;
 wxString                  *pHome_Locn;
 wxString                  *pWorldMapLocation;
 wxString                  *pInit_Chart_Dir;
@@ -805,6 +806,34 @@ int CALLBACK CrashCallback(CR_CRASH_CALLBACK_INFO* pInfo)
 
 #endif
 
+wxString *newPrivateFileName(wxStandardPaths &std_path, wxString *home_locn, const char *name, const char *windowsName)
+{
+    wxString fname = wxString::FromUTF8(name);
+    wxString fwname = wxString::FromUTF8(windowsName);
+    wxString *filePathAndName = new wxString( fname );
+
+#ifdef __WXMSW__
+    filePathAndName = new wxString( fwname );
+    filePathAndName->Prepend( *pHome_Locn );
+
+#else
+    filePathAndName = new wxString(_T(""));
+    filePathAndName->Append(std_path.GetUserDataDir());
+    appendOSDirSlash(filePathAndName);
+    filePathAndName->Append( fname );
+#endif
+
+    if( g_bportable ) {
+        filePathAndName->Clear();
+#ifdef __WXMSW__
+        filePathAndName->Append( fwname );
+#else
+        filePathAndName->Append( fname );
+#endif
+        filePathAndName->Prepend( *home_locn );
+    }
+    return filePathAndName;
+}
 
 // `Main program' equivalent, creating windows and returning main app frame
 //------------------------------------------------------------------------------
@@ -1763,26 +1792,10 @@ bool MyApp::OnInit()
 
 
 //      Establish location and name of chart database
-#ifdef __WXMSW__
-    pChartListFileName = new wxString( _T("CHRTLIST.DAT") );
-    pChartListFileName->Prepend( *pHome_Locn );
+    pChartListFileName = newPrivateFileName(std_path, pHome_Locn, "chartlist.dat", "CHRTLIST.DAT");
 
-#else
-    pChartListFileName = new wxString(_T(""));
-    pChartListFileName->Append(std_path.GetUserDataDir());
-    appendOSDirSlash(pChartListFileName);
-    pChartListFileName->Append(_T("chartlist.dat"));
-#endif
-
-    if( g_bportable ) {
-        pChartListFileName->Clear();
-#ifdef __WXMSW__
-        pChartListFileName->Append( _T("CHRTLIST.DAT") );
-#else
-        pChartListFileName->Append(_T("chartlist.dat"));
-#endif
-        pChartListFileName->Prepend( *pHome_Locn );
-    }
+//      Establish location and name of AIS MMSI -> Target Name mapping
+    pAISTargetNameFileName = newPrivateFileName(std_path, pHome_Locn, "mmsitoname.csv", "MMSINAME.CSV");
 
 //      Establish guessed location of chart tree
     if( pInit_Chart_Dir->IsEmpty() ) {
@@ -3595,17 +3608,15 @@ void MyFrame::ODoSetSize( void )
         // maximum size is 1/28 of the box width, or the box height - whicever is less
         int max_font_size = wxMin( (stat_box.width / 28), (stat_box.height) );
 
-#ifdef __WXMSW__
-        int try_font_size = 12;   // the Windows system default is too small so fix it at 12pt
-#else
         wxFont sys_font = *wxNORMAL_FONT;
-        int try_font_size = sys_font.GetPointSize() + 1; // start 1pt larger than system default
-#endif
+        int try_font_size = sys_font.GetPointSize();
 
 #ifdef __WXOSX__
         int min_font_size = 10; // much less than 10pt is unreadably small on OS X
+        try_font_size += 1;     // default to 1pt larger than system UI font
 #else
-        int min_font_size = 6;  // on Win/Linux the text does not shrink so fast and 6pt is fine
+        int min_font_size = 7;  // on Win/Linux the text does not shrink quite so fast
+        try_font_size += 2;     // default to 2pt larger than system UI font
 #endif
 
         // get the user's preferred font, or if none set then the system default with the size overridden
