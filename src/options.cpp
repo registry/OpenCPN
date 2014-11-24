@@ -1551,10 +1551,7 @@ void options::CreatePanel_Ownship( size_t parent, int border_size, int group_ite
     m_itemRadarRingsUnits = new wxChoice( itemPanelShip, ID_RADARDISTUNIT, wxDefaultPosition, m_pShipIconType->GetSize(), 2, pDistUnitsStrings );
     radarGrid->Add( m_itemRadarRingsUnits, 0, wxALIGN_RIGHT | wxALL, border_size );
 
-    pSailing = new wxCheckBox( itemPanelShip, ID_DAILYCHECKBOX, _("Advance route waypoint on arrival only") );
-    ownShip->Add( pSailing, 0 );
-
-    //  Tracks
+     //  Tracks
     wxStaticBox* trackText = new wxStaticBox( itemPanelShip, wxID_ANY, _("Tracks") );
     wxStaticBoxSizer* trackSizer = new wxStaticBoxSizer( trackText, wxVERTICAL );
     ownShip->Add( trackSizer, 0, wxGROW | wxALL, border_size );
@@ -1590,6 +1587,10 @@ void options::CreatePanel_Ownship( size_t parent, int border_size, int group_ite
 
     m_pText_ACRadius = new wxTextCtrl( itemPanelShip, -1 );
     pRouteGrid->Add( m_pText_ACRadius, 0, wxALL | wxALIGN_RIGHT, group_item_spacing );
+    
+    pSailing = new wxCheckBox( itemPanelShip, ID_DAILYCHECKBOX, _("Advance route waypoint on arrival only") );
+    routeSizer->Add( pSailing, 0 );
+    
     
     DimeControl( itemPanelShip );
 }
@@ -1652,6 +1653,57 @@ void options::CreatePanel_ChartsLoad( size_t parent, int border_size, int group_
 
     chartPanel->Layout();
 }
+
+void options::CreatePanel_ChartDisplay( size_t parent, int border_size, int group_item_spacing,
+                                        wxSize small_button_size )
+{
+    m_ChartDisplayPage = AddPage( parent, _("Display Options") );
+    
+    wxBoxSizer* itemBoxSizerUI = new wxBoxSizer( wxVERTICAL );
+    m_ChartDisplayPage->SetSizer( itemBoxSizerUI );
+
+    // Chart Display Options Box
+    wxStaticBox* itemStaticBoxSizerCDOStatic = new wxStaticBox( m_ChartDisplayPage, wxID_ANY, _("Chart Display Options") );
+    wxStaticBoxSizer* itemStaticBoxSizerCDO = new wxStaticBoxSizer( itemStaticBoxSizerCDOStatic,  wxVERTICAL );
+    itemBoxSizerUI->Add( itemStaticBoxSizerCDO, 0, wxEXPAND | wxALL, border_size );
+
+    //  Course Up display update period
+    wxFlexGridSizer *pCOGUPFilterGrid = new wxFlexGridSizer( 2 );
+    pCOGUPFilterGrid->AddGrowableCol( 1 );
+    itemStaticBoxSizerCDO->Add( pCOGUPFilterGrid, 0, wxALL | wxEXPAND, group_item_spacing );
+
+    wxStaticText* itemStaticTextCOGUPFilterSecs = new wxStaticText( m_ChartDisplayPage, wxID_STATIC,
+            _("Course-Up Mode Display Update Period (sec)") );
+    pCOGUPFilterGrid->Add( itemStaticTextCOGUPFilterSecs, 0, wxADJUST_MINSIZE, group_item_spacing );
+
+    pCOGUPUpdateSecs = new wxTextCtrl( m_ChartDisplayPage, ID_TEXTCTRL, _T(""), wxDefaultPosition,
+            wxDefaultSize );
+    pCOGUPFilterGrid->Add( pCOGUPUpdateSecs, 0, wxALIGN_RIGHT | wxALL, group_item_spacing );
+
+    //  "LookAhead" checkbox
+    pCBLookAhead = new wxCheckBox( m_ChartDisplayPage, ID_CHECK_LOOKAHEAD, _("Look Ahead Mode") );
+    itemStaticBoxSizerCDO->Add( pCBLookAhead, 0, wxALL, group_item_spacing );
+
+    //  Skewed Raster compenstation checkbox
+    pSkewComp = new wxCheckBox( m_ChartDisplayPage, ID_SKEWCOMPBOX, _("Show Skewed Raster Charts as North-Up") );
+    itemStaticBoxSizerCDO->Add( pSkewComp, 0, wxALL, group_item_spacing );
+    
+    //  Full Screen Quilting Disable checkbox
+    pFullScreenQuilt = new wxCheckBox( m_ChartDisplayPage, ID_FULLSCREENQUILT, _("Disable Full Screen Quilting") );
+    itemStaticBoxSizerCDO->Add( pFullScreenQuilt, 1, wxALL, group_item_spacing );
+    
+    wxStaticBox *zoomDetailBox = new wxStaticBox( m_ChartDisplayPage, wxID_ANY, _("Chart Zoom/Scale Sensitivity Level") );
+    wxStaticBoxSizer* zoomDetailBoxSizer = new wxStaticBoxSizer( zoomDetailBox, wxVERTICAL );
+    itemBoxSizerUI->Add( zoomDetailBoxSizer, 0, wxEXPAND | wxALL, border_size );
+    
+    m_pSlider_Zoom = new wxSlider( m_ChartDisplayPage, ID_CM93ZOOM, 0, -5,
+                                   5, wxDefaultPosition, wxSize( 200, 50),
+                                   wxSL_HORIZONTAL | wxSL_AUTOTICKS | wxSL_LABELS );
+    zoomDetailBoxSizer->Add( m_pSlider_Zoom, 0, wxALL | wxEXPAND, border_size );
+    
+    
+}
+
 
 void options::CreatePanel_VectorCharts( size_t parent, int border_size, int group_item_spacing,
         wxSize small_button_size )
@@ -1944,34 +1996,13 @@ void options::CreatePanel_Display( size_t parent, int border_size, int group_ite
     wxBoxSizer* itemBoxSizerUI = new wxBoxSizer( wxVERTICAL );
     pDisplayPanel->SetSizer( itemBoxSizerUI );
 
-    // Chart Display Options Box
+    // Display Options Box
     wxStaticBox* itemStaticBoxSizerCDOStatic = new wxStaticBox( pDisplayPanel, wxID_ANY,
-            _("Chart Display Options") );
+            _("Display Options") );
     wxStaticBoxSizer* itemStaticBoxSizerCDO = new wxStaticBoxSizer( itemStaticBoxSizerCDOStatic,
             wxVERTICAL );
     itemBoxSizerUI->Add( itemStaticBoxSizerCDO, 0, wxEXPAND | wxALL, border_size );
 
-    //  "Course Up" checkbox
-    pCBCourseUp = new wxCheckBox( pDisplayPanel, ID_COURSEUPCHECKBOX, _("Course UP Mode") );
-    itemStaticBoxSizerCDO->Add( pCBCourseUp, 0, wxALL, group_item_spacing );
-
-    //  Course Up display update period
-    wxFlexGridSizer *pCOGUPFilterGrid = new wxFlexGridSizer( 2 );
-    pCOGUPFilterGrid->AddGrowableCol( 1 );
-    itemStaticBoxSizerCDO->Add( pCOGUPFilterGrid, 0, wxALL | wxEXPAND, group_item_spacing );
-
-    wxStaticText* itemStaticTextCOGUPFilterSecs = new wxStaticText( pDisplayPanel, wxID_STATIC,
-            _("Course-Up Mode Display Update Period (sec)") );
-    pCOGUPFilterGrid->Add( itemStaticTextCOGUPFilterSecs, 0, wxADJUST_MINSIZE,
-                           group_item_spacing );
-
-    pCOGUPUpdateSecs = new wxTextCtrl( pDisplayPanel, ID_TEXTCTRL, _T(""), wxDefaultPosition,
-            wxDefaultSize );
-    pCOGUPFilterGrid->Add( pCOGUPUpdateSecs, 0, wxALIGN_RIGHT | wxALL, group_item_spacing );
-
-    //  "LookAhead" checkbox
-    pCBLookAhead = new wxCheckBox( pDisplayPanel, ID_CHECK_LOOKAHEAD, _("Look Ahead Mode") );
-    itemStaticBoxSizerCDO->Add( pCBLookAhead, 0, wxALL, group_item_spacing );
 
     //  Grid display  checkbox
     pSDisplayGrid = new wxCheckBox( pDisplayPanel, ID_CHECK_DISPLAYGRID, _("Show Grid") );
@@ -1981,74 +2012,60 @@ void options::CreatePanel_Display( size_t parent, int border_size, int group_ite
     pSDepthUnits = new wxCheckBox( pDisplayPanel, ID_SHOWDEPTHUNITSBOX1, _("Show Depth Units") );
     itemStaticBoxSizerCDO->Add( pSDepthUnits, 1, wxALL, group_item_spacing );
 
-    //  OpenGL Render checkbox and button
-    wxBoxSizer* OpenGLSizer = new wxBoxSizer( wxHORIZONTAL );
-    itemStaticBoxSizerCDO->Add( OpenGLSizer, 1, wxALL, group_item_spacing );
 
-    pOpenGL = new wxCheckBox( pDisplayPanel, ID_OPENGLBOX, _("Use Accelerated Graphics (OpenGL)") );
-    OpenGLSizer->Add( pOpenGL, 1, wxALL, group_item_spacing );
-    pOpenGL->Enable(!g_bdisable_opengl);
+   //  Chart Outlines checkbox
+    pCDOOutlines = new wxCheckBox( pDisplayPanel, ID_OUTLINECHECKBOX1, _("Show Chart Outlines") );
+    itemStaticBoxSizerCDO->Add( pCDOOutlines, 1, wxALL, group_item_spacing );
 
-    wxButton *bOpenGL = new wxButton( pDisplayPanel, ID_OPENGLOPTIONS, _("Options ...") );
-    OpenGLSizer->Add( bOpenGL, 1, wxALL, group_item_spacing );
-    bOpenGL->Enable(!g_bdisable_opengl);
+    //  "Course Up" checkbox
+    pCBCourseUp = new wxCheckBox( pDisplayPanel, ID_COURSEUPCHECKBOX, _("Course UP Mode") );
+    itemStaticBoxSizerCDO->Add( pCBCourseUp, 0, wxALL, group_item_spacing );
+    
+    
+    // Control Options Box
+    wxStaticBox* itemStaticBoxSizerCOStatic = new wxStaticBox( pDisplayPanel, wxID_ANY,
+                                                                _("Control Options") );
+    wxStaticBoxSizer* itemStaticBoxSizerCO = new wxStaticBoxSizer( itemStaticBoxSizerCOStatic,
+                                                                    wxVERTICAL );
+    itemBoxSizerUI->Add( itemStaticBoxSizerCO, 0, wxEXPAND | wxALL, border_size );
 
     // Smooth Pan/Zoom checkbox
     pSmoothPanZoom = new wxCheckBox( pDisplayPanel, ID_SMOOTHPANZOOMBOX,
                                      _("Smooth Panning / Zooming") );
-    itemStaticBoxSizerCDO->Add( pSmoothPanZoom, 1, wxALL, group_item_spacing );
-
+    itemStaticBoxSizerCO->Add( pSmoothPanZoom, 1, wxALL, group_item_spacing );
+    
     pEnableZoomToCursor = new wxCheckBox( pDisplayPanel, ID_ZTCCHECKBOX,
-            _("Zoom to Cursor") );
+                                          _("Zoom to Cursor") );
     pEnableZoomToCursor->SetValue( FALSE );
-    itemStaticBoxSizerCDO->Add( pEnableZoomToCursor, 1, wxALL, group_item_spacing );
-
-    pPreserveScale = new wxCheckBox( pDisplayPanel, ID_PRESERVECHECKBOX,
-            _("Preserve Scale when Switching Charts") );
-    itemStaticBoxSizerCDO->Add( pPreserveScale, 1, wxALL, group_item_spacing );
-
+    itemStaticBoxSizerCO->Add( pEnableZoomToCursor, 1, wxALL, group_item_spacing );
+    
     //  Quilting checkbox
     pCDOQuilting = new wxCheckBox( pDisplayPanel, ID_QUILTCHECKBOX1, _("Enable Chart Quilting") );
-    itemStaticBoxSizerCDO->Add( pCDOQuilting, 1, wxALL, group_item_spacing );
+    itemStaticBoxSizerCO->Add( pCDOQuilting, 1, wxALL, group_item_spacing );
+    
+    pPreserveScale = new wxCheckBox( pDisplayPanel, ID_PRESERVECHECKBOX,
+                                     _("Preserve Scale when Switching Charts") );
+    itemStaticBoxSizerCO->Add( pPreserveScale, 1, wxALL, group_item_spacing );
+    
+    
 
-    //  Full Screen Quilting Disable checkbox
-    pFullScreenQuilt = new wxCheckBox( pDisplayPanel, ID_FULLSCREENQUILT,
-            _("Disable Full Screen Quilting") );
-    itemStaticBoxSizerCDO->Add( pFullScreenQuilt, 1, wxALL, group_item_spacing );
-
-    //  Chart Outlines checkbox
-    pCDOOutlines = new wxCheckBox( pDisplayPanel, ID_OUTLINECHECKBOX1, _("Show Chart Outlines") );
-    itemStaticBoxSizerCDO->Add( pCDOOutlines, 1, wxALL, group_item_spacing );
-
-    //  Skewed Raster compenstation checkbox
-    pSkewComp = new wxCheckBox( pDisplayPanel, ID_SKEWCOMPBOX,
-            _("Show Skewed Raster Charts as North-Up") );
-    itemStaticBoxSizerCDO->Add( pSkewComp, 1, wxALL, group_item_spacing );
+    // OpenGL Options Box
+    wxStaticBox* itemStaticBoxSizerGLStatic = new wxStaticBox( pDisplayPanel, wxID_ANY,
+                                                               _("OpenGL") );
+    wxStaticBoxSizer* itemStaticBoxSizerGL = new wxStaticBoxSizer( itemStaticBoxSizerGLStatic,  wxVERTICAL );
+    itemBoxSizerUI->Add( itemStaticBoxSizerGL, 0, wxEXPAND | wxALL, border_size );
+                                                               
+    //  OpenGL Render checkbox and button
+    wxBoxSizer* OpenGLSizer = new wxBoxSizer( wxHORIZONTAL );
+    itemStaticBoxSizerGL->Add( OpenGLSizer, 1, wxALL, group_item_spacing );
     
-    //  Mobile/Tochscreen checkboxes
-    pMobile = new wxCheckBox( pDisplayPanel, ID_MOBILEBOX, _("Enable Touchscreen/Tablet interface") );
-    itemStaticBoxSizerCDO->Add( pMobile, 1, wxALL, group_item_spacing );
-                                
-    pResponsive = new wxCheckBox( pDisplayPanel, ID_REPONSIVEBOX, _("Enable Responsive graphics interface") );
-    itemStaticBoxSizerCDO->Add( pResponsive, 1, wxALL, group_item_spacing );
+    pOpenGL = new wxCheckBox( pDisplayPanel, ID_OPENGLBOX, _("Use Accelerated Graphics (OpenGL)") );
+    OpenGLSizer->Add( pOpenGL, 1, wxALL, group_item_spacing );
+    pOpenGL->Enable(!g_bdisable_opengl);
     
-    //  "Mag Heading" checkbox
-    pCBMagShow = new wxCheckBox( pDisplayPanel, ID_MAGSHOWCHECKBOX, _("Show Magnetic bearings and headings") );
-    itemStaticBoxSizerCDO->Add( pCBMagShow, 0, wxALL, group_item_spacing );
-    
-    //  Mag Heading user variation
-    wxFlexGridSizer *pUserVarGrid = new wxFlexGridSizer( 2 );
-    pUserVarGrid->AddGrowableCol( 1 );
-    itemStaticBoxSizerCDO->Add( pUserVarGrid, 0, wxALL | wxEXPAND, group_item_spacing );
-    
-    wxStaticText* itemStaticTextUserVar = new wxStaticText( pDisplayPanel, wxID_STATIC,
-                                                                    _("Assumed Magnetic Variation, deg.") );
-    pUserVarGrid->Add( itemStaticTextUserVar, 0, wxADJUST_MINSIZE,
-                       group_item_spacing );
-    
-    pMagVar = new wxTextCtrl( pDisplayPanel, ID_TEXTCTRL, _T(""), wxDefaultPosition,
-                                       wxDefaultSize );
-    pUserVarGrid->Add( pMagVar, 0, wxALIGN_RIGHT | wxALL, group_item_spacing );
+    wxButton *bOpenGL = new wxButton( pDisplayPanel, ID_OPENGLOPTIONS, _("Options ...") );
+    OpenGLSizer->Add( bOpenGL, 1, wxALL, group_item_spacing );
+    bOpenGL->Enable(!g_bdisable_opengl);
     
 }
 
@@ -2319,7 +2336,7 @@ void options::CreatePanel_UI( size_t parent, int border_size, int group_item_spa
     m_itemStyleListBox->SetStringSelection( g_StyleManager->GetCurrentStyle()->name );
     itemStyleStaticBoxSizer->Add( m_itemStyleListBox, 1, wxEXPAND | wxALL, border_size );
 
-    wxStaticBox* miscOptionsBox = new wxStaticBox( itemPanelFont, wxID_ANY, _("Miscellaneous Options") );
+    wxStaticBox* miscOptionsBox = new wxStaticBox( itemPanelFont, wxID_ANY, _("Interface Options") );
     wxStaticBoxSizer* miscOptions = new wxStaticBoxSizer( miscOptionsBox, wxVERTICAL );
     m_itemBoxSizerFontPanel->Add( miscOptions, 0, wxALL | wxEXPAND, border_size );
 
@@ -2337,55 +2354,26 @@ void options::CreatePanel_UI( size_t parent, int border_size, int group_item_spa
     pShowCompassWin->SetValue( FALSE );
     miscOptions->Add( pShowCompassWin, 0, wxALL, border_size );
 
+#if 0    
     pFullScreenToolbar = new wxCheckBox( itemPanelFont, ID_FSTOOLBARCHECKBOX,
             _("Show Toolbar in Fullscreen Mode") );
     miscOptions->Add( pFullScreenToolbar, 0, wxALL, border_size );
+#endif
 
     pTransparentToolbar = new wxCheckBox( itemPanelFont, ID_TRANSTOOLBARCHECKBOX,
             _("Enable Transparent Toolbar") );
     miscOptions->Add( pTransparentToolbar, 0, wxALL, border_size );
     if( g_bopengl ) pTransparentToolbar->Disable();
 
-    wxFlexGridSizer *pFormatGrid = new wxFlexGridSizer( 2 );
-    pFormatGrid->AddGrowableCol( 1 );
-    miscOptions->Add( pFormatGrid, 0, wxALL | wxEXPAND, border_size );
-
-    wxStaticText* itemStaticTextSDMMFormat = new wxStaticText( itemPanelFont, wxID_STATIC,
-            _("Show Lat/Long as") );
-    pFormatGrid->Add( itemStaticTextSDMMFormat, 0,
-            wxLEFT | wxRIGHT | wxTOP | wxADJUST_MINSIZE, border_size );
-
-    wxString pSDMMFormats[] = { _("Degrees, Decimal Minutes"), _("Decimal Degrees"),
-            _("Degrees, Minutes, Seconds") };
-    int m_SDMMFormatsNChoices = sizeof( pSDMMFormats ) / sizeof(wxString);
-    pSDMMFormat = new wxChoice( itemPanelFont, ID_SDMMFORMATCHOICE, wxDefaultPosition,
-            wxDefaultSize, m_SDMMFormatsNChoices, pSDMMFormats );
-    pFormatGrid->Add( pSDMMFormat, 0, wxALIGN_RIGHT, 2 );
-
-    wxStaticText* itemStaticTextDistanceFormat = new wxStaticText( itemPanelFont, wxID_STATIC,
-            _("Show distance as") );
-    pFormatGrid->Add( itemStaticTextDistanceFormat, 0,
-            wxLEFT | wxRIGHT | wxTOP | wxADJUST_MINSIZE, border_size );
-
-    wxString pDistanceFormats[] = { _("Nautical miles"), _("Statute miles"),
-            _("Kilometers"), _("Meters") };
-    int m_DistanceFormatsNChoices = sizeof( pDistanceFormats ) / sizeof(wxString);
-    pDistanceFormat = new wxChoice( itemPanelFont, ID_DISTANCEFORMATCHOICE, wxDefaultPosition,
-            wxDefaultSize, m_DistanceFormatsNChoices, pDistanceFormats );
-    pFormatGrid->Add( pDistanceFormat, 0, wxALIGN_RIGHT, 2 );
-
-    wxStaticText* itemStaticTextSpeedFormat = new wxStaticText( itemPanelFont, wxID_STATIC,
-            _("Show speed as") );
-    pFormatGrid->Add( itemStaticTextSpeedFormat, 0,
-            wxLEFT | wxRIGHT | wxTOP | wxADJUST_MINSIZE, border_size );
-
-    wxString pSpeedFormats[] = { _("Knots"), _("Mph"),
-            _("km/h"), _("m/s") };
-    int m_SpeedFormatsNChoices = sizeof( pSpeedFormats ) / sizeof(wxString);
-    pSpeedFormat = new wxChoice( itemPanelFont, ID_SPEEDFORMATCHOICE, wxDefaultPosition,
-            wxDefaultSize, m_SpeedFormatsNChoices, pSpeedFormats );
-    pFormatGrid->Add( pSpeedFormat, 0, wxALIGN_RIGHT, 2 );
-
+    //  Mobile/Touchscreen checkboxes
+    pMobile = new wxCheckBox( itemPanelFont, ID_MOBILEBOX, _("Enable Touchscreen/Tablet interface") );
+    miscOptions->Add( pMobile, 0, wxALL, border_size );
+    
+    pResponsive = new wxCheckBox( itemPanelFont, ID_REPONSIVEBOX, _("Enable Responsive graphics interface") );
+    miscOptions->Add( pResponsive, 0, wxALL, border_size );
+    
+    
+    
 
     pPlayShipsBells = new wxCheckBox( itemPanelFont, ID_BELLSCHECKBOX, _("Play Ships Bells"));
     miscOptions->Add( pPlayShipsBells, 0, wxALIGN_LEFT|wxALL, border_size);
@@ -2393,21 +2381,75 @@ void options::CreatePanel_UI( size_t parent, int border_size, int group_item_spa
     pWayPointPreventDragging = new wxCheckBox( itemPanelFont, ID_DRAGGINGCHECKBOX,
             _("Lock Waypoints (Unless waypoint property dialog visible)") );
     pWayPointPreventDragging->SetValue( FALSE );
-    miscOptions->Add( pWayPointPreventDragging, 0, wxALL,
-            border_size );
+    miscOptions->Add( pWayPointPreventDragging, 0, wxALL, border_size );
 
     pConfirmObjectDeletion = new wxCheckBox( itemPanelFont, ID_DELETECHECKBOX,
                                                _("Confirm deletion of tracks and routes") );
     pConfirmObjectDeletion->SetValue( FALSE );
     miscOptions->Add( pConfirmObjectDeletion, 0, wxALL, border_size );
     
-    wxStaticBox *zoomDetailBox = new wxStaticBox( itemPanelFont, wxID_ANY, _("Chart Zoom Detail Level") );
-    wxStaticBoxSizer* zoomDetailBoxSizer = new wxStaticBoxSizer( zoomDetailBox, wxVERTICAL );
-    m_pSlider_Zoom = new wxSlider( itemPanelFont, ID_CM93ZOOM, 0, -5,
-                                        5, wxDefaultPosition, wxSize( 200, 50),
-                                        wxSL_HORIZONTAL | wxSL_AUTOTICKS | wxSL_LABELS );
-    zoomDetailBoxSizer->Add( m_pSlider_Zoom, 0, wxALL | wxEXPAND, border_size );
-    m_itemBoxSizerFontPanel->Add( zoomDetailBoxSizer, 1, wxALL, border_size );
+    //  "Mag Heading" checkbox
+    pCBMagShow = new wxCheckBox( itemPanelFont, ID_MAGSHOWCHECKBOX, _("Show Magnetic bearings and headings") );
+    miscOptions->Add( pCBMagShow, 0, wxALL, group_item_spacing );
+    
+    //  Mag Heading user variation
+    wxFlexGridSizer *pUserVarGrid = new wxFlexGridSizer( 2 );
+    pUserVarGrid->AddGrowableCol( 1 );
+    miscOptions->Add( pUserVarGrid, 0, wxALL | wxEXPAND, group_item_spacing );
+    
+    wxStaticText* itemStaticTextUserVar = new wxStaticText( itemPanelFont, wxID_STATIC,
+                                                            _("Assumed Magnetic Variation, deg.") );
+    pUserVarGrid->Add( itemStaticTextUserVar, 0, wxADJUST_MINSIZE, group_item_spacing );
+                                                            
+    pMagVar = new wxTextCtrl( itemPanelFont, ID_TEXTCTRL, _T(""), wxDefaultPosition, wxDefaultSize );
+    pUserVarGrid->Add( pMagVar, 0, wxALIGN_RIGHT | wxALL, group_item_spacing );
+                                                            
+
+    wxStaticBox* unitOptionsBox = new wxStaticBox( itemPanelFont, wxID_ANY, _("Unit Display Options") );
+    wxStaticBoxSizer* unitOptions = new wxStaticBoxSizer( unitOptionsBox, wxVERTICAL );
+    m_itemBoxSizerFontPanel->Add( unitOptions, 0, wxALL | wxEXPAND, border_size );
+    
+    
+    wxFlexGridSizer *pFormatGrid = new wxFlexGridSizer( 2 );
+    pFormatGrid->AddGrowableCol( 1 );
+    unitOptions->Add( pFormatGrid, 0, wxALL | wxEXPAND, border_size );
+    
+    wxStaticText* itemStaticTextSDMMFormat = new wxStaticText( itemPanelFont, wxID_STATIC,
+                                                               _("Show Lat/Long as") );
+    pFormatGrid->Add( itemStaticTextSDMMFormat, 0,
+                      wxLEFT | wxRIGHT | wxTOP | wxADJUST_MINSIZE, border_size );
+    
+    wxString pSDMMFormats[] = { _("Degrees, Decimal Minutes"), _("Decimal Degrees"),
+    _("Degrees, Minutes, Seconds") };
+    int m_SDMMFormatsNChoices = sizeof( pSDMMFormats ) / sizeof(wxString);
+    pSDMMFormat = new wxChoice( itemPanelFont, ID_SDMMFORMATCHOICE, wxDefaultPosition,
+                                wxDefaultSize, m_SDMMFormatsNChoices, pSDMMFormats );
+    pFormatGrid->Add( pSDMMFormat, 0, wxALIGN_RIGHT, 2 );
+    
+    wxStaticText* itemStaticTextDistanceFormat = new wxStaticText( itemPanelFont, wxID_STATIC,
+                                                                   _("Show distance as") );
+    pFormatGrid->Add( itemStaticTextDistanceFormat, 0,
+                      wxLEFT | wxRIGHT | wxTOP | wxADJUST_MINSIZE, border_size );
+    
+    wxString pDistanceFormats[] = { _("Nautical miles"), _("Statute miles"),
+      _("Kilometers"), _("Meters") };
+      int m_DistanceFormatsNChoices = sizeof( pDistanceFormats ) / sizeof(wxString);
+      pDistanceFormat = new wxChoice( itemPanelFont, ID_DISTANCEFORMATCHOICE, wxDefaultPosition,
+                                      wxDefaultSize, m_DistanceFormatsNChoices, pDistanceFormats );
+      pFormatGrid->Add( pDistanceFormat, 0, wxALIGN_RIGHT, 2 );
+      
+      wxStaticText* itemStaticTextSpeedFormat = new wxStaticText( itemPanelFont, wxID_STATIC,
+                                                                  _("Show speed as") );
+      pFormatGrid->Add( itemStaticTextSpeedFormat, 0,
+                        wxLEFT | wxRIGHT | wxTOP | wxADJUST_MINSIZE, border_size );
+      
+      wxString pSpeedFormats[] = { _("Knots"), _("Mph"),
+      _("km/h"), _("m/s") };
+      int m_SpeedFormatsNChoices = sizeof( pSpeedFormats ) / sizeof(wxString);
+      pSpeedFormat = new wxChoice( itemPanelFont, ID_SPEEDFORMATCHOICE, wxDefaultPosition,
+                                   wxDefaultSize, m_SpeedFormatsNChoices, pSpeedFormats );
+      pFormatGrid->Add( pSpeedFormat, 0, wxALIGN_RIGHT, 2 );
+      
     
 }
 
@@ -2511,7 +2553,9 @@ void options::CreateControls()
     // ChartGroups must be created after ChartsLoad
     CreatePanel_ChartGroups( m_pageCharts, border_size, group_item_spacing, small_button_size );
     CreatePanel_TidesCurrents( m_pageCharts, border_size, group_item_spacing, small_button_size );
-
+    CreatePanel_ChartDisplay( m_pageCharts, border_size, group_item_spacing, small_button_size );
+    
+    
     m_pageShips = CreatePanel( _("Ships") );
     CreatePanel_Ownship( m_pageShips, border_size, group_item_spacing, small_button_size );
     CreatePanel_AIS( m_pageShips, border_size, group_item_spacing, small_button_size );
@@ -2687,7 +2731,7 @@ void options::SetInitialSettings()
 
     pPreserveScale->SetValue( g_bPreserveScaleOnX );
     pPlayShipsBells->SetValue( g_bPlayShipsBells );
-    pFullScreenToolbar->SetValue( g_bFullscreenToolbar );
+//    pFullScreenToolbar->SetValue( g_bFullscreenToolbar );
     pTransparentToolbar->SetValue( g_bTransparentToolbar );
     pSDMMFormat->Select( g_iSDMMFormat );
     pDistanceFormat->Select( g_iDistanceFormat );
@@ -3403,7 +3447,7 @@ void options::OnApplyClick( wxCommandEvent& event )
     g_bPreserveScaleOnX = pPreserveScale->GetValue();
 
     g_bPlayShipsBells = pPlayShipsBells->GetValue();
-    g_bFullscreenToolbar = pFullScreenToolbar->GetValue();
+//    g_bFullscreenToolbar = pFullScreenToolbar->GetValue();
     g_bTransparentToolbar = pTransparentToolbar->GetValue();
     g_iSDMMFormat = pSDMMFormat->GetSelection();
     g_iDistanceFormat = pDistanceFormat->GetSelection();
