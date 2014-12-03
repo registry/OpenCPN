@@ -373,6 +373,7 @@ enum
     ID_DEF_MENU_QUILTREMOVE,
     ID_DEF_MENU_COGUP,
     ID_DEF_MENU_NORTHUP,
+    ID_DEF_MENU_TOGGLE_FULL,
     ID_DEF_MENU_TIDEINFO,
     ID_DEF_MENU_CURRENTINFO,
     ID_DEF_ZERO_XTE,
@@ -1009,7 +1010,8 @@ BEGIN_EVENT_TABLE ( ChartCanvas, wxWindow )
     EVT_MENU ( ID_DEF_MENU_GOTOPOSITION,       ChartCanvas::PopupMenuHandler )
     EVT_MENU ( ID_DEF_MENU_COGUP,              ChartCanvas::PopupMenuHandler )
     EVT_MENU ( ID_DEF_MENU_NORTHUP,            ChartCanvas::PopupMenuHandler )
-
+    EVT_MENU ( ID_DEF_MENU_TOGGLE_FULL,        ChartCanvas::PopupMenuHandler )
+    
     EVT_MENU ( ID_RT_MENU_ACTIVATE,     ChartCanvas::PopupMenuHandler )
     EVT_MENU ( ID_RT_MENU_DEACTIVATE,   ChartCanvas::PopupMenuHandler )
     EVT_MENU ( ID_RT_MENU_INSERT,       ChartCanvas::PopupMenuHandler )
@@ -3690,6 +3692,12 @@ bool ChartCanvas::SetViewPoint( double lat, double lon, double scale_ppm, double
 
     if( VPoint.GetBBox().GetValid() ) {
 
+        //      Update the viewpoint reference scale
+        if( Current_Ch )
+            VPoint.ref_scale = Current_Ch->GetNativeScale();
+        else 
+            VPoint.ref_scale = m_pQuilt->GetRefNativeScale();
+        
         //    Calculate the on-screen displayed actual scale
         //    by a simple traverse northward from the center point
         //    of roughly 10 % of the Viewport extent
@@ -3731,11 +3739,7 @@ bool ChartCanvas::SetViewPoint( double lat, double lon, double scale_ppm, double
             double true_scale_display = floor( VPoint.chart_scale / 100. ) * 100.;
             wxString text;
 
-            
-            if( Current_Ch )
-                m_displayed_scale_factor = Current_Ch->GetNativeScale()/VPoint.chart_scale;
-            else 
-                m_displayed_scale_factor = m_pQuilt->GetRefNativeScale()/VPoint.chart_scale;
+            m_displayed_scale_factor = VPoint.ref_scale / VPoint.chart_scale;
             
             if( m_displayed_scale_factor > 10.0 )
                 text.Printf( _("Scale %4.0f (%1.0fx)"), true_scale_display, m_displayed_scale_factor );
@@ -6645,6 +6649,10 @@ void ChartCanvas::CanvasPopupMenu( int x, int y, int seltype )
         else
             MenuAppend( contextMenu, ID_DEF_MENU_NORTHUP, _("North Up Mode") );
     }
+
+    if(g_btouch){
+        MenuAppend( contextMenu, ID_DEF_MENU_TOGGLE_FULL, _("Toggle Full Screen") );
+    }
     
     if ( g_pRouteMan->IsAnyRouteActive() && g_pRouteMan->GetCurrentXTEToActivePoint() > 0. ) MenuAppend( contextMenu, ID_DEF_ZERO_XTE, _("Zero XTE") );
 
@@ -7660,6 +7668,10 @@ void ChartCanvas::PopupMenuHandler( wxCommandEvent& event )
     case ID_DEF_MENU_NORTHUP:
         gFrame->ToggleCourseUp();
         break;
+        
+    case ID_DEF_MENU_TOGGLE_FULL:
+        gFrame->ToggleFullScreen();
+        break;
 
     case ID_DEF_MENU_GOTOPOSITION:
         if( NULL == pGoToPositionDialog ) // There is one global instance of the Go To Position Dialog
@@ -7872,10 +7884,11 @@ void ChartCanvas::PopupMenuHandler( wxCommandEvent& event )
         if( dlg_return == wxID_YES ) {
             if( g_pRouteMan->GetpActiveRoute() == m_pSelectedRoute ) g_pRouteMan->DeactivateRoute();
 
-            if( m_pSelectedRoute->m_bIsInLayer ) break;
+            if( m_pSelectedRoute->m_bIsInLayer )
+                break;
 
-            pConfig->DeleteConfigRoute( m_pSelectedRoute );
-            g_pRouteMan->DeleteRoute( m_pSelectedRoute );
+            if( !g_pRouteMan->DeleteRoute( m_pSelectedRoute ) )
+                break;
             if( pRoutePropDialog && ( pRoutePropDialog->IsShown()) && (m_pSelectedRoute == pRoutePropDialog->GetRoute()) ) {
                 pRoutePropDialog->Hide();
             }
@@ -9412,23 +9425,18 @@ void ChartCanvas::DrawEmboss( ocpnDC &dc, emboss_data *pemboss)
 
 emboss_data *ChartCanvas::EmbossOverzoomIndicator( ocpnDC &dc )
 {
+    double zoom_factor = GetVP().ref_scale / GetVP().chart_scale;
+    
     if( GetQuiltMode() ) {
-        double chart_native_ppm;
-        chart_native_ppm = m_canvas_scale_factor / m_pQuilt->GetRefNativeScale();
-
-        double zoom_factor = GetVP().view_scale_ppm / chart_native_ppm;
-
-        if( zoom_factor <= 3.9 ) return NULL;
+        if( zoom_factor <= 3.9 )
+            return NULL;
     } else {
-        double chart_native_ppm;
-        if( Current_Ch ) chart_native_ppm = m_canvas_scale_factor / Current_Ch->GetNativeScale();
-        else
-            chart_native_ppm = m_true_scale_ppm;
-
-        double zoom_factor = GetVP().view_scale_ppm / chart_native_ppm;
         if( Current_Ch ) {
-            if( zoom_factor <= 3.9 ) return NULL;
+            if( zoom_factor <= 3.9 )
+                return NULL;
         }
+        else
+            return NULL;
     }
 
     if(m_pEM_OverZoom){
