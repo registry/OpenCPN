@@ -424,6 +424,7 @@ double                    g_COGAvg;
 bool                      g_bLookAhead;
 bool                      g_bskew_comp;
 bool                      g_bopengl;
+bool                      g_bShowFPS;
 bool                      g_bsmoothpanzoom;
 bool                      g_fog_overzoom;
 double                    g_overzoom_emphasis_base;
@@ -4236,6 +4237,7 @@ void MyFrame::ToggleFullScreen()
 
     ShowFullScreen( to, style );
     UpdateToolbar( global_color_scheme );
+    UpdateControlBar();
     Layout();
 }
 
@@ -5618,7 +5620,7 @@ void MyFrame::DoStackDelta( int direction )
         if( (current_stack_index + direction) < 0 )
             return;
 
-        if( m_bpersistent_quilt && g_bQuiltEnable ) {
+        if( m_bpersistent_quilt /*&& g_bQuiltEnable*/ ) {
             int new_dbIndex = pCurrentStack->GetDBIndex(current_stack_index + direction );
 
             if( cc1->IsChartQuiltableRef( new_dbIndex ) ) {
@@ -5681,6 +5683,7 @@ void MyFrame::DoStackDelta( int direction )
         }
     }
 
+    UpdateGlobalMenuItems(); // update the state of the menu items (checkmarks etc)
     cc1->SetQuiltChartHiLiteIndex( -1 );
 
     cc1->ReloadVP();
@@ -6540,7 +6543,7 @@ void MyFrame::HandlePianoClick( int selected_index, int selected_dbIndex )
     if( s_ProgDialog ) return;
 
     if( !cc1->GetQuiltMode() ) {
-        if( m_bpersistent_quilt && g_bQuiltEnable ) {
+        if( m_bpersistent_quilt/* && g_bQuiltEnable*/ ) {
             if( cc1->IsChartQuiltableRef( selected_dbIndex ) ) {
                 ToggleQuiltMode();
                 SelectQuiltRefdbChart( selected_dbIndex );
@@ -6605,6 +6608,7 @@ void MyFrame::HandlePianoClick( int selected_index, int selected_dbIndex )
     }
 
     cc1->SetQuiltChartHiLiteIndex( -1 );
+    UpdateGlobalMenuItems(); // update the state of the menu items (checkmarks etc)
     cc1->HideChartInfoWindow();
     DoChartUpdate();
     cc1->ReloadVP();                  // Pick up the new selections
@@ -8891,7 +8895,6 @@ void MyFrame::UpdateAISMOBRoute( AIS_Target_Data *ptarget )
 }
 
 
-
 #ifdef wxHAS_POWER_EVENTS
 void MyFrame::OnSuspending(wxPowerEvent& event)
 {
@@ -8899,12 +8902,6 @@ void MyFrame::OnSuspending(wxPowerEvent& event)
  //   printf("OnSuspending...%d\n", now.GetTicks());
 
     wxLogMessage(_T("System suspend starting..."));
-    if ( wxMessageBox(_T("Veto suspend?"), _T("Please answer"),
-        wxYES_NO, this) == wxYES )
-    {
-        event.Veto();
-        wxLogMessage(_T("Vetoed suspend."));
-    }
 }
 
 void MyFrame::OnSuspended(wxPowerEvent& WXUNUSED(event))
@@ -8912,6 +8909,7 @@ void MyFrame::OnSuspended(wxPowerEvent& WXUNUSED(event))
 //    wxDateTime now = wxDateTime::Now();
 //    printf("OnSuspended...%d\n", now.GetTicks());
     wxLogMessage(_T("System is going to suspend."));
+    
 }
 
 void MyFrame::OnSuspendCancel(wxPowerEvent& WXUNUSED(event))
@@ -8938,6 +8936,23 @@ void MyFrame::OnResume(wxPowerEvent& WXUNUSED(event))
             g_pMUX->StartAllStreams();
         }
     }
+
+    //  If OpenGL is enabled, Windows Resume does not properly refresh the application GL context.
+    //  We need to force a Resize event that actually does something.
+    if(g_bopengl){
+        if( IsMaximized() ){            // This is not real pretty on-screen, but works
+            Maximize(false);
+            wxYield();
+            Maximize(true);
+        }
+        else {
+            wxSize sz = GetSize();
+            SetSize( wxSize(sz.x - 1, sz.y));
+            wxYield();
+            SetSize( sz );
+        }
+    }
+    
 }
 #endif // wxHAS_POWER_EVENTS
 
