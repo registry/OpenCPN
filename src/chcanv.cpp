@@ -766,9 +766,6 @@ OCPNRegion ViewPort::GetVPRegionIntersect( const OCPNRegion &Region, size_t nPoi
             b_intersect |= Intersect_FL( p2, p3, f0, f1) != 0; if(b_intersect) break;
             b_intersect |= Intersect_FL( p3, p0, f0, f1) != 0; if(b_intersect) break;
             
-            
-            if(b_intersect)
-                break;
         }
         
         // Check segment, last point back to first point
@@ -2196,12 +2193,12 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
     //NUMERIC PAD
     case WXK_NUMPAD_ADD:              // '+' on NUM PAD
     case WXK_PAGEUP:
-        ZoomCanvas( 2.0 );
+        ZoomCanvas( 2.0, false );
         break;
 
     case WXK_NUMPAD_SUBTRACT:   // '-' on NUM PAD
     case WXK_PAGEDOWN:
-        ZoomCanvas( .5 );
+        ZoomCanvas( .5, false );
         break;
 
     default:
@@ -2217,11 +2214,11 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
         if( !g_b_assume_azerty ) {
             switch( key_char ) {
             case '+': case '=':
-                ZoomCanvas( 2.0 );
+                ZoomCanvas( 2.0, false );
                 break;
 
             case '-': case '_':
-                ZoomCanvas( 0.5 );
+                ZoomCanvas( 0.5, false );
                 break;
 
 #ifdef __WXMAC__
@@ -2241,15 +2238,15 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
                 break;
 #endif
             }
-        } else {
+        } else {   //AZERTY
             switch( key_char ) {
             case 43:
-                ZoomCanvas( 2.0 );
+                ZoomCanvas( 2.0, false );
                 break;
 
             case 54:                     // '-'  alpha/num pad
-            case 56:                     // '_'  alpha/num pad
-                ZoomCanvas( 0.5 );
+//            case 56:                     // '_'  alpha/num pad
+                ZoomCanvas( 0.5, false );
                 break;
             }
         }
@@ -3330,9 +3327,11 @@ void ChartCanvas::DoZoomCanvas( double factor,  bool can_zoom_to_cursor )
         if( can_zoom_to_cursor && g_bEnableZoomToCursor) {
             //  Arrange to combine the zoom and pan into one operation for smoother appearance
             SetVPScale( GetCanvasScaleFactor() / proposed_scale_onscreen, false );   // adjust, but deferred refresh
-            wxPoint2DDouble r;
-            GetDoubleCanvasPointPix( zlat, zlon, &r );
-            PanCanvas( r.m_x - mouse_x, r.m_y - mouse_y );  // this will give the Refresh()
+ 
+            wxPoint r;
+            GetCanvasPointPix( zlat, zlon, &r );
+            PanCanvas( r.x - mouse_x, r.y - mouse_y );  // this will give the Refresh()
+
             ClearbFollow();      // update the follow flag
         }
         else
