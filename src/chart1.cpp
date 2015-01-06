@@ -1106,6 +1106,11 @@ bool MyApp::OnInit()
 
     wxStandardPaths& crash_std_path = *dynamic_cast<wxStandardPaths*>(&wxApp::GetTraits()->GetStandardPaths());
     wxString crash_rpt_save_locn = crash_std_path.GetConfigDir();
+    if( g_bportable ) {
+        wxFileName exec_path_crash( crash_std_path.GetExecutablePath() );
+        crash_rpt_save_locn = exec_path_crash.GetPath( wxPATH_GET_VOLUME | wxPATH_GET_SEPARATOR );
+    }
+    
     wxString locn = crash_rpt_save_locn + _T("\\CrashReports");
     
     if(!wxDirExists( locn ) )
@@ -1600,7 +1605,7 @@ bool MyApp::OnInit()
     //    Manage internationalization of embedded messages
     //    using wxWidgets/gettext methodology....
 
-    wxLog::SetVerbose(true);            // log all messages for debugging language stuff
+//    wxLog::SetVerbose(true);            // log all messages for debugging language stuff
 
     if( lang_list[0] ) {
     };                 // silly way to avoid compiler warnings
@@ -1675,7 +1680,7 @@ bool MyApp::OnInit()
     //    Always use dot as decimal
     setlocale( LC_NUMERIC, "C" );
 
-    wxLog::SetVerbose( false );           // log no more verbose messages
+//    wxLog::SetVerbose( false );           // log no more verbose messages
 
     //  French language locale is assumed to include the AZERTY keyboard
     //  This applies to either the system language, or to OpenCPN language selection
@@ -11258,7 +11263,7 @@ bool ReloadLocale()
         //  So, Load the catalogs saved in a global string array which is populated as PlugIns request a catalog load.
         //  We want to load the PlugIn catalogs first, so that core opencpn translations loaded later will become precedent.
     
-        wxLog::SetVerbose(true);            // log all messages for debugging language stuff
+//        wxLog::SetVerbose(true);            // log all messages for debugging language stuff
         
         for(unsigned int i=0 ; i < g_locale_catalog_array.GetCount() ; i++){
             wxString imsg = _T("Loading catalog for:  ");
@@ -11272,7 +11277,7 @@ bool ReloadLocale()
         wxLogMessage( _T("Loading catalog for opencpn core.") );
         plocale_def_lang->AddCatalog( _T("opencpn") );
         
-        wxLog::SetVerbose(false);
+//        wxLog::SetVerbose(false);
        
         ret = true;
     }
