@@ -2795,6 +2795,7 @@ MyFrame::MyFrame( wxFrame *frame, const wxString& title, const wxPoint& pos, con
     m_COGFilterLast = 0.;
 
     g_sticky_chart = -1;
+    m_BellsToPlay = 0;
 }
 
 MyFrame::~MyFrame()
@@ -5854,12 +5855,10 @@ void MyFrame::OnBellsTimer(wxTimerEvent& event)
         wxLogMessage( _T("Using bells sound file: ") + soundfile );
     }
 
-    if(!bells_sound[bells - 1].IsPlaying()) {
-        bells_sound[bells - 1].Play();
-        m_BellsToPlay -= bells;
-    }
-
-    BellsTimer.Start(20, wxTIMER_ONE_SHOT);
+    bells_sound[bells - 1].Play();
+    m_BellsToPlay -= bells;
+    
+    BellsTimer.Start(2000, wxTIMER_ONE_SHOT);
 }
 
 int ut_index;

@@ -2,8 +2,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: opencpn\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2015-01-03 13:45-0600\n"
-"PO-Revision-Date: 2015-01-03 15:07-0500\n"
+"POT-Creation-Date: 2015-01-07 16:15-0600\n"
+"PO-Revision-Date: 2015-01-07 17:17-0500\n"
 "Last-Translator: nohal <pavel@kalian.cz>\n"
 "Language-Team: Chinese Traditional\n"
 "Language: zh_TW\n"
@@ -29,7 +29,7 @@ msgstr "轉向點屬性"
 msgid "Waypoint Information"
 msgstr "轉向點資訊"
 
-#: include/options.h:56 src/chart1.cpp:3042 src/chart1.cpp:5020
+#: include/options.h:56 src/chart1.cpp:3047 src/chart1.cpp:5026
 msgid "Options"
 msgstr "選項"
 
@@ -37,7 +37,7 @@ msgstr "選項"
 msgid "Sentence Filter"
 msgstr "字串篩選"
 
-#: include/about.h:39 src/chart1.cpp:3105 src/chart1.cpp:4909
+#: include/about.h:39 src/chart1.cpp:3110 src/chart1.cpp:4915
 msgid "About OpenCPN"
 msgstr "關於 OpenCPN "
 
@@ -128,36 +128,36 @@ msgstr "\n雖然 OpenCPN 設計以實用為目的,\n但並不提供任何擔保�
 msgid "Welcome to OpenCPN"
 msgstr "歡迎使用 OpenCPN"
 
-#: src/chart1.cpp:1375
+#: src/chart1.cpp:1379
 msgid "Old log will be moved to opencpn.log.log"
 msgstr "舊的日誌檔會移至opencpn.log.log"
 
-#: src/chart1.cpp:1559 src/chart1.cpp:1563
+#: src/chart1.cpp:1563 src/chart1.cpp:1567
 msgid "Failed to initialize the user interface. "
 msgstr "使用者介面啓用失敗"
 
-#: src/chart1.cpp:1560
+#: src/chart1.cpp:1564
 msgid "OpenCPN cannot start. "
 msgstr "OpenCPN 無法啟動."
 
-#: src/chart1.cpp:1561
+#: src/chart1.cpp:1565
 msgid "The necessary configuration files were not found. "
 msgstr "找不到所需的組態檔."
 
-#: src/chart1.cpp:1562
+#: src/chart1.cpp:1566
 msgid "See the log file at "
 msgstr "查看日誌檔 "
 
-#: src/chart1.cpp:1562
+#: src/chart1.cpp:1566
 msgid " for details."
 msgstr " 有關詳細資訊"
 
-#: src/chart1.cpp:1633
+#: src/chart1.cpp:1637
 msgid "Retrieving initial language selection from Windows Registry"
 msgstr "從Windows 註冊表取得啟始語言"
 
-#: src/chart1.cpp:1698 src/chart1.cpp:2249 src/chart1.cpp:5167
-#: src/chart1.cpp:9802 src/chart1.cpp:9833 src/tcmgr.cpp:762
+#: src/chart1.cpp:1702 src/chart1.cpp:2253 src/chart1.cpp:5173
+#: src/chart1.cpp:9806 src/chart1.cpp:9837 src/tcmgr.cpp:762
 #: src/options.cpp:3499 src/options.cpp:3506 src/options.cpp:3514
 #: src/options.cpp:3521 src/options.cpp:5755 src/pluginmanager.cpp:595
 #: src/pluginmanager.cpp:637 src/pluginmanager.cpp:665
@@ -166,353 +166,353 @@ msgstr "從Windows 註冊表取得啟始語言"
 msgid "OpenCPN Info"
 msgstr "OpenCPN 資訊"
 
-#: src/chart1.cpp:2035
+#: src/chart1.cpp:2039
 msgid " -- [Portable(-p) executing from "
 msgstr " -- [免安裝(-p) 執行來自 "
 
-#: src/chart1.cpp:2173
+#: src/chart1.cpp:2177
 msgid "Retrieving initial Chart Directory set from Windows Registry"
 msgstr "從Windows 註冊表取得啟始海圖目錄"
 
-#: src/chart1.cpp:2224
+#: src/chart1.cpp:2228
 msgid "Rebuilding chart database from configuration file entries..."
 msgstr "依據組態檔設定來更新海圖索引資料...."
 
-#: src/chart1.cpp:2227
+#: src/chart1.cpp:2231
 msgid "Elapsed time : "
 msgstr "經過時間 : "
 
-#: src/chart1.cpp:2228
+#: src/chart1.cpp:2232
 msgid "Estimated time : "
 msgstr "估計時間 : "
 
-#: src/chart1.cpp:2229
+#: src/chart1.cpp:2233
 msgid "Remaining time : "
 msgstr "剩餘時間 : "
 
-#: src/chart1.cpp:2230 src/chart1.cpp:5460 src/chart1.cpp:5462
+#: src/chart1.cpp:2234 src/chart1.cpp:5466 src/chart1.cpp:5468
 msgid "OpenCPN Chart Update"
 msgstr "OpenCPN 海圖更新"
 
-#: src/chart1.cpp:2247
+#: src/chart1.cpp:2251
 msgid "No Charts Installed.\nPlease select chart folders in Options > Charts."
 msgstr "沒有安裝圖資.\n請至 選項 -> 海圖 選取圖資目錄."
 
-#: src/chart1.cpp:2918 src/chcanv.cpp:10473
+#: src/chart1.cpp:2923 src/chcanv.cpp:10473
 msgid "AIS Target Query"
 msgstr "AIS 目標查詢"
 
-#: src/chart1.cpp:2997 src/chart1.cpp:4841
+#: src/chart1.cpp:3002 src/chart1.cpp:4847
 msgid "Zoom In"
 msgstr "放大"
 
-#: src/chart1.cpp:3003 src/chart1.cpp:4842
+#: src/chart1.cpp:3008 src/chart1.cpp:4848
 msgid "Zoom Out"
 msgstr "縮小"
 
-#: src/chart1.cpp:3012
+#: src/chart1.cpp:3017
 msgid "Shift to Larger Scale Chart"
 msgstr "換至大比例尺海圖"
 
-#: src/chart1.cpp:3020
+#: src/chart1.cpp:3025
 msgid "Shift to Smaller Scale Chart"
 msgstr "換至小比例尺海圖"
 
-#: src/chart1.cpp:3028 src/chart1.cpp:4892
+#: src/chart1.cpp:3033 src/chart1.cpp:4898
 msgid "Create Route"
 msgstr "建立航路"
 
-#: src/chart1.cpp:3035 src/chart1.cpp:4835
+#: src/chart1.cpp:3040 src/chart1.cpp:4841
 msgid "Auto Follow"
 msgstr "自動定位"
 
-#: src/chart1.cpp:3048 src/chart1.cpp:4859
+#: src/chart1.cpp:3053 src/chart1.cpp:4865
 msgid "Show ENC Text"
 msgstr "顯示 ENC 文字"
 
-#: src/chart1.cpp:3056 src/chart1.cpp:3141 src/chart1.cpp:4013
+#: src/chart1.cpp:3061 src/chart1.cpp:3146 src/chart1.cpp:4018
 msgid "Hide AIS Targets"
 msgstr "隱藏 AIS 目標"
 
-#: src/chart1.cpp:3063 src/chart1.cpp:4075 src/chart1.cpp:4866
+#: src/chart1.cpp:3068 src/chart1.cpp:4080 src/chart1.cpp:4872
 msgid "Show Currents"
 msgstr "顯示海流"
 
-#: src/chart1.cpp:3069 src/chart1.cpp:4109 src/chart1.cpp:4865
+#: src/chart1.cpp:3074 src/chart1.cpp:4114 src/chart1.cpp:4871
 msgid "Show Tides"
 msgstr "顯示潮汐"
 
-#: src/chart1.cpp:3075
+#: src/chart1.cpp:3080
 msgid "Print Chart"
 msgstr "列印海圖"
 
-#: src/chart1.cpp:3081 src/routemanagerdialog.cpp:425
+#: src/chart1.cpp:3086 src/routemanagerdialog.cpp:425
 msgid "Route & Mark Manager"
-msgstr ""
+msgstr "航路 & 標記管理"
 
-#: src/chart1.cpp:3088 src/chart1.cpp:4459 src/chart1.cpp:4836
+#: src/chart1.cpp:3093 src/chart1.cpp:4465 src/chart1.cpp:4842
 msgid "Enable Tracking"
-msgstr ""
+msgstr "啟用追跡"
 
-#: src/chart1.cpp:3095 src/chart1.cpp:4868
+#: src/chart1.cpp:3100 src/chart1.cpp:4874
 msgid "Change Color Scheme"
 msgstr "更換色彩樣式"
 
-#: src/chart1.cpp:3114 src/chart1.cpp:4898 src/chart1.cpp:4902
+#: src/chart1.cpp:3119 src/chart1.cpp:4904 src/chart1.cpp:4908
 msgid "Drop MOB Marker"
 msgstr "標定人員落水標記"
 
-#: src/chart1.cpp:3114
+#: src/chart1.cpp:3119
 msgid " (Ctrl-Space)"
 msgstr " (Ctrl-Space)"
 
-#: src/chart1.cpp:3145 src/chart1.cpp:4016 src/chart1.cpp:4879
+#: src/chart1.cpp:3150 src/chart1.cpp:4021 src/chart1.cpp:4885
 msgid "Show AIS Targets"
 msgstr "顯示 AIS 目標"
 
-#: src/chart1.cpp:3507
+#: src/chart1.cpp:3512
 msgid "Anchorage created "
 msgstr "錨固建立 "
 
-#: src/chart1.cpp:3722
+#: src/chart1.cpp:3727
 msgid "StatusBar"
 msgstr "狀態列"
 
-#: src/chart1.cpp:3896
+#: src/chart1.cpp:3901
 msgid "Group \""
 msgstr "群組 \""
 
-#: src/chart1.cpp:3898
+#: src/chart1.cpp:3903
 msgid "\" is empty, switching to \"All Active Charts\" group."
 msgstr "\" 是空的, 切換到 \"All Active Charts\" 群組."
 
-#: src/chart1.cpp:3900
+#: src/chart1.cpp:3905
 msgid "OpenCPN Group Notice"
 msgstr "OpenCPN 群組通知"
 
-#: src/chart1.cpp:4077
+#: src/chart1.cpp:4082
 msgid "Hide Currents"
-msgstr ""
+msgstr "隱藏海流"
 
-#: src/chart1.cpp:4111
+#: src/chart1.cpp:4116
 msgid "Hide Tides"
-msgstr ""
+msgstr "隱藏潮汐"
 
-#: src/chart1.cpp:4118
+#: src/chart1.cpp:4123
 msgid "Chart1::Event...TCMgr Not Available"
 msgstr "Chart1::Event...TCMgr 無法獲得"
 
-#: src/chart1.cpp:4313 src/chart1.cpp:4368
+#: src/chart1.cpp:4318 src/chart1.cpp:4374
 msgid "MAN OVERBOARD"
 msgstr "人員落水"
 
-#: src/chart1.cpp:4330
+#: src/chart1.cpp:4335
 msgid "1.0 NM along COG"
 msgstr "1.0 NM 沿著 COG"
 
-#: src/chart1.cpp:4341
+#: src/chart1.cpp:4346
 msgid "Temporary MOB Route"
 msgstr "暫時 MOB 路徑"
 
-#: src/chart1.cpp:4342
+#: src/chart1.cpp:4347
 msgid "Assumed 1 Mile Point"
 msgstr "1 海浬假設點"
 
-#: src/chart1.cpp:4391
+#: src/chart1.cpp:4397
 msgid "Disable Tracking"
-msgstr ""
+msgstr "取消追跡"
 
-#: src/chart1.cpp:4411 src/chart1.cpp:7888 src/chart1.cpp:8021
+#: src/chart1.cpp:4417 src/chart1.cpp:7892 src/chart1.cpp:8025
 #: src/routemanagerdialog.cpp:1590
 msgid "(Unnamed Track)"
 msgstr "(未命名航跡)"
 
-#: src/chart1.cpp:4509 src/chart1.cpp:4838 src/chart1.cpp:6467
+#: src/chart1.cpp:4515 src/chart1.cpp:4844 src/chart1.cpp:6471
 #: src/chcanv.cpp:6747
 msgid "North Up Mode"
 msgstr "北方朝上模式"
 
-#: src/chart1.cpp:4523
+#: src/chart1.cpp:4529
 msgid "Show ENC Text (T)"
-msgstr ""
+msgstr "顯示 ENC 文字 (T)"
 
-#: src/chart1.cpp:4525
+#: src/chart1.cpp:4531
 msgid "Hide ENC Text (T)"
-msgstr ""
+msgstr "隱藏 ENC 文字 (T)"
 
-#: src/chart1.cpp:4839 src/chcanv.cpp:6742
+#: src/chart1.cpp:4845 src/chcanv.cpp:6742
 msgid "Course Up Mode"
 msgstr "航向朝上模式"
 
-#: src/chart1.cpp:4844
-msgid "Larger Scale Chart"
-msgstr ""
-
-#: src/chart1.cpp:4845
-msgid "Smaller Scale Chart"
-msgstr ""
-
-#: src/chart1.cpp:4848
-msgid "Exit OpenCPN"
-msgstr ""
-
 #: src/chart1.cpp:4850
-msgid "&Navigate"
-msgstr ""
+msgid "Larger Scale Chart"
+msgstr "較大比例尺海圖"
 
-#: src/chart1.cpp:4854 src/options.cpp:2228
+#: src/chart1.cpp:4851
+msgid "Smaller Scale Chart"
+msgstr "較小比例尺海圖"
+
+#: src/chart1.cpp:4854
+msgid "Exit OpenCPN"
+msgstr "退出 OpenCPN"
+
+#: src/chart1.cpp:4856
+msgid "&Navigate"
+msgstr "& 導航"
+
+#: src/chart1.cpp:4860 src/options.cpp:2228
 msgid "Enable Chart Quilting"
 msgstr "啟用自動接圖功能"
 
-#: src/chart1.cpp:4855 src/options.cpp:2266
+#: src/chart1.cpp:4861 src/options.cpp:2266
 msgid "Show Chart Outlines"
 msgstr "顯示海圖圖框"
 
-#: src/chart1.cpp:4856 src/options.cpp:2647
+#: src/chart1.cpp:4862 src/options.cpp:2647
 msgid "Show Chart Bar"
-msgstr ""
+msgstr "顯示圖表欄"
 
-#: src/chart1.cpp:4860
+#: src/chart1.cpp:4866
 msgid "Show ENC Lights"
-msgstr ""
+msgstr "顯示 ENC 燈標"
 
-#: src/chart1.cpp:4861
+#: src/chart1.cpp:4867
 msgid "Show ENC Soundings"
-msgstr ""
+msgstr "顯示 ENC 水深"
 
-#: src/chart1.cpp:4862
+#: src/chart1.cpp:4868
 msgid "Show ENC Anchoring Info"
-msgstr ""
+msgstr "顯示 ENC 錨泊資訊"
 
-#: src/chart1.cpp:4871 src/chart1.cpp:4873
+#: src/chart1.cpp:4877 src/chart1.cpp:4879
 msgid "Enter Full Screen"
-msgstr ""
-
-#: src/chart1.cpp:4875
-msgid "&View"
-msgstr ""
-
-#: src/chart1.cpp:4880
-msgid "Show Target Tracks"
-msgstr ""
+msgstr "進入全螢幕"
 
 #: src/chart1.cpp:4881
+msgid "&View"
+msgstr "&V檢視"
+
+#: src/chart1.cpp:4886
+msgid "Show Target Tracks"
+msgstr "顯示目標軌跡"
+
+#: src/chart1.cpp:4887
 msgid "Show CPA Alert Dialogs"
-msgstr ""
+msgstr "顯示 CPA 警報對話框"
 
-#: src/chart1.cpp:4882
+#: src/chart1.cpp:4888
 msgid "Sound CPA Alarms"
-msgstr ""
+msgstr "CPA 警報聲響"
 
-#: src/chart1.cpp:4884 src/chcanv.cpp:6872
+#: src/chart1.cpp:4890 src/chcanv.cpp:6872
 msgid "AIS Target List..."
 msgstr "AIS 目標列表..."
 
-#: src/chart1.cpp:4885
-msgid "&AIS"
-msgstr ""
-
-#: src/chart1.cpp:4889
-msgid "Measure Distance"
-msgstr ""
-
 #: src/chart1.cpp:4891
-msgid "Route && Mark Manager..."
-msgstr ""
-
-#: src/chart1.cpp:4894
-msgid "Drop Mark at Boat"
-msgstr ""
+msgid "&AIS"
+msgstr "&AIS"
 
 #: src/chart1.cpp:4895
-msgid "Drop Mark at Cursor"
-msgstr ""
+msgid "Measure Distance"
+msgstr "測量距離"
+
+#: src/chart1.cpp:4897
+msgid "Route && Mark Manager..."
+msgstr "航路&&標記管理"
 
 #: src/chart1.cpp:4900
+msgid "Drop Mark at Boat"
+msgstr "在船舶位置放置標記"
+
+#: src/chart1.cpp:4901
+msgid "Drop Mark at Cursor"
+msgstr "在游標位置放置標記"
+
+#: src/chart1.cpp:4906
 msgid "Preferences..."
-msgstr ""
+msgstr "設定偏好..."
 
-#: src/chart1.cpp:4904 src/options.cpp:1834
+#: src/chart1.cpp:4910 src/options.cpp:1834
 msgid "Options..."
-msgstr ""
+msgstr "選項..."
 
-#: src/chart1.cpp:4907
+#: src/chart1.cpp:4913
 msgid "&Tools"
-msgstr ""
+msgstr "&T工具"
 
-#: src/chart1.cpp:4910
+#: src/chart1.cpp:4916
 msgid "OpenCPN Help"
-msgstr ""
+msgstr "OpenCPN 説明"
 
-#: src/chart1.cpp:4911
+#: src/chart1.cpp:4917
 msgid "&Help"
-msgstr ""
+msgstr "&H説明"
 
-#: src/chart1.cpp:5166
+#: src/chart1.cpp:5172
 msgid "Please restart OpenCPN to activate language or style changes."
 msgstr "請重新啟動 OpenCPN 來顯示新設定的語系與樣式."
 
-#: src/chart1.cpp:6460
+#: src/chart1.cpp:6464
 msgid "Rotated Mode"
-msgstr ""
+msgstr "旋轉模式"
 
-#: src/chart1.cpp:7536
+#: src/chart1.cpp:7540
 msgid "Show This Chart"
 msgstr "顯示此海圖"
 
-#: src/chart1.cpp:7541 src/chcanv.cpp:6798
+#: src/chart1.cpp:7545 src/chcanv.cpp:6798
 msgid "Hide This Chart"
 msgstr "隱藏此海圖"
 
-#: src/chart1.cpp:7791
+#: src/chart1.cpp:7795
 msgid "Chart Print"
 msgstr "海圖列印"
 
-#: src/chart1.cpp:7800 src/routeprintout.cpp:469
+#: src/chart1.cpp:7804 src/routeprintout.cpp:469
 msgid "There was a problem printing.\nPerhaps your current printer is not set correctly?"
 msgstr "列印發生錯誤.\n印表機是否連接妥當?"
 
-#: src/chart1.cpp:7951 src/chart1.cpp:8024 src/routemanagerdialog.cpp:890
+#: src/chart1.cpp:7955 src/chart1.cpp:8028 src/routemanagerdialog.cpp:890
 msgid "(Unnamed Route)"
 msgstr "(未命名航路)"
 
-#: src/chart1.cpp:8583
+#: src/chart1.cpp:8587
 msgid " Ship "
 msgstr " 船名"
 
-#: src/chart1.cpp:8854 src/chart1.cpp:8905
+#: src/chart1.cpp:8858 src/chart1.cpp:8909
 msgid "AIS MAN OVERBOARD"
-msgstr ""
+msgstr "AIS 人員落水"
 
-#: src/chart1.cpp:8867
+#: src/chart1.cpp:8871
 msgid "Ownship"
-msgstr ""
+msgstr "本船"
 
-#: src/chart1.cpp:8878
+#: src/chart1.cpp:8882
 msgid "Temporary AISMOB Route"
-msgstr ""
+msgstr "臨時的 AISMOB 航路"
 
-#: src/chart1.cpp:8879
+#: src/chart1.cpp:8883
 msgid "Present Ownship"
-msgstr ""
+msgstr "目前的本船"
 
-#: src/chart1.cpp:8949
+#: src/chart1.cpp:8953
 msgid "AIS MAN OVERBOARD UPDATE"
-msgstr ""
+msgstr "AIS 人員落水更新"
 
-#: src/chart1.cpp:9797
+#: src/chart1.cpp:9801
 msgid "OpenCPN requires access to serial ports to use serial NMEA data.\n"
 msgstr "OpenCPN 需要存取序列埠來使用序列 NMEA 資料.\n"
 
-#: src/chart1.cpp:9799
+#: src/chart1.cpp:9803
 msgid "No Serial Ports can be found on this system.\nYou must install a serial port (modprobe correct kernel module) or plug in a usb serial device.\n"
 msgstr "在這系統上找不到任何序列埠。\n您必須安裝一個序列埠 (modprobe 正確的核心模組) 或插上一個 usb 串列設備 \n"
 
-#: src/chart1.cpp:9821
+#: src/chart1.cpp:9825
 msgid "You do currently not have permission to access the serial ports on this system.\n\nIt is suggested that you exit OpenCPN now,\nand add yourself to the correct group to enable serial port access.\n\nYou may do so by executing the following command from the linux command line:\n\n                sudo usermod -a -G "
 msgstr "您目前沒有權限存取這個系統上的序列埠.\n\n建議您現在退出 OpenCPN，\n並將自己加到正確具有使用序列埠權限的群組.\n\n您可以在linux命令列下通過執行下面的命令來達成:\n\n sudo usermod -a -G "
 
-#: src/chart1.cpp:10255 src/routeprop.cpp:361 src/routeprop.cpp:1831
+#: src/chart1.cpp:10259 src/routeprop.cpp:361 src/routeprop.cpp:1831
 #: src/routemanagerdialog.cpp:428 src/options.cpp:655 src/options.cpp:847
 #: src/options.cpp:1769 src/options.cpp:2149 src/options.cpp:2724
 #: src/options.cpp:2728 src/options.cpp:5844 src/TrackPropDlg.cpp:85
@@ -527,7 +527,7 @@ msgstr "海圖文字"
 
 #: src/tcmgr.cpp:761
 msgid "It seems you have no tide/current harmonic data installed."
-msgstr ""
+msgstr "看起來您尚未安裝潮汐、海流資料。"
 
 #: src/cm93.cpp:6722
 msgid "OpenCPN CM93 Cell Offset Adjustments"
@@ -610,7 +610,7 @@ msgstr "   建立海圖索引失敗 "
 
 #: src/chartimg.cpp:1944
 msgid "---<<< Warning:  Chart Datum may be incorrect. >>>---"
-msgstr ""
+msgstr "---<<< 警告： 海圖參考基準可能不正確。 >>>--"
 
 #: src/chartimg.cpp:5003
 msgid "---<<< Warning:  Chart georef accuracy may be poor. >>>---"
@@ -707,7 +707,7 @@ msgstr " 到 "
 #: src/chcanv.cpp:3832
 #, c-format
 msgid "Scale %4.0f (%1.0fx)"
-msgstr ""
+msgstr "Scale %4.0f (%1.0fx)"
 
 #: src/chcanv.cpp:3834
 #, c-format
@@ -814,11 +814,11 @@ msgstr "海圖朝上模式"
 
 #: src/chcanv.cpp:6752 src/chcanv.cpp:6759
 msgid "Toggle Full Screen"
-msgstr ""
+msgstr "切換全螢幕顯示"
 
 #: src/chcanv.cpp:6764
 msgid "Zero XTE"
-msgstr ""
+msgstr "XTE 為零"
 
 #: src/chcanv.cpp:6771
 msgid "Paste Waypoint"
@@ -1611,7 +1611,7 @@ msgstr "組合!"
 
 #: src/routeprop.cpp:1938
 msgid "Arrival Radius"
-msgstr ""
+msgstr "到達半徑"
 
 #: src/routeprop.cpp:1962 src/options.cpp:1319 src/options.cpp:1346
 msgid "..."
@@ -1668,19 +1668,19 @@ msgstr "連結開啓供編輯"
 
 #: src/routeprop.cpp:2685
 msgid "Copy"
-msgstr ""
+msgstr "複製"
 
 #: src/routeprop.cpp:2686
 msgid "Copy lat/long"
-msgstr ""
+msgstr "複製 緯度/經度"
 
 #: src/routeprop.cpp:2687
 msgid "Paste"
-msgstr ""
+msgstr "貼上"
 
 #: src/routeprop.cpp:2688
 msgid "Paste lat/long"
-msgstr ""
+msgstr "貼上 緯度/經度"
 
 #: src/routemanagerdialog.cpp:457 src/options.cpp:1618
 msgid "Routes"
@@ -2790,7 +2790,7 @@ msgstr "AIS 目標名稱"
 
 #: src/options.cpp:347
 msgid "MMSI Extended Properties"
-msgstr ""
+msgstr "MMSI 擴充屬性"
 
 #: src/options.cpp:353 src/options.cpp:686 src/AISTargetListDialog.cpp:372
 #: src/AIS_Target_Data.cpp:317 src/AIS_Target_Data.cpp:326
@@ -2799,79 +2799,79 @@ msgstr "MMSI"
 
 #: src/options.cpp:362
 msgid "Tracking"
-msgstr ""
+msgstr "追跡"
 
 #: src/options.cpp:367
 msgid "Default tracking"
-msgstr ""
+msgstr "預設追跡"
 
 #: src/options.cpp:371
 msgid "Always track"
-msgstr ""
+msgstr "始終追跡"
 
 #: src/options.cpp:374
 msgid "Never track"
-msgstr ""
+msgstr "永遠不追蹤"
 
 #: src/options.cpp:377 src/options.cpp:533
 msgid "Persistent"
-msgstr ""
+msgstr "持續"
 
 #: src/options.cpp:384
 msgid "Ignore this MMSI"
-msgstr ""
+msgstr "忽略此 MMSI"
 
 #: src/options.cpp:387
 msgid "Handle this MMSI as SART/PLB(AIS) MOB."
-msgstr ""
+msgstr "處理此 MMSI 如同 SART/PLB(AIS) MOB."
 
 #: src/options.cpp:390
 msgid "Convert AIVDM to AIVDO for this MMSI"
-msgstr ""
+msgstr "將此 MMSI 的 AIVDM 轉換為 AIVDO"
 
 #: src/options.cpp:527
 msgid "Always"
-msgstr ""
+msgstr "永遠"
 
 #: src/options.cpp:529
 msgid "Never"
-msgstr ""
+msgstr "永遠不會"
 
 #: src/options.cpp:570 src/options.cpp:621
 msgid "Edit MMSI Properties"
-msgstr ""
+msgstr "編輯 MMSI 屬性"
 
 #: src/options.cpp:588 src/options.cpp:2368 src/options.cpp:2374
 msgid "MMSI Properties"
-msgstr ""
+msgstr "MMSI 屬性"
 
 #: src/options.cpp:590
 msgid "Edit..."
-msgstr ""
+msgstr "編輯…"
 
 #: src/options.cpp:694
 msgid "Track Mode"
-msgstr ""
+msgstr "追蹤模式"
 
 #: src/options.cpp:702
 msgid "Ignore"
-msgstr ""
+msgstr "忽略"
 
 #: src/options.cpp:710
 msgid "MOB"
-msgstr ""
+msgstr "MOB"
 
 #: src/options.cpp:718
 msgid "VDM->VDO"
-msgstr ""
+msgstr "VDM->VDO"
 
 #: src/options.cpp:724
 msgid "New..."
-msgstr ""
+msgstr "新增..."
 
 #: src/options.cpp:747
 msgid "Add MMSI Properties"
-msgstr ""
+msgstr "新增 MMSI 屬性"
 
 #: src/options.cpp:1068
 msgid "NMEA"
@@ -3087,27 +3087,27 @@ msgstr "輸出至此連接埠(作為 Autopilot 或 NMEA 轉送器)"
 
 #: src/options.cpp:1286
 msgid "APB bearing precision"
-msgstr ""
+msgstr "APB 方位精度"
 
 #: src/options.cpp:1290
 msgid "x"
-msgstr ""
+msgstr "x"
 
 #: src/options.cpp:1290
 msgid "x.x"
-msgstr ""
+msgstr "x.x"
 
 #: src/options.cpp:1290
 msgid "x.xx"
-msgstr ""
+msgstr "x.xx"
 
 #: src/options.cpp:1290
 msgid "x.xxx"
-msgstr ""
+msgstr "x.xxx"
 
 #: src/options.cpp:1290
 msgid "x.xxxx"
-msgstr ""
+msgstr "x.xxxx"
 
 #: src/options.cpp:1299
 msgid "Input filtering"
@@ -3167,7 +3167,7 @@ msgstr "COG 向量線長度(分鐘)"
 
 #: src/options.cpp:1527
 msgid "Heading Predictor Length (NMi)"
-msgstr ""
+msgstr "艏向預測長度(NMi)"
 
 #: src/options.cpp:1533
 msgid "Ship Icon Type"
@@ -3203,7 +3203,7 @@ msgstr "最小螢幕顯示大小(mm)"
 
 #: src/options.cpp:1571
 msgid "Show range rings"
-msgstr ""
+msgstr "顯示距離圈"
 
 #: src/options.cpp:1574
 msgid "None"
@@ -3255,11 +3255,11 @@ msgstr "航路點到達圈半徑(海浬)"
 
 #: src/options.cpp:1632
 msgid "Advance route waypoint on arrival only"
-msgstr ""
+msgstr "只有在到達時使用進階航路轉向點"
 
 #: src/options.cpp:1642
 msgid "Chart Files"
-msgstr ""
+msgstr "海圖檔"
 
 #: src/options.cpp:1647
 msgid "Directories"
@@ -3291,7 +3291,7 @@ msgstr "進階"
 
 #: src/options.cpp:1721 src/options.cpp:2224
 msgid "Chart Display"
-msgstr ""
+msgstr "海圖顯示"
 
 #: src/options.cpp:1725
 msgid "Show Skewed Raster Charts as North-Up"
@@ -3303,31 +3303,31 @@ msgstr "取消全螢幕接圖功能"
 
 #: src/options.cpp:1731
 msgid "Suppress blur/fog effects on overzoom"
-msgstr ""
+msgstr "過度放大時抑制模糊/霧化現象"
 
 #: src/options.cpp:1734
 msgid "Suppress scaled vector charts on overzoom"
-msgstr ""
+msgstr "過度縮放時抑制向量圖形"
 
 #: src/options.cpp:1743
 msgid "Course-Up Update Period"
-msgstr ""
+msgstr "航向朝上顯示更新週期"
 
 #: src/options.cpp:1750
 msgid "seconds"
-msgstr ""
+msgstr "秒"
 
 #: src/options.cpp:1759
 msgid "Chart Zoom/Scale Weighting"
-msgstr ""
+msgstr "海圖縮放/比例權重"
 
 #: src/options.cpp:1767
 msgid "With a lower value, the same zoom level shows a less detailed chart.\nWith a higher value, the same zoom level shows a more detailed chart."
-msgstr ""
+msgstr "數值較小，在相同的縮放級別顯示較不詳細的圖表。 \n數值較大，在相同的縮放級別顯示更詳細的圖表。"
 
 #: src/options.cpp:1782 src/options.cpp:2241
 msgid "Controls"
-msgstr ""
+msgstr "控制項"
 
 #: src/options.cpp:1786
 msgid "Lock Waypoints (Unless waypoint property dialog visible)"
@@ -3339,23 +3339,23 @@ msgstr "重複確認刪除航跡與航路"
 
 #: src/options.cpp:1801
 msgid "Physical Screen Width"
-msgstr ""
+msgstr "實體螢幕寬度"
 
 #: src/options.cpp:1805 src/options.cpp:3073 src/options.cpp:3202
 msgid "Auto"
-msgstr ""
+msgstr "自動"
 
 #: src/options.cpp:1808
 msgid "Manual:"
-msgstr ""
+msgstr "手動："
 
 #: src/options.cpp:1814
 msgid "mm"
-msgstr ""
+msgstr "mm"
 
 #: src/options.cpp:1826
 msgid "Graphics"
-msgstr ""
+msgstr "圖形"
 
 #: src/options.cpp:1830
 msgid "Use Accelerated Graphics (OpenGL)"
@@ -3367,7 +3367,7 @@ msgstr "啟用透明工具列"
 
 #: src/options.cpp:1854
 msgid "Vector Chart Display"
-msgstr ""
+msgstr "向量圖顯示"
 
 #: src/options.cpp:1875
 msgid "Display Category"
@@ -3403,7 +3403,7 @@ msgstr "海圖資訊物件"
 
 #: src/options.cpp:1901
 msgid "Buoys/Lights"
-msgstr ""
+msgstr "浮標/燈號"
 
 #: src/options.cpp:1906
 msgid "Buoy/Light Labels"
@@ -3419,7 +3419,7 @@ msgstr "延伸燈號扇型範圍"
 
 #: src/options.cpp:1918
 msgid "Chart Texts"
-msgstr ""
+msgstr "海圖文字"
 
 #: src/options.cpp:1923
 msgid "National text on chart"
@@ -3435,7 +3435,7 @@ msgstr "精簡文字"
 
 #: src/options.cpp:1935
 msgid "Chart Detail"
-msgstr ""
+msgstr "海圖細節"
 
 #: src/options.cpp:1936
 msgid "Reduced Detail at Small Scale"
@@ -3443,7 +3443,7 @@ msgstr "在小比例尺減少細節"
 
 #: src/options.cpp:1947
 msgid "Graphics Style"
-msgstr ""
+msgstr "圖形樣式"
 
 #: src/options.cpp:1948
 msgid "Paper Chart"
@@ -3483,7 +3483,7 @@ msgstr "淺水區水深"
 
 #: src/options.cpp:1977 src/options.cpp:1985 src/options.cpp:1993
 msgid "metres"
-msgstr ""
+msgstr "公尺"
 
 #: src/options.cpp:1980
 msgid "Safety Depth"
@@ -3535,15 +3535,15 @@ msgstr "刪除群組"
 
 #: src/options.cpp:2202
 msgid "Navigation Mode"
-msgstr ""
+msgstr "導航模式"
 
 #: src/options.cpp:2209
 msgid "North Up"
-msgstr ""
+msgstr "北方朝上"
 
 #: src/options.cpp:2211
 msgid "Course Up"
-msgstr ""
+msgstr "航路朝上"
 
 #: src/options.cpp:2214
 msgid "Look Ahead Mode"
@@ -3563,7 +3563,7 @@ msgstr "縮放時以游標位置為中心"
 
 #: src/options.cpp:2259
 msgid "Display Features"
-msgstr ""
+msgstr "顯示功能"
 
 #: src/options.cpp:2263
 msgid "Show Grid"
@@ -3575,7 +3575,7 @@ msgstr "顯示水深單位"
 
 #: src/options.cpp:2277
 msgid "Units"
-msgstr ""
+msgstr "單位"
 
 #: src/options.cpp:2298
 msgid "Nautical miles"
@@ -3595,11 +3595,11 @@ msgstr "英哩每小時"
 
 #: src/options.cpp:2315
 msgid "Depth"
-msgstr ""
+msgstr "水深"
 
 #: src/options.cpp:2328
 msgid "Lat/Long"
-msgstr ""
+msgstr "緯度/經度"
 
 #: src/options.cpp:2329
 msgid "Degrees, Decimal Minutes"
@@ -3615,19 +3615,19 @@ msgstr "度, 分, 秒"
 
 #: src/options.cpp:2342
 msgid "Bearings"
-msgstr ""
+msgstr "方位"
 
 #: src/options.cpp:2348
 msgid "Show magnetic bearings and headings"
-msgstr ""
+msgstr "顯示磁羅經方位與艏向"
 
 #: src/options.cpp:2355
 msgid "Assumed magnetic variation"
-msgstr ""
+msgstr "假定的磁場偏差"
 
 #: src/options.cpp:2361
 msgid "deg (+W, -E)"
-msgstr ""
+msgstr "deg (+W, -E)"
 
 #: src/options.cpp:2389
 msgid "AIS Targets"
@@ -3763,7 +3763,7 @@ msgstr "工具列與視窗樣式"
 
 #: src/options.cpp:2633
 msgid "Interface Options"
-msgstr ""
+msgstr "介面選項"
 
 #: src/options.cpp:2637
 msgid "Show Status Bar"
@@ -3771,7 +3771,7 @@ msgstr "顯示狀態列"
 
 #: src/options.cpp:2642
 msgid "Show Menu Bar"
-msgstr ""
+msgstr "顯示功能表列"
 
 #: src/options.cpp:2651
 msgid "Show Compass/GPS Status Window"
@@ -3783,11 +3783,11 @@ msgstr "播放船鐘聲效"
 
 #: src/options.cpp:2659
 msgid "Enable Touchscreen interface"
-msgstr ""
+msgstr "啟用觸控螢幕介面"
 
 #: src/options.cpp:2662
 msgid "Enable Tablet Scaled Graphics interface"
-msgstr ""
+msgstr "啟用平板縮放圖形介面"
 
 #: src/options.cpp:2777
 msgid "Apply"
@@ -3815,15 +3815,15 @@ msgstr "插件"
 
 #: src/options.cpp:3172
 msgid "feet"
-msgstr ""
+msgstr "英呎"
 
 #: src/options.cpp:3172
 msgid "meters"
-msgstr ""
+msgstr "公尺"
 
 #: src/options.cpp:3172
 msgid "fathoms"
-msgstr ""
+msgstr "噚"
 
 #: src/options.cpp:3404
 msgid "Add a directory containing chart files"
@@ -3899,7 +3899,7 @@ msgstr "輸入NMEA字串"
 
 #: src/options.cpp:5754
 msgid "An NMEA sentence is generally 3 characters long (like RMC, GGA etc.)\n It can also have a two letter prefix identifying the source, or TALKER, of the message.\n The whole sentences then looks like GPGGA or AITXT.\n You may filter out all the sentences with certain TALKER prefix (like GP, AI etc.).\n\n The filter accepts just these three formats."
-msgstr ""
+msgstr "NMEA 字串通常由 3 個字元來標示其代表訊息(例如 RMC, GGA 等等)\n，前方可能再加上兩個前置字元來表示發送來源\n，使得整個 NMEA 字串看起來像這樣 GPGGA 或 AITXT。\n你可以利用特定的發送源前置字元(例如GP, AI等等)來過濾所有字串。"
 
 #: src/options.cpp:5806
 msgid "Accept Sentences"
@@ -3931,7 +3931,7 @@ msgstr "紋理壓縮快取"
 
 #: src/options.cpp:5885
 msgid "Texture Compression with Caching"
-msgstr ""
+msgstr "貼圖壓縮快取"
 
 #: src/options.cpp:5906
 msgid "Texture Memory Size (MB)"
@@ -3947,7 +3947,7 @@ msgstr "清除紋理快取"
 
 #: src/options.cpp:5935
 msgid "Show FPS"
-msgstr ""
+msgstr "顯示 FPS"
 
 #: src/about.cpp:267
 msgid "The Open Source Chart Plotter/Navigator"
@@ -3983,11 +3983,11 @@ msgstr "關閉"
 
 #: src/s57chart.cpp:4049
 msgid "S57 Cell Update chain incomplete.\nENC features may be incomplete or inaccurate.\nCheck the logfile for details."
-msgstr ""
+msgstr "S57 圖格更新鏈不完整。 \nENC 功能可能不完整或不正確。 \n檢查日誌檔查看詳細資訊。"
 
 #: src/s57chart.cpp:4050
 msgid "OpenCPN Create SENC Warning"
-msgstr ""
+msgstr "OpenCPN 建立 SENC警告"
 
 #: src/s57chart.cpp:4290
 msgid "OpenCPN S57 SENC File Create..."
@@ -3999,11 +3999,11 @@ msgstr "<font size=-2>(扇形角度為朝海的真方位)</font><br>"
 
 #: src/routeman.cpp:780 src/routeman.cpp:856
 msgid "You are trying to delete an active AIS MOB route, are you REALLY sure?"
-msgstr ""
+msgstr "您正試圖刪除作用中的 AIS MOB 航路，您真的確定嗎？"
 
 #: src/routeman.cpp:780 src/routeman.cpp:856
 msgid "OpenCPN Warning"
-msgstr ""
+msgstr "OpenCPN 警告"
 
 #: src/routeman.cpp:1018
 msgid "Waypoints can be renamed to reflect the new order, the names will be '001', '002' etc.\n\nDo you want to rename the waypoints?"
@@ -4029,7 +4029,7 @@ msgstr "偵測到插件 %s (%s), 版本 %i.%i . 此版本尚不穩定, 請至 op
 
 #: src/pluginmanager.cpp:662
 msgid "Unreadable PlugIn library detected, check the file permissions:\n"
-msgstr ""
+msgstr "檢測到無法讀取的外掛程式庫，請檢查檔案權限:\n"
 
 #: src/pluginmanager.cpp:687
 msgid "Incompatible PlugIn detected:\n"
@@ -4369,19 +4369,19 @@ msgstr "AIS 目標列表"
 
 #: src/AISTargetAlertDialog.cpp:152
 msgid "AISTargetAlert"
-msgstr ""
+msgstr "AIS目標警報"
 
 #: src/AISTargetAlertDialog.cpp:190
 msgid "&Silence Alert"
-msgstr ""
+msgstr "&S無聲警報"
 
 #: src/AISTargetAlertDialog.cpp:197
 msgid "&Acknowledge"
-msgstr ""
+msgstr "&A確認"
 
 #: src/AISTargetAlertDialog.cpp:203
 msgid "&Jump To"
-msgstr ""
+msgstr "&J跳轉到"
 
 #: src/AISTargetAlertDialog.cpp:240 src/AISTargetQueryDialog.cpp:191
 #: src/AISTargetQueryDialog.cpp:274
@@ -5007,7 +5007,7 @@ msgstr "阿拉伯聯合大公國"
 
 #: src/AIS_Target_Data.cpp:1061
 msgid "Tajikistan"
-msgstr ""
+msgstr "塔吉克斯坦"
 
 #: src/AIS_Target_Data.cpp:1062 src/AIS_Target_Data.cpp:1063
 msgid "Yemen"
@@ -5219,7 +5219,7 @@ msgstr "克羅澤群島"
 
 #: src/AIS_Target_Data.cpp:1120
 msgid "Ivory Coast"
-msgstr ""
+msgstr "象牙海岸"
 
 #: src/AIS_Target_Data.cpp:1121
 msgid "Comoros (Union of the)"
@@ -5460,15 +5460,15 @@ msgstr "委內瑞拉"
 #: src/AISTargetQueryDialog.cpp:131 src/AISTargetQueryDialog.cpp:242
 #: src/AISTargetQueryDialog.cpp:272
 msgid "Record Track"
-msgstr ""
+msgstr "記錄軌跡"
 
 #: src/AISTargetQueryDialog.cpp:165
 msgid "The recently captured track of this target has been recorded.\nDo you want to continue recording until the end of the current OpenCPN session?"
-msgstr ""
+msgstr "已錄下了這一目標最近擷取的軌跡。 \nDo 您想要繼續錄製，直到目前的 OpenCPN 程式結束嗎？"
 
 #: src/AISTargetQueryDialog.cpp:268
 msgid "Stop Tracking"
-msgstr ""
+msgstr "停止追蹤"
 
 #: src/RolloverWin.cpp:96 src/RolloverWin.cpp:147
 msgid "AISRollover"
@@ -5485,7 +5485,7 @@ msgstr "標記"
 
 #: src/RoutePoint.cpp:648
 msgid "Waypoint(s) Transmitted."
-msgstr ""
+msgstr "轉向點已傳輸."
 
 #: src/RoutePoint.cpp:651
 msgid "Error on Waypoint Upload.  Garmin GPS not connected"
@@ -5497,73 +5497,73 @@ msgstr "轉向點上傳錯誤.  請檢查 logfiles..."
 
 #: src/TCWin.cpp:77
 msgid "Tide"
-msgstr ""
+msgstr "潮汐"
 
 #: src/TCWin.cpp:82
 msgid "Current"
-msgstr ""
+msgstr "海流"
 
 #: src/TCWin.cpp:153
 msgid "Prev"
-msgstr ""
+msgstr "上一個"
 
 #: src/TCWin.cpp:163
 msgid "Next"
-msgstr ""
+msgstr "下一個"
 
 #: src/TCWin.cpp:245
 msgid "Reference Station :"
-msgstr ""
+msgstr "參考站："
 
 #: src/TCWin.cpp:261
 msgid "Data Source :"
-msgstr ""
+msgstr "資料來源："
 
 #: src/TCWin.cpp:458
 msgid "HW"
-msgstr ""
+msgstr "HW"
 
 #: src/TCWin.cpp:458
 msgid "LW"
-msgstr ""
+msgstr "LW"
 
 #: src/TCWin.cpp:636
 msgid "Today"
-msgstr ""
+msgstr "今天"
 
 #: src/TCWin.cpp:637 src/TCWin.cpp:642
 msgid "Tomorrow"
-msgstr ""
+msgstr "明天"
 
 #: src/TTYWindow.cpp:65
 msgid "Legend"
-msgstr ""
+msgstr "圖例"
 
 #: src/TTYWindow.cpp:73 src/TTYWindow.cpp:152
 msgid "Pause"
-msgstr ""
+msgstr "暫停"
 
 #: src/TTYWindow.cpp:109
 msgid "Message accepted"
-msgstr ""
+msgstr "接受的訊息"
 
 #: src/TTYWindow.cpp:116
 msgid "Input message filtered, output message filtered and dropped"
-msgstr ""
+msgstr "篩選的輸入訊息, 輸出訊息過濾和丟棄"
 
 #: src/TTYWindow.cpp:123
 msgid "Input Message filtered and dropped"
-msgstr ""
+msgstr "輸入的訊息過濾和丟棄"
 
 #: src/TTYWindow.cpp:130
 msgid "Output Message"
-msgstr ""
+msgstr "輸出訊息"
 
 #: src/TTYWindow.cpp:137
 msgid "Information Message or Message with errors"
-msgstr ""
+msgstr "資訊或錯誤訊息"
 
 #: src/TTYWindow.cpp:147
 msgid "Resume"
-msgstr ""
+msgstr "繼續"
 
