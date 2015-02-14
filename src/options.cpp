@@ -39,6 +39,7 @@
 #include <wx/display.h>
 #include <wx/choice.h>
 #include <wx/dirdlg.h>
+#include <wx/clrpicker.h>
 #if wxCHECK_VERSION(2,9,4) /* does this work in 2.8 too.. do we need a test? */
 #include <wx/renderer.h>
 #endif
@@ -93,6 +94,7 @@ extern bool             g_bShowMag;
 extern double           g_UserVar;
 extern int              g_chart_zoom_modifier;
 extern int              g_NMEAAPBPrecision;
+extern wxString         g_TalkerIdText;
 
 extern wxString         *pInit_Chart_Dir;
 extern wxArrayOfConnPrm *g_pConnectionParams;
@@ -138,6 +140,10 @@ extern bool             g_bWplIsAprsPosition;
 extern int              g_iNavAidRadarRingsNumberVisible;
 extern float            g_fNavAidRadarRingsStep;
 extern int              g_pNavAidRadarRingsStepUnits;
+extern int              g_iWaypointRangeRingsNumber;
+extern float            g_fWaypointRangeRingsStep;
+extern int              g_iWaypointRangeRingsStepUnits;
+extern wxColour         g_colourWaypointRangeRingsColour;
 extern bool             g_bWayPointPreventDragging;
 
 extern bool             g_bPreserveScaleOnX;
@@ -165,7 +171,7 @@ extern int              g_iSDMMFormat;
 extern int              g_iDistanceFormat;
 extern int              g_iSpeedFormat;
 
-extern bool             g_bSailing;
+extern bool             g_bAdvanceRouteWaypointOnArrivalOnly;
 
 extern int              g_cm93_zoom_factor;
 
@@ -824,6 +830,7 @@ BEGIN_EVENT_TABLE( options, wxDialog )
     EVT_CHECKBOX( ID_ZTCCHECKBOX, options::OnZTCCheckboxClick )
     EVT_CHOICE( ID_SHIPICONTYPE, options::OnShipTypeSelect )
     EVT_CHOICE( ID_RADARRINGS, options::OnRadarringSelect )
+    EVT_CHOICE( ID_WAYPOINTRANGERINGS, options::OnWaypointRangeRingSelect )
     EVT_CHAR_HOOK( options::OnCharHook )
 END_EVENT_TABLE()
 
@@ -940,7 +947,7 @@ void options::Init()
     m_pagePlugins = -1;
     m_pageConnections = -1;
     
-    lastPage = -1;
+    lastPage = 0;
     
     m_pPlugInCtrl = NULL;       // for deferred loading
     m_pNMEAForm = NULL;
@@ -1283,7 +1290,17 @@ void options::CreatePanel_NMEA( size_t parent, int border_size, int group_item_s
     m_cbOutput = new wxCheckBox( m_pNMEAForm, wxID_ANY, _("Output on this port ( as Autopilot or NMEA Repeater)"), wxDefaultPosition, wxDefaultSize, 0 );
     fgSizer5->Add( m_cbOutput, 0, wxALL, 5 );
 
+
+    m_stTalkerIdText = new wxStaticText( m_pNMEAForm, wxID_ANY, _("Talker ID (blank = default ID)"), wxDefaultPosition, wxDefaultSize, 0 );
+    m_stTalkerIdText->Wrap( -1 );
+    fgSizer5->Add( m_stTalkerIdText, 0, wxALL, 5 );
+
+    m_TalkerIdText = new wxTextCtrl( m_pNMEAForm, ID_TEXTCTRL, _T(""), wxDefaultPosition, wxSize( 50, -1 ), 0 );
+    m_TalkerIdText->SetMaxLength( 2 );
+    fgSizer5->Add( m_TalkerIdText, 0, wxALIGN_LEFT | wxALL, group_item_spacing );
+
     m_stPrecision = new wxStaticText( m_pNMEAForm, wxID_ANY, _("APB bearing precision"), wxDefaultPosition, wxDefaultSize, 0 );
+
     m_stPrecision->Wrap( -1 );
     fgSizer5->Add( m_stPrecision, 0, wxALL, 5 );
 
@@ -1629,10 +1646,51 @@ void options::CreatePanel_Ownship( size_t parent, int border_size, int group_ite
     m_pText_ACRadius = new wxTextCtrl( itemPanelShip, -1 );
     pRouteGrid->Add( m_pText_ACRadius, 0, wxALL | wxALIGN_RIGHT, group_item_spacing );
     
-    pSailing = new wxCheckBox( itemPanelShip, ID_DAILYCHECKBOX, _("Advance route waypoint on arrival only") );
-    routeSizer->Add( pSailing, 0 );
+    pAdvanceRouteWaypointOnArrivalOnly = new wxCheckBox( itemPanelShip, ID_DAILYCHECKBOX, _("Advance route waypoint on arrival only") );
+    routeSizer->Add( pAdvanceRouteWaypointOnArrivalOnly, 0 );
     
+    //  Waypoints
+    wxStaticBox* waypointText = new wxStaticBox( itemPanelShip, wxID_ANY, _("Waypoints") );
+    wxStaticBoxSizer* waypointSizer = new wxStaticBoxSizer( waypointText, wxVERTICAL );
+    ownShip->Add( waypointSizer, 0, wxTOP | wxALL | wxEXPAND, border_size );
     
+    wxFlexGridSizer* dispWaypointOptionsGrid = new wxFlexGridSizer( 2, 2, group_item_spacing, group_item_spacing );
+    dispWaypointOptionsGrid->AddGrowableCol( 1 );
+    
+    wxFlexGridSizer* waypointrrSelect = new wxFlexGridSizer( 1, 2, group_item_spacing, group_item_spacing );
+    waypointrrSelect->AddGrowableCol( 1 );
+    waypointSizer->Add( waypointrrSelect, 0, wxLEFT|wxRIGHT | wxEXPAND, border_size );
+
+    wxStaticText *waypointrrTxt = new wxStaticText( itemPanelShip, wxID_ANY, _("Waypoint range rings") );
+    waypointrrSelect->Add( waypointrrTxt, 1, wxEXPAND | wxALL, group_item_spacing );
+
+    pWaypointRangeRingsNumber = new wxChoice( itemPanelShip, ID_WAYPOINTRANGERINGS, wxDefaultPosition, m_pShipIconType->GetSize(), 11, rrAlt );
+    waypointrrSelect->Add( pWaypointRangeRingsNumber, 0, wxALIGN_RIGHT | wxALL, group_item_spacing );
+
+    waypointradarGrid = new wxFlexGridSizer( 2, 2, group_item_spacing, group_item_spacing );
+    waypointradarGrid->AddGrowableCol( 1 );
+    waypointSizer->Add( waypointradarGrid, 0, wxLEFT | wxEXPAND, 30 );
+
+    wxStaticText* waypointdistanceText = new wxStaticText( itemPanelShip, wxID_STATIC, _("Distance Between Waypoint Rings") );
+    waypointradarGrid->Add( waypointdistanceText, 1, wxEXPAND | wxALL, group_item_spacing );
+
+    pWaypointRangeRingsStep = new wxTextCtrl( itemPanelShip, ID_TEXTCTRL, _T(""), wxDefaultPosition, wxSize( 100, -1 ), 0 );
+    waypointradarGrid->Add( pWaypointRangeRingsStep, 0, wxALIGN_RIGHT | wxALL, group_item_spacing );
+
+    wxStaticText* waypointunitText = new wxStaticText( itemPanelShip, wxID_STATIC, _("Distance Unit") );
+    waypointradarGrid->Add( waypointunitText, 1, wxEXPAND | wxALL, group_item_spacing );
+
+    m_itemWaypointRangeRingsUnits = new wxChoice( itemPanelShip, ID_RADARDISTUNIT, wxDefaultPosition, m_pShipIconType->GetSize(), 2, pDistUnitsStrings );
+    waypointradarGrid->Add( m_itemWaypointRangeRingsUnits, 0, wxALIGN_RIGHT | wxALL, border_size );
+
+    wxStaticText* waypointrangeringsColour = new wxStaticText( itemPanelShip, wxID_STATIC, _("Waypoint Range Ring Colours") );
+    waypointradarGrid->Add( waypointrangeringsColour, 1, wxEXPAND | wxALL, 1 );
+    
+    m_colourWaypointRangeRingsColour = new wxColourPickerCtrl( itemPanelShip, wxID_ANY, *wxRED, wxDefaultPosition, wxDefaultSize, 0, wxDefaultValidator, _T("ID_COLOURWAYPOINTRANGERINGSCOLOUR") );
+    waypointradarGrid->Add( m_colourWaypointRangeRingsColour, 0, wxALIGN_RIGHT | wxALL, 1);
+
+
+   
     DimeControl( itemPanelShip );
 }
 
@@ -2358,7 +2416,7 @@ void options::CreatePanel_Units( size_t parent, int border_size, int group_item_
     pMagVar = new wxTextCtrl( panelUnits, ID_TEXTCTRL, _T(""), wxDefaultPosition, wxSize(50, -1), wxTE_RIGHT );
     magVarSizer->Add( pMagVar, 0, wxALIGN_CENTRE_VERTICAL, group_item_spacing );
 
-    magVarSizer->Add( new wxStaticText(panelUnits, wxID_ANY, _("deg (+W, -E)")),
+    magVarSizer->Add( new wxStaticText(panelUnits, wxID_ANY, _("deg (-W, +E)")),
                      0, wxALL | wxALIGN_CENTRE_VERTICAL, group_item_spacing );
 
 }
@@ -2961,6 +3019,14 @@ void options::SetInitialSettings()
     m_itemRadarRingsUnits->SetSelection( g_pNavAidRadarRingsStepUnits );
     OnRadarringSelect( eDummy );
 
+    if( g_iWaypointRangeRingsNumber > 10 ) g_iWaypointRangeRingsNumber = 10;
+    pWaypointRangeRingsNumber->SetSelection( g_iWaypointRangeRingsNumber );
+    buf.Printf( _T("%.3f"), g_fWaypointRangeRingsStep );
+    pWaypointRangeRingsStep->SetValue( buf );
+    m_itemWaypointRangeRingsUnits->SetSelection( g_iWaypointRangeRingsStepUnits );
+    m_colourWaypointRangeRingsColour->SetColour( g_colourWaypointRangeRingsColour );
+    OnWaypointRangeRingSelect( eDummy );
+
     pWayPointPreventDragging->SetValue( g_bWayPointPreventDragging );
     pConfirmObjectDeletion->SetValue( g_bConfirmObjectDelete );
 
@@ -2981,7 +3047,7 @@ void options::SetInitialSettings()
     pDistanceFormat->Select( g_iDistanceFormat );
     pSpeedFormat->Select( g_iSpeedFormat );
     
-    pSailing->SetValue( g_bSailing );
+    pAdvanceRouteWaypointOnArrivalOnly->SetValue( g_bAdvanceRouteWaypointOnArrivalOnly );
 
     pTrackDaily->SetValue( g_bTrackDaily );
     pTrackHighlite->SetValue( g_bHighliteTracks );
@@ -3076,6 +3142,8 @@ void options::SetInitialSettings()
     }
     
     pScreenMM->SetValue(screenmm);
+
+     m_TalkerIdText->SetValue( g_TalkerIdText.MakeUpper() );
     
 #ifdef USE_S57
     m_pSlider_CM93_Zoom->SetValue( g_cm93_zoom_factor );
@@ -3271,6 +3339,20 @@ void options::OnRadarringSelect( wxCommandEvent& event )
         radarGrid->ShowItems( false );
     } else {
         radarGrid->ShowItems( true );
+    }
+    dispOptions->Layout();
+    ownShip->Layout();
+    itemPanelShip->Layout();
+    itemPanelShip->Refresh();
+    event.Skip();
+}
+
+void options::OnWaypointRangeRingSelect( wxCommandEvent& event )
+{
+    if( pWaypointRangeRingsNumber->GetSelection() == 0 ) {
+        waypointradarGrid->ShowItems( false );
+    } else {
+        waypointradarGrid->ShowItems( true );
     }
     dispOptions->Layout();
     ownShip->Layout();
@@ -3846,6 +3928,10 @@ void options::OnApplyClick( wxCommandEvent& event )
     g_iNavAidRadarRingsNumberVisible = pNavAidRadarRingsNumberVisible->GetSelection();
     g_fNavAidRadarRingsStep = atof( pNavAidRadarRingsStep->GetValue().mb_str() );
     g_pNavAidRadarRingsStepUnits = m_itemRadarRingsUnits->GetSelection();
+    g_iWaypointRangeRingsNumber = pWaypointRangeRingsNumber->GetSelection();
+    g_fWaypointRangeRingsStep = atof( pWaypointRangeRingsStep->GetValue().mb_str() );
+    g_iWaypointRangeRingsStepUnits = m_itemWaypointRangeRingsUnits->GetSelection();
+    g_colourWaypointRangeRingsColour = m_colourWaypointRangeRingsColour->GetColour();
     g_bWayPointPreventDragging = pWayPointPreventDragging->GetValue();
     g_bConfirmObjectDelete = pConfirmObjectDeletion->GetValue();
 
@@ -3857,7 +3943,7 @@ void options::OnApplyClick( wxCommandEvent& event )
     g_iDistanceFormat = pDistanceFormat->GetSelection();
     g_iSpeedFormat = pSpeedFormat->GetSelection();
     
-    g_bSailing = pSailing->GetValue();
+    g_bAdvanceRouteWaypointOnArrivalOnly = pAdvanceRouteWaypointOnArrivalOnly->GetValue();
 
     g_nTrackPrecision = pTrackPrecision->GetSelection();
 
@@ -3927,6 +4013,10 @@ void options::OnApplyClick( wxCommandEvent& event )
     g_bAISRolloverShowCPA = m_pCheck_Rollover_CPA->GetValue();
 
     g_chart_zoom_modifier = m_pSlider_Zoom->GetValue();
+    
+    g_NMEAAPBPrecision = m_choicePrecision->GetCurrentSelection();
+    
+    g_TalkerIdText = m_TalkerIdText->GetValue().MakeUpper();
     
 #ifdef USE_S57
     //    Handle Vector Charts Tab
@@ -5132,12 +5222,19 @@ void options::ShowNMEACommon(bool visible)
         if (m_cbOutput->IsChecked()) {
             m_stPrecision->Enable(true);
             m_choicePrecision->Enable(true);
+            m_stTalkerIdText->Enable(true);
+            m_TalkerIdText->Enable( true );
         } else {
-            m_stPrecision->Enable(false);
-            m_choicePrecision->Enable(false);
+            m_stPrecision->Enable( false );
+            m_choicePrecision->Enable( false );
+            m_stTalkerIdText->Enable( false );
+            m_TalkerIdText->Enable( false );
         }
         m_choicePriority->Show();
         m_stPriority->Show();
+        m_stPrecision->Show();
+        m_stTalkerIdText->Show();
+        m_TalkerIdText->Show();
         m_cbCheckCRC->Show();
     }
     else
@@ -5156,6 +5253,8 @@ void options::ShowNMEACommon(bool visible)
         m_cbOutput->Hide();
         m_choicePriority->Hide();
         m_stPrecision->Hide();
+        m_stTalkerIdText->Hide();
+        m_TalkerIdText->Hide();
         m_choicePrecision->Hide();
         m_stPriority->Hide();
         m_cbCheckCRC->Hide();
@@ -5548,9 +5647,13 @@ void options::OnCbOutput( wxCommandEvent& event )
     if (m_cbOutput->IsChecked()) {
         m_stPrecision->Enable(true);
         m_choicePrecision->Enable(true);
+        m_stTalkerIdText->Enable(true);
+        m_TalkerIdText->Enable( true );
     } else {
         m_stPrecision->Enable(false);
         m_choicePrecision->Enable(false);
+        m_stTalkerIdText->Enable( false );
+        m_TalkerIdText->Enable( false );
     }
 }
 

@@ -31,6 +31,7 @@
 #include <wx/cmdline.h>
 #include <wx/snglinst.h>
 #include <wx/power.h>
+#include <wx/clrpicker.h>
 
 #ifdef __WXMSW__
 #include "wx/msw/private.h"
@@ -302,6 +303,7 @@ class MyFrame: public wxFrame
     void OnExit(wxCommandEvent& event);
     void OnSize(wxSizeEvent& event);
     void OnMove(wxMoveEvent& event);
+    void OnInitTimer(wxTimerEvent& event);
     void OnFrameTimer1(wxTimerEvent& event);
     bool DoChartUpdate(void);
     void OnEvtTHREADMSG(OCPN_ThreadMessageEvent& event);
@@ -417,6 +419,9 @@ class MyFrame: public wxFrame
     int                 nRoute_State;
     int                 nBlinkerTick;
     bool                m_bTimeIsSet;
+
+    wxTimer             InitTimer;
+    int                 m_iInitCount;
 
     wxTimer             FrameTCTimer;
     wxTimer             FrameTimer1;
@@ -543,6 +548,7 @@ private:
 enum {
     ID_NMEA_WINDOW      = wxID_HIGHEST,
     ID_AIS_WINDOW,
+    INIT_TIMER,
     FRAME_TIMER_1,
     FRAME_TIMER_2,
     TIMER_AIS1,
