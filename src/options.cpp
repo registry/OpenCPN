@@ -76,7 +76,11 @@ extern GLuint g_raster_format;
 #include "cm93.h"
 #endif
 
+#include "OCPNPlatform.h"
+
 wxString GetOCPNKnownLanguage(wxString lang_canonical, wxString *lang_dir);
+
+extern OCPNPlatform     *g_Platform;
 
 extern MyFrame          *gFrame;
 extern ChartCanvas      *cc1;
@@ -105,8 +109,6 @@ extern int              g_SOGFilterSec;
 
 extern PlugInManager    *g_pi_manager;
 extern ocpnStyle::StyleManager*   g_StyleManager;
-
-extern wxString         g_SData_Locn;
 
 extern bool             g_bDisplayGrid;
 
@@ -1176,7 +1178,22 @@ void options::CreatePanel_NMEA( size_t parent, int border_size, int group_item_s
     m_rbTypeNet = new wxRadioButton( m_pNMEAForm, wxID_ANY, _("Network"), wxDefaultPosition, wxDefaultSize, 0 );
     bSizer15->Add( m_rbTypeNet, 0, wxALL, 5 );
 
-
+    if(OCPNPlatform::hasInternalGPS()){      // has internal GPS
+        m_rbTypeInternalGPS = new wxRadioButton( m_pNMEAForm, wxID_ANY, _("Built-in GPS"), wxDefaultPosition, wxDefaultSize, 0 );
+        bSizer15->Add( m_rbTypeInternalGPS, 0, wxALL, 5 );
+    }
+    else
+        m_rbTypeInternalGPS = NULL;
+        
+    
+    if(OCPNPlatform::hasInternalBT()){      // has built-in Bluetooth
+        m_rbTypeInternalBT = new wxRadioButton( m_pNMEAForm, wxID_ANY, _("Built-in Bluetooth"), wxDefaultPosition, wxDefaultSize, 0 );
+        bSizer15->Add( m_rbTypeInternalBT, 0, wxALL, 5 );
+    }
+    else
+        m_rbTypeInternalBT = NULL;
+    
+    
     sbSizerConnectionProps->Add( bSizer15, 0, wxEXPAND, 0 );
 
     gSizerNetProps = new wxGridSizer( 0, 2, 0, 0 );
@@ -1377,8 +1394,15 @@ void options::CreatePanel_NMEA( size_t parent, int border_size, int group_item_s
     m_lcSources->Connect( wxEVT_COMMAND_LIST_ITEM_SELECTED, wxListEventHandler( options::OnSelectDatasource ), NULL, this );
     m_buttonAdd->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( options::OnAddDatasourceClick ), NULL, this );
     m_buttonRemove->Connect( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler( options::OnRemoveDatasourceClick ), NULL, this );
+    
     m_rbTypeSerial->Connect( wxEVT_COMMAND_RADIOBUTTON_SELECTED, wxCommandEventHandler( options::OnTypeSerialSelected ), NULL, this );
     m_rbTypeNet->Connect( wxEVT_COMMAND_RADIOBUTTON_SELECTED, wxCommandEventHandler( options::OnTypeNetSelected ), NULL, this );
+    
+    if(m_rbTypeInternalGPS)
+        m_rbTypeInternalGPS->Connect( wxEVT_COMMAND_RADIOBUTTON_SELECTED, wxCommandEventHandler( options::OnTypeGPSSelected ), NULL, this );
+    if(m_rbTypeInternalBT)
+        m_rbTypeInternalBT->Connect( wxEVT_COMMAND_RADIOBUTTON_SELECTED, wxCommandEventHandler( options::OnTypeBTSelected ), NULL, this );
+    
     m_rbNetProtoTCP->Connect( wxEVT_COMMAND_RADIOBUTTON_SELECTED, wxCommandEventHandler( options::OnNetProtocolSelected ), NULL, this );
     m_rbNetProtoUDP->Connect( wxEVT_COMMAND_RADIOBUTTON_SELECTED, wxCommandEventHandler( options::OnNetProtocolSelected ), NULL, this );
     m_rbNetProtoGPSD->Connect( wxEVT_COMMAND_RADIOBUTTON_SELECTED, wxCommandEventHandler( options::OnNetProtocolSelected ), NULL, this );
@@ -2910,7 +2934,7 @@ void options::CreateControls()
     // I would prefer to change this so the plugins are only loaded if and when
     // they select the plugin page
     if(!g_bLoadedDisabledPlugins) {
-        g_pi_manager->LoadAllPlugIns( g_Plugin_Dir, false );
+        g_pi_manager->LoadAllPlugIns( g_Platform->GetPluginDir(), false );
         g_bLoadedDisabledPlugins = true;
     }
 
@@ -3543,7 +3567,7 @@ void options::OnButtonaddClick( wxCommandEvent& event )
 
     if( g_bportable ) {
         wxFileName f( selDir );
-        f.MakeRelativeTo( *pHome_Locn );
+        f.MakeRelativeTo( g_Platform->GetHomeDir() );
         pActiveChartsList->Append( f.GetFullPath() );
     } else
         pActiveChartsList->Append( selDir );
@@ -3659,8 +3683,12 @@ ConnectionParams *options::CreateConnectionParamsFromSelectedItem()
     pConnectionParams->Valid = true;
     if ( m_rbTypeSerial->GetValue() )
         pConnectionParams->Type = SERIAL;
-    else
+    else if ( m_rbTypeNet->GetValue() )
         pConnectionParams->Type = NETWORK;
+    else if ( m_rbTypeInternalGPS->GetValue() )
+        pConnectionParams->Type = INTERNAL_GPS;
+    else if ( m_rbTypeInternalBT->GetValue() )
+        pConnectionParams->Type = INTERNAL_BT;
     
     //  Save the existing addr/port to allow closing of existing port
     pConnectionParams->LastNetworkAddress = pConnectionParams->NetworkAddress;
@@ -3703,6 +3731,13 @@ ConnectionParams *options::CreateConnectionParamsFromSelectedItem()
 
     pConnectionParams->bEnabled = m_connection_enabled;
     pConnectionParams->b_IsSetup = false;
+ 
+    if(pConnectionParams->Type == INTERNAL_GPS){
+        pConnectionParams->NetworkAddress = _T("");
+        pConnectionParams->NetworkPort = 0;
+        pConnectionParams->NetProtocol = PROTO_UNDEFINED;
+        pConnectionParams->Baudrate = 0;
+    }
     
     return pConnectionParams;
 }
@@ -3905,6 +3940,7 @@ void options::OnApplyClick( wxCommandEvent& event )
            if( cp->bEnabled ) {
            dsPortType port_type = cp->IOSelect;
                 DataStream *dstr = new DataStream( g_pMUX,
+                                            cp->Type,       
                                             cp->GetDSPort(),
                                             wxString::Format(wxT("%i"), cp->Baudrate),
                                             port_type,
@@ -4271,12 +4307,18 @@ void options::OnButtondeleteClick( wxCommandEvent& event )
 
     wxString dirname;
 
+#ifndef __WXQT__                // Multi selection is not implemented in wxQT
+    
     wxArrayInt pListBoxSelections;
     pActiveChartsList->GetSelections( pListBoxSelections );
     int nSelections = pListBoxSelections.GetCount();
     for( int i = 0; i < nSelections; i++ ) {
         pActiveChartsList->Delete( pListBoxSelections.Item( ( nSelections - i ) - 1 ) );
     }
+#else
+    int n = pActiveChartsList->GetSelection();
+    pActiveChartsList->Delete( n );    
+#endif
 
     UpdateWorkArrayFromTextCtl();
 
@@ -4459,7 +4501,7 @@ void options::OnPageChange( wxListbookEvent& event )
             // always add us english
             m_itemLangListBox->Append( _T("English (U.S.)") );
 
-            wxString lang_dir = g_SData_Locn + _T("share/locale/");
+            wxString lang_dir = g_Platform->GetSharedDataDir() + _T("share/locale/");
             for( int it = 1; it < nLang; it++ ) {
                 if( wxLocale::IsAvailable( lang_list[it] ) ) {
                     wxLocale ltest( lang_list[it], 0 );
@@ -4607,7 +4649,7 @@ void options::OnPageChange( wxListbookEvent& event )
 
 void options::OnButtonSelectSound( wxCommandEvent& event )
 {
-    wxString sound_dir = g_SData_Locn;
+    wxString sound_dir = g_Platform->GetSharedDataDir();
     sound_dir.Append( _T("sounds") );
 
     wxFileDialog *openDialog = new wxFileDialog( NULL, _("Select Sound File"), sound_dir, wxT(""),
@@ -4616,7 +4658,7 @@ void options::OnButtonSelectSound( wxCommandEvent& event )
     if( response == wxID_OK ) {
         if( g_bportable ) {
             wxFileName f( openDialog->GetPath() );
-            f.MakeRelativeTo( *pHome_Locn );
+            f.MakeRelativeTo( g_Platform->GetHomeDir() );
             g_sAIS_Alert_Sound_File = f.GetFullPath();
         } else
             g_sAIS_Alert_Sound_File = openDialog->GetPath();
@@ -5185,7 +5227,7 @@ void options::OnInsertTideDataLocation( wxCommandEvent &event )
 
         if( g_bportable ) {
             wxFileName f( sel_file );
-            f.MakeRelativeTo( *pHome_Locn );
+            f.MakeRelativeTo( g_Platform->GetHomeDir() );
             tcDataSelected->Append( f.GetFullPath() );
         } else
             tcDataSelected->Append( sel_file );
@@ -5195,7 +5237,7 @@ void options::OnInsertTideDataLocation( wxCommandEvent &event )
         wxString data_dir = fn.GetPath();
         if( g_bportable ) {
             wxFileName f( data_dir );
-            f.MakeRelativeTo( *pHome_Locn );
+            f.MakeRelativeTo( g_Platform->GetHomeDir() );
             g_TCData_Dir = f.GetFullPath();
         }
         else
@@ -5249,6 +5291,19 @@ void options::OnTypeNetSelected( wxCommandEvent& event )
     SetNMEAFormToNet();
 }
 
+void options::OnTypeGPSSelected( wxCommandEvent& event )
+{
+    OnConnValChange(event);
+    SetNMEAFormToGPS();
+}
+
+void options::OnTypeBTSelected( wxCommandEvent& event )
+{
+    OnConnValChange(event);
+    SetNMEAFormToBT();
+}
+
+
 void options::OnUploadFormatChange( wxCommandEvent& event )
 {
     if ( event.GetEventObject() == m_cbGarminUploadHost && event.IsChecked() )
@@ -5264,6 +5319,9 @@ void options::ShowNMEACommon(bool visible)
     {
         m_rbTypeSerial->Show();
         m_rbTypeNet->Show();
+        if(m_rbTypeInternalGPS) m_rbTypeInternalGPS->Show();
+        if(m_rbTypeInternalBT) m_rbTypeInternalBT->Show();
+        
         m_rbIAccept->Show();
         m_rbIIgnore->Show();
         m_rbOAccept->Show();
@@ -5298,6 +5356,9 @@ void options::ShowNMEACommon(bool visible)
     {
         m_rbTypeSerial->Hide();
         m_rbTypeNet->Hide();
+        if(m_rbTypeInternalGPS) m_rbTypeInternalGPS->Hide();
+        if(m_rbTypeInternalBT) m_rbTypeInternalBT->Hide();
+        
         m_rbIAccept->Hide();
         m_rbIIgnore->Hide();
         m_rbOAccept->Hide();
@@ -5375,11 +5436,35 @@ void options::ShowNMEASerial(bool visible)
     }
 }
 
+void options::ShowNMEAGPS(bool visible)
+{
+    if ( visible )
+    {
+    }
+    else
+    {
+    }
+}
+
+void options::ShowNMEABT(bool visible)
+{
+    if ( visible )
+    {
+    }
+    else
+    {
+    }
+}
+
 void options::SetNMEAFormToSerial()
 {
     ShowNMEACommon( true );
+    
     ShowNMEANet( false );
+    ShowNMEAGPS( false );
+    ShowNMEABT( false );
     ShowNMEASerial( true );
+    
     m_pNMEAForm->FitInside();
     m_pNMEAForm->Layout();
     Fit();
@@ -5391,6 +5476,36 @@ void options::SetNMEAFormToNet()
 {
     ShowNMEACommon( true );
     ShowNMEANet( true );
+    ShowNMEAGPS( false );
+    ShowNMEABT( false );
+    ShowNMEASerial( false );
+    m_pNMEAForm->FitInside();
+    m_pNMEAForm->Layout();
+    Fit();
+    Layout();
+    SetDSFormRWStates();
+}
+
+void options::SetNMEAFormToGPS()
+{
+    ShowNMEACommon( true );
+    ShowNMEANet( false );
+    ShowNMEAGPS( true );
+    ShowNMEABT( false );
+    ShowNMEASerial( false );
+    m_pNMEAForm->FitInside();
+    m_pNMEAForm->Layout();
+    Fit();
+    Layout();
+    SetDSFormRWStates();
+}
+
+void options::SetNMEAFormToBT()
+{
+    ShowNMEACommon( true );
+    ShowNMEANet( false );
+    ShowNMEAGPS( false );
+    ShowNMEABT( true );
     ShowNMEASerial( false );
     m_pNMEAForm->FitInside();
     m_pNMEAForm->Layout();
@@ -5403,11 +5518,14 @@ void options::ClearNMEAForm()
 {
     ShowNMEACommon( false );
     ShowNMEANet( false );
+    ShowNMEAGPS( false );
+    ShowNMEABT( false );
     ShowNMEASerial( false );
     m_pNMEAForm->FitInside();
     m_pNMEAForm->Layout();
     Fit();
     Layout();
+    
 }
 
 wxString StringArrayToString(wxArrayString arr)
@@ -5497,12 +5615,25 @@ void options::SetConnectionParams(ConnectionParams *cp)
         m_rbTypeSerial->SetValue( true );
         SetNMEAFormToSerial();
     }
-    else
+    else if ( cp->Type == NETWORK )
     {
         m_rbTypeNet->SetValue( true );
         SetNMEAFormToNet();
     }
-
+    else if ( cp->Type == INTERNAL_GPS )
+    {
+        m_rbTypeInternalGPS->SetValue( true );
+        SetNMEAFormToGPS();
+    }
+    else if ( cp->Type == INTERNAL_BT )
+    {
+        m_rbTypeInternalBT->SetValue( true );
+        SetNMEAFormToBT();
+    }
+    
+    else
+        ClearNMEAForm();
+    
     m_connection_enabled = cp->bEnabled;
 }
 
@@ -6131,7 +6262,7 @@ void OpenGLOptionsDlg::OnButtonClear( wxCommandEvent& event )
     if(g_bopengl)
         cc1->GetglCanvas()->ClearAllRasterTextures();
 
-    wxString path =  g_PrivateDataDir + wxFileName::GetPathSeparator() + _T("raster_texture_cache");
+    wxString path =  g_Platform->GetPrivateDataDir() + wxFileName::GetPathSeparator() + _T("raster_texture_cache");
     if(::wxDirExists( path )){
         wxArrayString files;
         size_t nfiles = wxDir::GetAllFiles(path, &files);
@@ -6147,7 +6278,7 @@ void OpenGLOptionsDlg::OnButtonClear( wxCommandEvent& event )
 
 wxString OpenGLOptionsDlg::TextureCacheSize()
 {
-    wxString path =  g_PrivateDataDir + wxFileName::GetPathSeparator() + _T("raster_texture_cache");
+    wxString path =  g_Platform->GetPrivateDataDir() + wxFileName::GetPathSeparator() + _T("raster_texture_cache");
     int total = 0;
     if(::wxDirExists( path )) {
         wxArrayString files;

@@ -34,9 +34,18 @@
 
 #include <QtAndroidExtras/QAndroidJniObject>
 
+#define GPS_OFF                         0
+#define GPS_ON                          1
+#define GPS_PROVIDER_AVAILABLE          2
+#define GPS_SHOWPREFERENCES             3
 
-extern  bool androidGetMemoryStatus( int *mem_total, int *mem_used );
-extern  double GetAndroidDisplaySize();
+extern bool androidGetMemoryStatus( int *mem_total, int *mem_used );
+extern double GetAndroidDisplaySize();
 
+
+extern bool androidStartNMEA(wxEvtHandler *consumer);
+extern bool androidStopNMEA();
+extern wxString androidGPSService(int parm);
+extern bool androidDeviceHasGPS();
 
 #endif   //guard
