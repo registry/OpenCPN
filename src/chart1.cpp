@@ -44,7 +44,6 @@
 #include <wx/dialog.h>
 #include <wx/progdlg.h>
 #include <wx/clrpicker.h>
-
 #include <wx/dialog.h>
 
 #include "dychart.h"
@@ -98,6 +97,7 @@
 #include "pluginmanager.h"
 #include "AIS_Target_Data.h"
 #include "OCPNPlatform.h"
+#include "crashprint.h"
 
 #ifdef ocpnUSE_GL
 #include "glChartCanvas.h"
