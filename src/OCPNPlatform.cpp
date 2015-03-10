@@ -35,6 +35,7 @@
 #include "wx/stdpaths.h"
 #include <wx/filename.h>
 
+#include "dychart.h"
 #include "OCPNPlatform.h"
 
 #include "chart1.h"
@@ -42,7 +43,6 @@
 
 #ifdef __OCPN__ANDROID__
 #include "androidUTIL.h"
-#include "qdebug.h"
 #endif
 
 // Include CrashRpt Header
@@ -638,7 +638,7 @@ bool OCPNPlatform::InitializeLogFile( void )
         
 #ifdef __OCPN__ANDROID__
         //  Trouble printing timestamp
-    logger->SetTimestamp((const char *)NULL);
+    g_logger->SetTimestamp((const char *)NULL);
 #endif
         
 #if defined(__WXGTK__) || defined(__WXOSX__)

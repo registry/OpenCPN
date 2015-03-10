@@ -139,6 +139,7 @@ AIS_Decoder::AIS_Decoder( wxFrame *parent )
     TimerAIS.SetOwner(this, TIMER_AIS1);
     TimerAIS.Start(TIMER_AIS_MSEC,wxTIMER_CONTINUOUS);
     
+    m_ptentative_dsctarget = NULL;
     m_dsc_timer.SetOwner( this, TIMER_DSC );
     
 
@@ -1097,6 +1098,9 @@ AIS_Target_Data *AIS_Decoder::ProcessDSx( const wxString& str, bool b_take_dsc )
         token = tkz.GetNextToken();         // expansion indicator
         
         dsc_quadrant = (int) (dsc_tmp / 1000000000.0);
+        
+        if(dsc_quadrant > 3)                // Position is "Unspecified", or 9999999999
+            return NULL;
         
         dsc_lat = (int) ( dsc_tmp / 100000.0 );
         dsc_lon = dsc_tmp - dsc_lat * 100000.0;

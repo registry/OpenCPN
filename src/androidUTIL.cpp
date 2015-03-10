@@ -28,23 +28,25 @@
 #include "wx/wx.h"
 #endif //precompiled headers
 
+#include <wx/tokenzr.h>
 
 #include <QtAndroidExtras/QAndroidJniObject>
-#include "qdebug.h"
 
+#include "dychart.h"
 #include "androidUTIL.h"
 #include "OCPN_DataStreamEvent.h"
 #include "chart1.h"
 
+
 JavaVM *java_vm;
 JNIEnv* jenv;
+bool     b_androidBusyShown;
 
+
+extern MyFrame                  *gFrame;
 extern const wxEventType wxEVT_OCPN_DATASTREAM;
+wxEvtHandler                    *s_pAndroidNMEAMessageConsumer;
 
-
-
-
-wxEvtHandler    *s_pAndroidNMEAMessageConsumer;
 
 jint JNI_OnLoad(JavaVM *vm, void *reserved)
 {
@@ -117,6 +119,25 @@ extern "C"{
 }
 
 
+extern "C"{
+    JNIEXPORT jint JNICALL Java_org_opencpn_OCPNNativeLib_onConfigChange(JNIEnv *env, jobject obj)
+    {
+        qDebug() << "onConfigChange";
+        GetAndroidDisplaySize();
+        
+        wxSize new_size = getAndroidDisplayDimensions();
+        qDebug() << "onConfigChange" << new_size.x << new_size.y;
+        
+        gFrame->TriggerResize(new_size);
+        
+//        wxSizeEvent ev(new_size);
+        
+//        wxEvtHandler *evh = dynamic_cast<wxEvtHandler*>(cc1);
+        
+//        evh->AddPendingEvent(ev);
+        return 77;
+    }
+}
 
 
 
@@ -226,7 +247,7 @@ double GetAndroidDisplaySize()
     }
     
     //  Call the desired method
-    QAndroidJniObject data = activity.callObjectMethod("getDisplayDPI", "()Ljava/lang/String;");
+    QAndroidJniObject data = activity.callObjectMethod("getDisplayMetrics", "()Ljava/lang/String;");
     
     wxString return_string;
     jstring s = data.object<jstring>();
@@ -240,6 +261,8 @@ double GetAndroidDisplaySize()
         return_string = wxString(ret_string, wxConvUTF8);
     }
     
+    wxLogMessage(_T("Metrics:") + return_string);
+    
     wxString istr = return_string.BeforeFirst('.');
     
     long ldpi;
@@ -249,6 +272,96 @@ double GetAndroidDisplaySize()
 
     return ret;
 }
+
+
+wxSize getAndroidDisplayDimensions( void )
+{
+    wxSize sz_ret = ::wxGetDisplaySize();               // default, probably reasonable, but maybe not accurate
+    
+    QAndroidJniObject activity = QAndroidJniObject::callStaticObjectMethod("org/qtproject/qt5/android/QtNative",
+                                                                           "activity", "()Landroid/app/Activity;");
+    
+    if ( !activity.isValid() ){
+        qDebug() << "Activity is not valid";
+        return sz_ret;
+    }
+    
+    //  Call the desired method
+    QAndroidJniObject data = activity.callObjectMethod("getDisplayMetrics", "()Ljava/lang/String;");
+    
+    wxString return_string;
+    jstring s = data.object<jstring>();
+    
+    //  Need a Java environment to decode the resulting string
+    if (java_vm->GetEnv( (void **) &jenv, JNI_VERSION_1_6) != JNI_OK) {
+        qDebug() << "GetEnv failed.";
+    }
+    else {
+        const char *ret_string = (jenv)->GetStringUTFChars(s, NULL);
+        return_string = wxString(ret_string, wxConvUTF8);
+    }
+    
+     wxStringTokenizer tk(return_string, _T(";"));
+    if( tk.HasMoreTokens() ){
+        wxString token = tk.GetNextToken();     // xdpi
+        token = tk.GetNextToken();
+        long a = ::wxGetDisplaySize().x;        // wxWidgets idea
+        if(token.ToLong( &a ))
+            sz_ret.x = a;
+        
+        token = tk.GetNextToken();
+        long b = ::wxGetDisplaySize().y;        // wxWidgets idea
+        if(token.ToLong( &b ))
+            sz_ret.y = b;
+    }
+    
+    return sz_ret;
+    
+}
+
+void androidShowBusyIcon()
+{
+    if(b_androidBusyShown)
+        return;
+    qDebug() << "Showit";
+    
+    //  Get a reference to the running native activity
+    QAndroidJniObject activity = QAndroidJniObject::callStaticObjectMethod("org/qtproject/qt5/android/QtNative",
+                                                                           "activity", "()Landroid/app/Activity;");
+    
+    if ( !activity.isValid() ){
+        qDebug() << "Activity is not valid";
+        return;
+    }
+    
+    //  Call the desired method
+    QAndroidJniObject data = activity.callObjectMethod("showBusyCircle", "()Ljava/lang/String;");
+    
+    b_androidBusyShown = true;
+}
+
+void androidHideBusyIcon()
+{
+    if(!b_androidBusyShown)
+        return;
+    
+    qDebug() << "Hideit";
+    
+    //  Get a reference to the running native activity
+    QAndroidJniObject activity = QAndroidJniObject::callStaticObjectMethod("org/qtproject/qt5/android/QtNative",
+                                                                           "activity", "()Landroid/app/Activity;");
+    
+    if ( !activity.isValid() ){
+        qDebug() << "Activity is not valid";
+        return;
+    }
+    
+    //  Call the desired method
+    QAndroidJniObject data = activity.callObjectMethod("hideBusyCircle", "()Ljava/lang/String;");
+
+    b_androidBusyShown = false;
+}
+
 
 
 bool LoadQtStyleSheet(wxString &sheet_file)
