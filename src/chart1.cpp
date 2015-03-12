@@ -665,7 +665,6 @@ int              g_NMEAAPBPrecision;
 
 wxString         g_TalkerIdText;
 
-bool             g_bEmailCrashReport;
 bool             g_bAdvanceRouteWaypointOnArrivalOnly;
 
 wxArrayString    g_locale_catalog_array;
@@ -2018,57 +2017,12 @@ extern ocpnGLOptions g_GLOptions;
 
     FontMgr::Get().ScrubList(); // is this needed?
 
-//    g_FloatingToolbarDialog->LockPosition(false);
-
 //      Start up the ticker....
     gFrame->FrameTimer1.Start( TIMER_GFRAME_1, wxTIMER_CONTINUOUS );
 
 //      Start up the ViewPort Rotation angle Averaging Timer....
     if(g_bCourseUp)
         gFrame->FrameCOGTimer.Start( 10, wxTIMER_CONTINUOUS );
-
-//        gFrame->MemFootTimer.Start(wxMax(g_MemFootSec * 1000, 60 * 1000), wxTIMER_CONTINUOUS);
-//        gFrame->MemFootTimer.Start(1000, wxTIMER_CONTINUOUS);
-
-    // Import Layer-wise any .gpx files from /Layers directory
-    wxString layerdir = g_Platform->GetPrivateDataDir();
-    layerdir.Append( _T("layers") );
-
-#if 0
-    wxArrayString file_array;
-    g_LayerIdx = 0;
-
-    if( wxDir::Exists( layerdir ) ) {
-        wxString laymsg;
-        laymsg.Printf( wxT("Getting .gpx layer files from: %s"), layerdir.c_str() );
-        wxLogMessage( laymsg );
-
-        wxDir dir;
-        dir.Open( layerdir );
-        if( dir.IsOpened() ) {
-            wxString filename;
-            layerdir.Append( wxFileName::GetPathSeparator() );
-            bool cont = dir.GetFirst( &filename );
-            while( cont ) {
-                filename.Prepend( layerdir );
-                wxFileName f( filename );
-                if( f.GetExt().IsSameAs( wxT("gpx") ) ) pConfig->ImportGPX( gFrame, true, filename,
-                        false ); // preload a single-gpx-file layer
-                else
-                    pConfig->ImportGPX( gFrame, true, filename, true ); // preload a layer from subdirectory
-                cont = dir.GetNext( &filename );
-            }
-        }
-    }
-#endif
-
-    if( wxDir::Exists( layerdir ) ) {
-        wxString laymsg;
-        laymsg.Printf( wxT("Getting .gpx layer files from: %s"), layerdir.c_str() );
-        wxLogMessage( laymsg );
-
-        pConfig->LoadLayers(layerdir);
-    }
 
     cc1->ReloadVP();                  // once more, and good to go
 
@@ -2260,13 +2214,9 @@ int MyApp::OnExit()
     delete m_checker;
 #endif
 
-#ifdef OCPN_USE_CRASHRPT
-#ifndef _DEBUG
-    // Uninstall Windows crash reporting
-    crUninstall();
-#endif
-#endif
 
+    g_Platform->OnExit_2();
+    
     return TRUE;
 }
 
@@ -5453,12 +5403,27 @@ void MyFrame::OnInitTimer(wxTimerEvent& event)
 {
     switch(m_iInitCount++) {
     case 0:
+    {
         // Load the waypoints.. both of these routines are very slow to execute which is why
         // they have been to defered until here
         pWayPointMan = new WayPointman();
         pConfig->LoadNavObjects();
+        
+        // Import Layer-wise any .gpx files from /Layers directory
+        wxString layerdir = g_Platform->GetPrivateDataDir();
+        appendOSDirSlash( &layerdir );
+        layerdir.Append( _T("layers") );
+        
+        if( wxDir::Exists( layerdir ) ) {
+            wxString laymsg;
+            laymsg.Printf( wxT("Getting .gpx layer files from: %s"), layerdir.c_str() );
+            wxLogMessage( laymsg );
+            
+            pConfig->LoadLayers(layerdir);
+        }
+        
         break;
-
+    }
     case 1:
         // Connect Datastreams
         

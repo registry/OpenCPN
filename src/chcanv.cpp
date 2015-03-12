@@ -1388,6 +1388,7 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
 
     int panspeed = m_modkeys == wxMOD_ALT ? 2 : 100;
 
+#ifdef OCPN_ALT_MENUBAR        
 #ifndef __WXOSX__
     // If the permanent menubar is disabled, we show it temporarily when Alt is pressed or when
     // Alt + a letter is presssed (for the top-menu-level hotkeys).
@@ -1409,7 +1410,7 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
         }
     }
 #endif
-
+#endif
 
     // HOTKEYS
     switch( event.GetKeyCode() ) {
@@ -1853,6 +1854,7 @@ void ChartCanvas::OnKeyUp( wxKeyEvent &event )
 
     case WXK_ALT:
         m_modkeys &= ~wxMOD_ALT;
+#ifdef OCPN_ALT_MENUBAR        
 #ifndef __WXOSX__
         // If the permanent menu bar is disabled, and we are not in the middle of another key combo,
         // then show the menu bar temporarily when Alt is released (or hide it if already visible).
@@ -1862,6 +1864,7 @@ void ChartCanvas::OnKeyUp( wxKeyEvent &event )
         }
         m_bMayToggleMenuBar = true;
 #endif
+#endif        
         break;
 
     case WXK_CONTROL:
@@ -2492,6 +2495,49 @@ void ChartCanvas::GetDoubleCanvasPointPix( double rlat, double rlon, wxPoint2DDo
     *r = GetVP().GetDoublePixFromLL( rlat, rlon );
 }
 
+void ChartCanvas::GetDoubleCanvasPointPixVP( ViewPort &vp, double rlat, double rlon, wxPoint2DDouble *r )
+{
+    // If the Current Chart is a raster chart, and the
+    // requested lat/long is within the boundaries of the chart,
+    // and the VP is not rotated,
+    // then use the embedded BSB chart georeferencing algorithm
+    // for greater accuracy
+    // Additionally, use chart embedded georef if the projection is TMERC
+    //  i.e. NOT MERCATOR and NOT POLYCONIC
+    
+    // If for some reason the chart rejects the request by returning an error,
+    // then fall back to Viewport Projection estimate from canvas parameters
+    if( Current_Ch && ( Current_Ch->GetChartFamily() == CHART_FAMILY_RASTER )
+        && ( ( ( fabs( vp.rotation ) < .0001 ) &&
+        ( ( !g_bskew_comp || ( fabs( vp.skew ) < .0001 ) ) ) )
+        || ( ( Current_Ch->GetChartProjectionType() != PROJECTION_MERCATOR )
+        && ( Current_Ch->GetChartProjectionType() != PROJECTION_TRANSVERSE_MERCATOR )
+        && ( Current_Ch->GetChartProjectionType() != PROJECTION_POLYCONIC ) ) ) )
+    {
+        ChartBaseBSB *Cur_BSB_Ch = dynamic_cast<ChartBaseBSB *>( Current_Ch );
+        //                        bool bInside = G_FloatPtInPolygon ( ( MyFlPoint * ) Cur_BSB_Ch->GetCOVRTableHead ( 0 ),
+        //                                                            Cur_BSB_Ch->GetCOVRTablenPoints ( 0 ), rlon, rlat );
+        //                        bInside = true;
+        //                        if ( bInside )
+        if( Cur_BSB_Ch ) {
+            //    This is a Raster chart....
+            //    If the VP is changing, the raster chart parameters may not yet be setup
+            //    So do that before accessing the chart's embedded georeferencing
+            Cur_BSB_Ch->SetVPRasterParms( vp );
+            double rpixxd, rpixyd;
+            if( 0 == Cur_BSB_Ch->latlong_to_pix_vp( rlat, rlon, rpixxd, rpixyd, vp ) ) {
+                r->m_x = rpixxd;
+                r->m_y = rpixyd;
+                return;
+            }
+        }
+    }
+    
+    //    if needed, use the VPoint scaling estimator,
+    *r = vp.GetDoublePixFromLL( rlat, rlon );
+}
+
+
 // This routine might be deleted and all of the rendering improved
 // to have floating point accuracy
 void ChartCanvas::GetCanvasPointPix( double rlat, double rlon, wxPoint *r )
@@ -2500,6 +2546,14 @@ void ChartCanvas::GetCanvasPointPix( double rlat, double rlon, wxPoint *r )
     GetDoubleCanvasPointPix(rlat, rlon, &p);
     *r = wxPoint(wxRound(p.m_x), wxRound(p.m_y));
 }
+
+void ChartCanvas::GetCanvasPointPixVP( ViewPort &vp, double rlat, double rlon, wxPoint *r )
+{
+    wxPoint2DDouble p;
+    GetDoubleCanvasPointPixVP(vp, rlat, rlon, &p);
+    *r = wxPoint(wxRound(p.m_x), wxRound(p.m_y));
+}
+
 
 void ChartCanvas::GetCanvasPixPoint( double x, double y, double &lat, double &lon )
 {
@@ -4631,7 +4685,127 @@ bool ChartCanvas::MouseEventProcessObjects( wxMouseEvent& event )
     
     SelectRadius = sel_rad_pix / ( m_true_scale_ppm * 1852 * 60 );  // Degrees, approximately
     
+///
+    // We start with Double Click processing. The first left click just starts a timer and
+    // is remembered, then we actually do something if there is a LeftDClick.
+    // If there is, the two single clicks are ignored.
     
+    if( event.LeftDClick() && ( cursor_region == CENTER ) ) {
+        m_DoubleClickTimer->Start();
+        singleClickEventIsValid = false;
+        
+        double zlat, zlon;
+        GetCanvasPixPoint( x, y, zlat, zlon );
+        
+        SelectItem *pFindAIS;
+        pFindAIS = pSelectAIS->FindSelection( zlat, zlon, SELTYPE_AISTARGET );
+        
+        if( pFindAIS ) {
+            m_FoundAIS_MMSI = pFindAIS->GetUserData();
+            if( g_pAIS->Get_Target_Data_From_MMSI( m_FoundAIS_MMSI ) ) {
+                wxWindow *pwin = wxDynamicCast(this, wxWindow);
+                ShowAISTargetQueryDialog( pwin, m_FoundAIS_MMSI );
+            }
+            return true;
+        }
+        
+        SelectableItemList rpSelList = pSelect->FindSelectionList( zlat, zlon, SELTYPE_ROUTEPOINT );
+        wxSelectableItemListNode *node = rpSelList.GetFirst();
+        bool b_onRPtarget = false;
+        while( node ) {
+            SelectItem *pFind = node->GetData();
+            RoutePoint *frp = (RoutePoint *) pFind->m_pData1;
+            if(m_pRoutePointEditTarget && (frp == m_pRoutePointEditTarget) ){
+                b_onRPtarget = true;
+                break;
+            }
+            node = node->GetNext();
+        }
+        
+        //      Double tap with selected RoutePoint or Mark
+        bool bt1 = m_bMarkEditing;
+        RoutePoint *pp = m_pRoutePointEditTarget;
+        
+        if(m_pRoutePointEditTarget){
+            if( b_onRPtarget ) {
+                ShowMarkPropertiesDialog( m_pRoutePointEditTarget );
+                return true;
+            }
+            else {
+                m_pRoutePointEditTarget->m_bIsBeingEdited = false;
+                m_pRoutePointEditTarget->m_bPtIsSelected = false;
+                wxRect wp_rect;
+                m_pRoutePointEditTarget->CalculateDCRect( m_dc_route, &wp_rect );
+                m_pRoutePointEditTarget = NULL;         //cancel selection
+                RefreshRect( wp_rect, true );
+                return true;
+            }
+        }
+        else{
+            node = rpSelList.GetFirst();
+            if( node ) {
+                SelectItem *pFind = node->GetData();
+                RoutePoint *frp = (RoutePoint *) pFind->m_pData1;
+                if( frp ){
+                    wxArrayPtrVoid *proute_array = g_pRouteMan->GetRouteArrayContaining( frp );
+
+                    // Use route array (if any) to determine actual visibility for this point
+                    bool brp_viz = false;
+                    if( proute_array ){
+                        for( unsigned int ir = 0; ir < proute_array->GetCount(); ir++ )
+                        {
+                            Route *pr = (Route *) proute_array->Item( ir );
+                            if( pr->IsVisible() )
+                            {
+                                brp_viz = true;
+                                break;
+                            }
+                        }
+                        if( !brp_viz && frp->m_bKeepXRoute ) // is not visible as part of route, but still exists as a waypoint
+                            brp_viz = frp->IsVisible(); // so treat as isolated point
+                        } else
+                            brp_viz = frp->IsVisible(); // isolated point
+
+                    if( brp_viz ){
+                        ShowMarkPropertiesDialog( frp );
+                        return true;
+                    }
+                }
+            }
+        }
+        
+        
+        
+        SelectItem* cursorItem;
+        cursorItem = pSelect->FindSelection( zlat, zlon, SELTYPE_ROUTESEGMENT );
+        
+        if( cursorItem ) {
+            Route *pr = (Route *) cursorItem->m_pData3;
+            if( pr->IsVisible() ) {
+                ShowRoutePropertiesDialog( _("Route Properties"), pr );
+                return true;
+            }
+        }
+        
+        cursorItem = pSelect->FindSelection( zlat, zlon, SELTYPE_TRACKSEGMENT );
+        
+        if( cursorItem ) {
+            Route *pr = (Route *) cursorItem->m_pData3;
+            if( pr->IsVisible() ) {
+                ShowTrackPropertiesDialog( pr );
+                return true;
+            }
+        }
+        
+        // Found no object to act on, so show chart info.
+        
+        ShowObjectQueryWindow( x, y, zlat, zlon );
+        return true;
+    }
+    
+    
+    
+///    
     if( event.LeftDown() ) {
         //  This really should not be needed, but....
         //  on Windows, when using wxAUIManager, sometimes the focus is lost
@@ -4671,28 +4845,50 @@ bool ChartCanvas::MouseEventProcessObjects( wxMouseEvent& event )
                 RoutePoint *pNearbyPoint = pWayPointMan->GetNearbyWaypoint( rlat, rlon,
                                                                             nearby_radius_meters );
                 if( pNearbyPoint && ( pNearbyPoint != m_prev_pMousePoint )
-                    && !pNearbyPoint->m_bIsInTrack && !pNearbyPoint->m_bIsInLayer )
+                    && !pNearbyPoint->m_bIsInTrack && !pNearbyPoint->m_bIsInLayer && pNearbyPoint->IsVisible() )
                 {
-                    int dlg_return;
-                    #ifndef __WXOSX__
-                    dlg_return = OCPNMessageBox( this, _("Use nearby waypoint?"),
+                    wxArrayPtrVoid *proute_array = g_pRouteMan->GetRouteArrayContaining( pNearbyPoint );
+
+                    // Use route array (if any) to determine actual visibility for this point
+                    bool brp_viz = false;
+                    if( proute_array ){
+                        for( unsigned int ir = 0; ir < proute_array->GetCount(); ir++ ){
+                            Route *pr = (Route *) proute_array->Item( ir );
+                            if( pr->IsVisible() ) {
+                                brp_viz = true;
+                                break;
+                            }
+                        }
+            
+                        if( !brp_viz && pNearbyPoint->m_bKeepXRoute ) // is not visible as part of route, but still exists as a waypoint
+                            brp_viz = pNearbyPoint->IsVisible(); // so treat as isolated point
+                    }
+                    else
+                        brp_viz = pNearbyPoint->IsVisible(); // isolated point
+                    
+                    
+                    if( brp_viz ){
+                        int dlg_return;
+#ifndef __WXOSX__
+                        dlg_return = OCPNMessageBox( this, _("Use nearby waypoint?"),
                                                  _("OpenCPN Route Create"),
                                                    (long) wxYES_NO | wxCANCEL | wxYES_DEFAULT );
-                                                 #else
-                                                 dlg_return = wxID_YES;
-                                                 #endif
-                                                 if( dlg_return == wxID_YES ) {
-                                                     pMousePoint = pNearbyPoint;
+#else
+                        dlg_return = wxID_YES;
+#endif
+                        if( dlg_return == wxID_YES ) {
+                            pMousePoint = pNearbyPoint;
                                                      
-                                                     // Using existing waypoint, so nothing to delete for undo.
-                                                     if( parent_frame->nRoute_State > 1 )
-                                                         undo->BeforeUndoableAction( Undo_AppendWaypoint, pMousePoint, Undo_HasParent, NULL );
+                            // Using existing waypoint, so nothing to delete for undo.
+                            if( parent_frame->nRoute_State > 1 )
+                                undo->BeforeUndoableAction( Undo_AppendWaypoint, pMousePoint, Undo_HasParent, NULL );
                                                      
-                                                     // check all other routes to see if this point appears in any other route
-                                                         // If it appears in NO other route, then it should e considered an isolated mark
-                                                         if( !g_pRouteMan->FindRouteContainingWaypoint( pMousePoint ) ) pMousePoint->m_bKeepXRoute =
-                                                             true;
-                                                 }
+                            // check all other routes to see if this point appears in any other route
+                            // If it appears in NO other route, then it should e considered an isolated mark
+                            if( !g_pRouteMan->FindRouteContainingWaypoint( pMousePoint ) )
+                                pMousePoint->m_bKeepXRoute = true;
+                        }
+                    }
                 }
                 
                 if( NULL == pMousePoint ) {                 // need a new point
@@ -5074,7 +5270,7 @@ bool ChartCanvas::MouseEventProcessObjects( wxMouseEvent& event )
                 RoutePoint *pNearbyPoint = pWayPointMan->GetNearbyWaypoint( rlat, rlon,
                                                                             nearby_radius_meters );
                 if( pNearbyPoint && ( pNearbyPoint != m_prev_pMousePoint )
-                    && !pNearbyPoint->m_bIsInTrack && !pNearbyPoint->m_bIsInLayer )
+                    && !pNearbyPoint->m_bIsInTrack && !pNearbyPoint->m_bIsInLayer && pNearbyPoint->IsVisible() )
                 {
                     int dlg_return;
                     #ifndef __WXOSX__
@@ -5591,7 +5787,7 @@ bool ChartCanvas::MouseEventProcessObjects( wxMouseEvent& event )
                                 break;
                             }
                         }
-                        if( !brp_viz )                          // is not visible as part of route
+                        if( !brp_viz  && prp->m_bKeepXRoute)    // is not visible as part of route, but still exists as a waypoint
                             brp_viz = prp->IsVisible();         //  so treat as isolated point
                             
                     } else
