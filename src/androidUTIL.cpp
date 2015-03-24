@@ -339,12 +339,12 @@ wxSize getAndroidDisplayDimensions( void )
     if( tk.HasMoreTokens() ){
         wxString token = tk.GetNextToken();     // xdpi
         token = tk.GetNextToken();
-        long a = ::wxGetDisplaySize().x;        // wxWidgets idea
+        long a = ::wxGetDisplaySize().x;        // default is wxWidgets idea
         if(token.ToLong( &a ))
             sz_ret.x = a;
         
         token = tk.GetNextToken();
-        long b = ::wxGetDisplaySize().y;        // wxWidgets idea
+        long b = ::wxGetDisplaySize().y;        
         if(token.ToLong( &b ))
             sz_ret.y = b;
     }
@@ -559,8 +559,11 @@ wxArrayString androidGetBluetoothScanResults()
         wxString token = tk.GetNextToken();
         ret_array.Add(token);
     }
-        
-        return ret_array;
+    
+    if(!ret_array.GetCount())
+        ret_array.Add(_("Nothing found"));
+    
+    return ret_array;
 }
 
 

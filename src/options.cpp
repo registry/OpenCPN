@@ -949,11 +949,22 @@ void options::Init()
     m_pageUI = -1;
     m_pagePlugins = -1;
     m_pageConnections = -1;
+
+    m_buttonScanBT = 0;
+    m_stBTPairs = 0;
+    m_choiceBTDataSources = 0;
     
     lastPage = 0;
     
     m_pPlugInCtrl = NULL;       // for deferred loading
     m_pNMEAForm = NULL;
+
+#ifdef __OCPN__ANDROID__
+    m_scrollRate = 1;
+#else
+    m_scrollRate = 15;
+#endif    
+    
     
     // This variable is used by plugin callback function AddOptionsPage
     g_pOptions = this;
@@ -1005,7 +1016,7 @@ wxScrolledWindow *options::AddPage( size_t parent, const wxString & title)
     int style = wxVSCROLL | wxTAB_TRAVERSAL;
     if( page->IsKindOf( CLASSINFO(wxNotebook))) {
         window = new wxScrolledWindow( page, wxID_ANY, wxDefaultPosition, wxDefaultSize, style );
-        window->SetScrollRate(15,15);
+        window->SetScrollRate(m_scrollRate, m_scrollRate);
         ((wxNotebook *)page)->AddPage( window, title );
     } else if (page->IsKindOf(CLASSINFO(wxScrolledWindow))) {
         wxString toptitle = m_pListbook->GetPageText( parent );
@@ -1020,12 +1031,12 @@ wxScrolledWindow *options::AddPage( size_t parent, const wxString & title)
          * we must explicitely Show() it */
         page->Show();
         window = new wxScrolledWindow( nb, wxID_ANY, wxDefaultPosition, wxDefaultSize, style );
-        window->SetScrollRate(15, 15);
+        window->SetScrollRate(m_scrollRate, m_scrollRate);
         nb->AddPage( window, title );
         nb->ChangeSelection( 0 );
     } else { // This is the default content, we can replace it now
         window = new wxScrolledWindow( m_pListbook, wxID_ANY, wxDefaultPosition, wxDefaultSize, style, title );
-        window->SetScrollRate(5, 5);
+        window->SetScrollRate(m_scrollRate, m_scrollRate);
         wxString toptitle = m_pListbook->GetPageText( parent );
         m_pListbook->DeletePage( parent );
         m_pListbook->InsertPage( parent, window, toptitle, false, parent );
@@ -2137,7 +2148,7 @@ void options::CreatePanel_VectorCharts( size_t parent, int border_size, int grou
     marinersSizer->Add( ps57CtlListBox, 1, wxALL | wxEXPAND, group_item_spacing );
 #else
     wxScrolledWindow *marinersWindow = new wxScrolledWindow( ps57Ctl, wxID_ANY, wxDefaultPosition, wxSize(250, 350), wxHSCROLL | wxVSCROLL);
-    marinersWindow->SetScrollRate(5, 5);
+    marinersWindow->SetScrollRate(m_scrollRate, m_scrollRate);
     marinersSizer->Add( marinersWindow, 1, wxALL | wxEXPAND, group_item_spacing );
     
     wxBoxSizer* bSizerScrollMariners = new wxBoxSizer( wxVERTICAL );
@@ -2972,7 +2983,7 @@ void options::CreateControls()
     //      Build the PlugIn Manager Panel
     m_pPlugInCtrl = new PluginListPanel( itemPanelPlugins, ID_PANELPIM, wxDefaultPosition,
             wxDefaultSize, g_pi_manager->GetPlugInArray() );
-    m_pPlugInCtrl->SetScrollRate( 15, 15 );
+    m_pPlugInCtrl->SetScrollRate( m_scrollRate, m_scrollRate );
 
     itemBoxSizerPanelPlugins->Add( m_pPlugInCtrl, 1, wxEXPAND|wxALL, border_size );
 */
@@ -4639,7 +4650,7 @@ void options::OnPageChange( wxListbookEvent& event )
      
             m_pPlugInCtrl = new PluginListPanel( itemPanelPlugins, ID_PANELPIM, wxDefaultPosition,
                                          wxDefaultSize, g_pi_manager->GetPlugInArray() );
-            m_pPlugInCtrl->SetScrollRate( 15, 15 );
+            m_pPlugInCtrl->SetScrollRate( m_scrollRate, m_scrollRate );
     
             itemBoxSizerPanelPlugins->Add( m_pPlugInCtrl, 1, wxEXPAND|wxALL, 4 );
             
@@ -4874,7 +4885,12 @@ ChartGroupsUI::ChartGroupsUI( wxWindow* parent )
 {
     Create( parent, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxVSCROLL, _("Chart Groups") );
 
-    SetScrollRate(5,5);
+    int scrollRate = 5;
+#ifdef __OCPN__ANDROID__
+    scrollRate = 1;
+#endif    
+    
+    SetScrollRate(scrollRate, scrollRate);
     
     m_GroupSelectedPage = -1;
     m_pActiveChartsTree = 0;
@@ -5500,16 +5516,16 @@ void options::ShowNMEABT(bool visible)
 {
     if ( visible )
     {
-        m_buttonScanBT->Show();
-        m_stBTPairs->Show();
-        m_choiceBTDataSources->Show();
+        if(m_buttonScanBT) m_buttonScanBT->Show();
+        if(m_stBTPairs) m_stBTPairs->Show();
+        if(m_choiceBTDataSources) m_choiceBTDataSources->Show();
         
     }
     else
     {
-        m_buttonScanBT->Hide();
-        m_stBTPairs->Hide();
-        m_choiceBTDataSources->Hide();
+        if(m_buttonScanBT) m_buttonScanBT->Hide();
+        if(m_stBTPairs) m_stBTPairs->Hide();
+        if(m_choiceBTDataSources) m_choiceBTDataSources->Hide();
     }
 }
 

@@ -1668,9 +1668,10 @@ bool MyApp::OnInit()
 #endif
 
 #ifdef __OCPN__ANDROID__
-    ::wxDisplaySize( &cw, &ch);
+    wxSize asz = getAndroidDisplayDimensions();
+    ch = asz.y;
+    cw = asz.x;
     qDebug() << cw << ch;
-    ch -= 24;                           // This accounts for an error in the wxQT-Android interface...
 
     if((cw > 200) && (ch > 200) )
         new_frame_size.Set( cw, ch );
@@ -2081,8 +2082,6 @@ extern ocpnGLOptions g_GLOptions;
 
     wxLogMessage( wxString::Format(_("OpenCPN Initialized in %ld ms."), sw.Time() ) );
 
-//    qDebug() << "OpenCPN Initialized ms:" <<  sw.Time();
-    
 #ifdef __OCPN__ANDROID__
     androidHideBusyIcon();
 #endif    
@@ -3952,6 +3951,8 @@ void MyFrame::ActivateMOB( void )
     RoutePoint *pWP_MOB = new RoutePoint( gLat, gLon, _T ( "mob" ), mob_label, GPX_EMPTY_STRING );
     pWP_MOB->m_bKeepXRoute = true;
     pWP_MOB->m_bIsolatedMark = true;
+    pWP_MOB->SetWaypointArrivalRadius( -1.0 ); // Negative distance is code to signal "Never Arrive"
+    
     pSelect->AddSelectableRoutePoint( gLat, gLon, pWP_MOB );
     pConfig->AddNewWayPoint( pWP_MOB, -1 );       // use auto next num
 
@@ -7034,8 +7035,7 @@ bool MyFrame::DoChartUpdate( void )
     if( NULL == pCurrentStack ) pCurrentStack = new ChartStack;
 
     // Build a chart stack based on tLat, tLon
-    if( 0 == ChartData->BuildChartStack( &WorkStack, tLat, tLon, g_sticky_chart ) )       // Bogus Lat, Lon?
-            {
+    if( 0 == ChartData->BuildChartStack( &WorkStack, tLat, tLon, g_sticky_chart ) ) {      // Bogus Lat, Lon?
         if( NULL == pDummyChart ) {
             pDummyChart = new ChartDummy;
             bNewChart = true;
@@ -7052,9 +7052,11 @@ bool MyFrame::DoChartUpdate( void )
         bNewView |= cc1->SetViewPoint( tLat, tLon, set_scale, 0, cc1->GetVPRotation() );
 
         //      If the chart stack has just changed, there is new status
-        if( !ChartData->EqualStacks( &WorkStack, pCurrentStack ) ) {
-            bNewPiano = true;
-            bNewChart = true;
+        if(WorkStack.nEntry && pCurrentStack->nEntry){
+            if( !ChartData->EqualStacks( &WorkStack, pCurrentStack ) ) {
+                bNewPiano = true;
+                bNewChart = true;
+            }
         }
 
         //      Copy the new (by definition empty) stack into the target stack
