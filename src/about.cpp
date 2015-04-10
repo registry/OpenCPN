@@ -60,6 +60,8 @@ extern MyFrame          *gFrame;
 extern wxString         glog_file;
 extern wxString         gConfig_File;
 extern ocpnStyle::StyleManager* g_StyleManager;
+extern about            *g_pAboutDlg;
+extern bool             g_bresponsive;
 
 char AboutText[] =
 {
@@ -166,6 +168,7 @@ BEGIN_EVENT_TABLE( about, wxDialog )
     EVT_BUTTON( ID_DONATE, about::OnDonateClick)
     EVT_BUTTON( ID_COPYINI, about::OnCopyClick)
     EVT_BUTTON( ID_COPYLOG, about::OnCopyClick)
+    EVT_CLOSE( about::OnClose )
 END_EVENT_TABLE()
 
 about::about( )
@@ -194,11 +197,22 @@ bool about::Create( wxWindow* parent, wxWindowID id, const wxString& caption, co
 
     m_btips_loaded = false;
 
+    wxFont *qFont = GetOCPNScaledFont(_("Dialog"));
+    SetFont( *qFont );
+    
     CreateControls();
     Update();
 
+    wxSize sz = g_Platform->getDisplaySize();
+    
     GetSizer()->Fit( this );
-    GetSizer()->SetSizeHints( this );
+    
+    //Set the maximum size of the entire settings dialog
+    SetSizeHints( -1, -1, sz.x-100, sz.y-100 );
+
+    if( g_bresponsive )
+        SetSize( wxSize( sz.x-100, sz.y-100 ) );
+        
     Centre();
 
     return TRUE;
@@ -224,10 +238,13 @@ void about::Update()
     wxString conf = _T("\n    Config file location: ");
     conf.Append( g_Platform->GetConfigFileName() );
     pAboutTextCtl->WriteText( conf );
-
+    pAboutTextCtl->SetInsertionPoint( 0 );
+    
     pAuthorTextCtl->Clear();
     wxString *pAuthorsString = new wxString( AuthorText, wxConvUTF8 );
     pAuthorTextCtl->WriteText( *pAuthorsString );
+    pAuthorTextCtl->SetInsertionPoint( 0 );
+    
     delete pAuthorsString;
 
     pLicenseTextCtl->Clear();
@@ -259,6 +276,11 @@ void about::Update()
 
 void about::CreateControls()
 {
+    //  Set the nominal vertical size of the embedded controls
+    int v_size = 300;
+    if(g_bresponsive)
+        v_size = -1;
+    
     about* itemDialog1 = this;
 
     wxBoxSizer* aboutSizer = new wxBoxSizer( wxVERTICAL );
@@ -308,7 +330,7 @@ void about::CreateControls()
     itemPanelAbout->SetSizer( itemBoxSizer6 );
 
     pAboutTextCtl = new wxTextCtrl( itemPanelAbout, -1, _T(""), wxDefaultPosition,
-            wxSize( -1, 300 ), wxTE_MULTILINE | wxTE_READONLY );
+                                    wxSize( -1, v_size ), wxTE_MULTILINE | wxTE_READONLY );
     pAboutTextCtl->InheritAttributes();
     itemBoxSizer6->Add( pAboutTextCtl, 0, wxALIGN_CENTER_HORIZONTAL | wxEXPAND | wxALL, 5 );
 
@@ -322,7 +344,7 @@ void about::CreateControls()
     itemPanelAuthors->SetSizer( itemBoxSizer7 );
 
     pAuthorTextCtl = new wxTextCtrl( itemPanelAuthors, -1, _T(""), wxDefaultPosition,
-            wxSize( -1, 300 ), wxTE_MULTILINE | wxTE_READONLY );
+                                     wxSize( -1, v_size ), wxTE_MULTILINE | wxTE_READONLY );
     pAuthorTextCtl->InheritAttributes();
     itemBoxSizer7->Add( pAuthorTextCtl, 0, wxALIGN_CENTER_HORIZONTAL | wxEXPAND | wxALL, 5 );
 
@@ -344,7 +366,7 @@ void about::CreateControls()
     tcflags |= wxTE_DONTWRAP;
 #endif
     pLicenseTextCtl = new wxTextCtrl( itemPanelLicense, -1, _T(""), wxDefaultPosition,
-            wxSize( -1, 300 ), tcflags );
+                                      wxSize( -1, v_size ), tcflags );
 
     pLicenseTextCtl->InheritAttributes();
     itemBoxSizer8->Add( pLicenseTextCtl, 0, wxALIGN_CENTER_HORIZONTAL | wxEXPAND | wxALL, 5 );
@@ -374,6 +396,12 @@ void about::CreateControls()
 void about::OnXidOkClick( wxCommandEvent& event )
 {
   Close();
+}
+
+void about::OnClose( wxCloseEvent& event )
+{
+    Destroy();
+    g_pAboutDlg = NULL;
 }
 
 void about::OnDonateClick( wxCommandEvent& event )
