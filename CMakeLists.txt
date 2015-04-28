@@ -396,7 +396,7 @@ INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/src)
 #  IF NOT DEBUGGING CFLAGS="-O2 -march=native"
 IF(NOT WIN32 AND NOT APPLE )
   ADD_DEFINITIONS( "-Wall -Wno-unused -fexceptions -rdynamic" )
-  ADD_DEFINITIONS( " -g -fno-strict-aliasing")
+  ADD_DEFINITIONS( " -g -O2 -fno-strict-aliasing")
 
   ADD_DEFINITIONS( " -DPREFIX=\\\"${CMAKE_INSTALL_PREFIX}\\\"")
   # profiling with gprof
@@ -468,19 +468,39 @@ IF(QT_ANDROID)
   ADD_DEFINITIONS(-D__OCPN__ANDROID__)
   ADD_DEFINITIONS(-DANDROID)
 
-  SET(CMAKE_CXX_FLAGS "-pthread -fPIC")
+  SET(CMAKE_CXX_FLAGS "-pthread -fPIC -s")
 
-  INCLUDE_DIRECTORIES("${Qt_Base}/5.2.1/android_armv7/include/QtCore")
-  INCLUDE_DIRECTORIES("${Qt_Base}/5.2.1/android_armv7/include")
-  INCLUDE_DIRECTORIES("${Qt_Base}/5.2.1/android_armv7/include/QtWidgets")
-  INCLUDE_DIRECTORIES("${Qt_Base}/5.2.1/android_armv7/include/QtGui")
-  INCLUDE_DIRECTORIES("${Qt_Base}/5.2.1/android_armv7/include/QtOpenGL")
-  INCLUDE_DIRECTORIES("${Qt_Base}/5.2.1/android_armv7/include/QtTest")
+  ## Compiler flags
+ #   if(CMAKE_COMPILER_IS_GNUCXX)
+ #       set(CMAKE_CXX_FLAGS "-O2")        ## Optimize
+        set(CMAKE_EXE_LINKER_FLAGS "-s")  ## Strip binary
+ #   endif()
+    
+#  INCLUDE_DIRECTORIES("${Qt_Base}/5.2.1/android_armv7/include/QtCore")
+#  INCLUDE_DIRECTORIES("${Qt_Base}/5.2.1/android_armv7/include")
+#  INCLUDE_DIRECTORIES("${Qt_Base}/5.2.1/android_armv7/include/QtWidgets")
+#  INCLUDE_DIRECTORIES("${Qt_Base}/5.2.1/android_armv7/include/QtGui")
+#  INCLUDE_DIRECTORIES("${Qt_Base}/5.2.1/android_armv7/include/QtOpenGL")
+#  INCLUDE_DIRECTORIES("${Qt_Base}/5.2.1/android_armv7/include/QtTest")
+
+  INCLUDE_DIRECTORIES("${Qt_Base}/5.3/android_armv7/include/QtCore")
+  INCLUDE_DIRECTORIES("${Qt_Base}/5.3/android_armv7/include")
+  INCLUDE_DIRECTORIES("${Qt_Base}/5.3/android_armv7/include/QtWidgets")
+  INCLUDE_DIRECTORIES("${Qt_Base}/5.3/android_armv7/include/QtGui")
+  INCLUDE_DIRECTORIES("${Qt_Base}/5.3/android_armv7/include/QtOpenGL")
+  INCLUDE_DIRECTORIES("${Qt_Base}/5.3/android_armv7/include/QtTest")
 
   ADD_DEFINITIONS(-DQT_WIDGETS_LIB)
 
+#  SET_PROPERTY(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)
+#  SET(BUILD_SHARED_LIBS "ON")
+
   INCLUDE_DIRECTORIES("${wxQt_Base}/include")
+#  For static build
   INCLUDE_DIRECTORIES( "${wxQt_Base}/${wxQt_Build}/lib/wx/include/arm-linux-androideabi-qt-unicode-static-3.1")
+
+#  For dynamic build  
+#  INCLUDE_DIRECTORIES( "${wxQt_Base}/${wxQt_Build}/lib/wx/include/arm-linux-androideabi-qt-unicode-3.1")
 ENDIF()
 
 
