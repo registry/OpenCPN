@@ -124,6 +124,7 @@ extern RouteProp        *pRoutePropDialog;
 extern bool             s_bSetSystemTime;
 extern bool             g_bDisplayGrid;         //Flag indicating if grid is to be displayed
 extern bool             g_bPlayShipsBells;
+extern int              g_iSoundDeviceIndex;
 extern bool             g_bFullscreenToolbar;
 extern bool             g_bShowLayers;
 extern bool             g_bTransparentToolbar;
@@ -1338,6 +1339,7 @@ int MyConfig::LoadMyConfig()
     Read( _T ( "ShowCompassWindow" ), &m_bShowCompassWin, 1 );
     Read( _T ( "ShowGrid" ), &g_bDisplayGrid, 0 );
     Read( _T ( "PlayShipsBells" ), &g_bPlayShipsBells, 0 );
+    Read( _T ( "SoundDeviceIndex" ), &g_iSoundDeviceIndex, -1 );
     Read( _T ( "FullscreenToolbar" ), &g_bFullscreenToolbar, 1 );
     Read( _T ( "TransparentToolbar" ), &g_bTransparentToolbar, 1 );
     Read( _T ( "PermanentMOBIcon" ), &g_bPermanentMOBIcon, 0 );
@@ -2495,6 +2497,7 @@ void MyConfig::UpdateSettings()
     Write( _T ( "SetSystemTime" ), s_bSetSystemTime );
     Write( _T ( "ShowGrid" ), g_bDisplayGrid );
     Write( _T ( "PlayShipsBells" ), g_bPlayShipsBells );
+    Write( _T ( "SoundDeviceIndex" ), g_iSoundDeviceIndex );
     Write( _T ( "FullscreenToolbar" ), g_bFullscreenToolbar );
     Write( _T ( "TransparentToolbar" ), g_bTransparentToolbar );
     Write( _T ( "PermanentMOBIcon" ), g_bPermanentMOBIcon );
@@ -4565,7 +4568,6 @@ void AlphaBlending( ocpnDC &dc, int x, int y, int size_x, int size_y, float radi
 #ifdef ocpnUSE_GL
         /* opengl version */
         glEnable( GL_BLEND );
-        glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
 
         if(radius > 1.0f){
             wxColour c(color.Red(), color.Green(), color.Blue(), transparency);
