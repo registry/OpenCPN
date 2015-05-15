@@ -61,6 +61,7 @@
 #endif
 
 #ifdef __WXGTK__
+#include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #endif
 
@@ -4974,6 +4975,8 @@ int MyFrame::ProcessOptionsDialog( int rr, options* dialog )
         DoCOGSet();
     }
 
+    g_pRouteMan->SetColorScheme(global_color_scheme);           // reloads pens and brushes
+    
     //    Stuff the Filter tables
     double stuffcog = 0.;
     double stuffsog = 0.;
