@@ -858,6 +858,8 @@ options::options( MyFrame* parent, wxWindowID id, const wxString& caption, const
 {
     Init();
 
+    LoadS57();                  // Need to load S52 Options
+    
     pParent = parent;
 
     long wstyle = wxDEFAULT_DIALOG_STYLE | wxRESIZE_BORDER;
@@ -2884,8 +2886,11 @@ void options::CreatePanel_UI( size_t parent, int border_size, int group_item_spa
     
     pSoundDeviceIndex = new wxSpinCtrl( itemPanelFont, wxID_ANY );
     pSoundDeviceIndex->SetValue( g_iSoundDeviceIndex );
+    pSoundDeviceIndex->Hide();
     
     if(OCPN_Sound::DeviceCount() > 1){
+        pSoundDeviceIndex->Show();
+        
         wxFlexGridSizer *pSoundDeviceIndexGrid = new wxFlexGridSizer( 2 );
         miscOptions->Add( pSoundDeviceIndexGrid, 0, wxALL | wxEXPAND, group_item_spacing );
     
@@ -3647,10 +3652,8 @@ void options::OnOpenGLOptions( wxCommandEvent& event )
     }
 
     if(dlg.m_brebuild_cache) {
-        Hide();
-        cc1->Disable();
-        BuildCompressedCache();
-        cc1->Enable();
+        m_returnChanges = REBUILD_RASTER_CACHE;
+        Finish();
     }
 #endif
 }
@@ -4489,27 +4492,34 @@ void options::OnXidOkClick( wxCommandEvent& event )
     OnApplyClick( event );
     if( event.GetInt() == wxID_STOP ) return;
 
+    Finish();
+}
+
+void options::Finish()
+{
     //  Required to avoid intermittent crash on wxGTK
     m_pListbook->ChangeSelection(0);
     for (size_t i = 0; i < m_pListbook->GetPageCount(); i++)
     {
         wxNotebookPage* pg = m_pListbook->GetPage( i );
-
+        
         if( pg->IsKindOf( CLASSINFO(wxNotebook))) {
-                wxNotebook *nb = ((wxNotebook *)pg);
-                nb->ChangeSelection(0);
+            wxNotebook *nb = ((wxNotebook *)pg);
+            nb->ChangeSelection(0);
         }
     }
-
+    
     delete pActiveChartsList;
     delete ps57CtlListBox;
     delete tcDataSelected;
-
+    
     lastWindowPos = GetPosition();
     lastWindowSize = GetSize();
     SetReturnCode( m_returnChanges );
     EndModal( m_returnChanges );
+    
 }
+
 
 void options::OnButtondeleteClick( wxCommandEvent& event )
 {

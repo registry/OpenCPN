@@ -63,9 +63,6 @@ extern int          g_GroupIndex;
 extern s52plib      *ps52plib;
 extern ChartDB      *ChartData;
 
-#ifdef USE_S57
-void LoadS57();
-#endif
 bool G_FloatPtInPolygon(MyFlPoint *rgpts, int wnumpts, float x, float y) ;
 bool GetMemoryStatus(int *mem_total, int *mem_used);
 
@@ -392,10 +389,12 @@ ChartBase *ChartDB::GetChart(const wxChar *theFilePath, ChartClassDescriptor &ch
       }
 #ifdef USE_S57
       else if (chartExt == wxT("000") || chartExt == wxT("S57")) {
+            LoadS57();
             pch = new s57chart;
       }
 #endif
       else if (chart_desc.m_descriptor_type == PLUGIN_DESCRIPTOR) {
+            LoadS57();
             ChartPlugInWrapper *cpiw = new ChartPlugInWrapper(chart_desc.m_class_name);
             pch = (ChartBase *)cpiw;
       }

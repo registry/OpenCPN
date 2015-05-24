@@ -462,22 +462,30 @@ void BuildCompressedCache()
     long style = wxPD_SMOOTH | wxPD_ELAPSED_TIME | wxPD_ESTIMATED_TIME | wxPD_REMAINING_TIME | wxPD_CAN_SKIP;
 //    style |= wxSTAY_ON_TOP;
     
-    pprog = new wxProgressDialog(_("OpenCPN Compressed Cache Update"), _T(""), count+1, GetOCPNCanvasWindow(), style );
+    wxString msg0;
+#ifdef __WXQT__    
+    msg0 = _T("Very longgggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg top line ");
+#endif    
+    for(int i=0 ; i < thread_count ; i++){msg0 += _T("line\n\n");}
+    pprog = new wxProgressDialog(_("OpenCPN Compressed Cache Update"), msg0, count+1, GetOCPNCanvasWindow(), style );
+    
+    wxSize csz = GetOCPNCanvasWindow()->GetClientSize();
+    if(csz.x < 600 || csz.y < 600){
+        wxFont *qFont = GetOCPNScaledFont(_("Dialog"));         // to get type, weight, etc...
+        wxFont *sFont = wxTheFontList->FindOrCreateFont( 10, qFont->GetFamily(), qFont->GetStyle(), qFont->GetWeight());
+        pprog->SetFont( *sFont );
+    }
     
     
     //    Make sure the dialog is big enough to be readable
     pprog->Hide();
     wxSize sz = pprog->GetSize();
-    wxSize csz = GetOCPNCanvasWindow()->GetClientSize();
-    sz.x = csz.x * 7 / 10;
+    sz.x = csz.x * 8 / 10;
     sz.y += thread_count * 40;          // allow for multiline messages
     pprog->SetSize( sz );
     pprog_size = sz;
 
     pprog->Centre();
-    wxString msg0;
-    for(int i=0 ; i < thread_count ; i++){msg0 += _T("\n\n");}
-    pprog->Update( 0, msg0 ); // Sometimes this lock opencpn up because of recursive event loop
     pprog->Show();
     pprog->Raise();
     
@@ -503,8 +511,11 @@ void BuildCompressedCache()
 
         bool skip = false;
         wxString msg;
-        msg.Printf( _("Distance from Ownship:  %4.0f NMi      Chart: "), distance);
-        msg += pchart->GetFullPath();
+        msg.Printf( _("Distance from Ownship:  %4.0f NMi"), distance);
+        if(pprog_size.x > 600){
+            msg += _T("   Chart:");
+            msg += pchart->GetFullPath();
+        }
         
         if(!ramonly)
             pprog->Update(pprog_count, _T("0000/0000 \n") + msg, &skip );
@@ -2456,23 +2467,23 @@ void glChartCanvas::Invalidate()
 void glChartCanvas::RenderRasterChartRegionGL( ChartBase *chart, ViewPort &vp, OCPNRegion &region )
 {
     if( !chart ) return;
-
+    
     ChartPlugInWrapper *pPlugInWrapper = dynamic_cast<ChartPlugInWrapper*>( chart );
     ChartBaseBSB *pBSBChart = dynamic_cast<ChartBaseBSB*>( chart );
-
+    
     if( !pPlugInWrapper && !pBSBChart ) return;
-
+    
     bool b_plugin = false;
     if( pPlugInWrapper ) b_plugin = true;
- 
+    
     /* setup texture parameters */
     glEnable( GL_TEXTURE_2D );
     glTexEnvi( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE );
-
+    
     //  Make a special VP to account for rotations
     if( vp.b_MercatorProjectionOverride ) vp.SetProjectionType( PROJECTION_MERCATOR );
     ViewPort svp = vp;
-
+    
     svp.pix_width = svp.rv_rect.width;
     svp.pix_height = svp.rv_rect.height;
     
@@ -2489,9 +2500,8 @@ void glChartCanvas::RenderRasterChartRegionGL( ChartBase *chart, ViewPort &vp, O
         if(vp.b_quilt && (fabs(skew_norm) > 1.0)){
             //  make a larger viewport to ensure getting all of the chart tiles
             ViewPort xvp = svp;
-            float maxdiag = sqrtf( (xvp.pix_width * xvp.pix_width) + (xvp.pix_height * xvp.pix_height) );
-            xvp.pix_width = maxdiag;
-            xvp.pix_height = maxdiag;
+            xvp.pix_width *= 2;
+            xvp.pix_height *= 2;
             pPlugInWrapper->ComputeSourceRectangle( xvp, &R );
         }
         else { 
@@ -2499,7 +2509,7 @@ void glChartCanvas::RenderRasterChartRegionGL( ChartBase *chart, ViewPort &vp, O
         }
         
         Rp.x = R.x, Rp.y = R.y, Rs.x = R.width, Rs.y = R.height;
-
+        
         scalefactor = pPlugInWrapper->GetRasterScaleFactor();
         size_X = pPlugInWrapper->GetSize_X();
         size_Y = pPlugInWrapper->GetSize_Y();
@@ -2507,28 +2517,28 @@ void glChartCanvas::RenderRasterChartRegionGL( ChartBase *chart, ViewPort &vp, O
         if(vp.b_quilt && (fabs(skew_norm) > 1.0)){
             //  make a larger viewport to ensure getting all of the chart tiles
             ViewPort xvp = svp;
-            float maxdiag = sqrtf( (xvp.pix_width * xvp.pix_width) + (xvp.pix_height * xvp.pix_height) );
-            xvp.pix_width = maxdiag;
-            xvp.pix_height = maxdiag;
+            xvp.pix_width *= 2;
+            xvp.pix_height *= 2;
             pBSBChart->ComputeSourceRectangle( xvp, &Rp, &Rs );
         }
         else {
             pBSBChart->ComputeSourceRectangle( svp, &Rp, &Rs );
         }
         
+        
         scalefactor = pBSBChart->GetRasterScaleFactor();
         size_X = pBSBChart->GetSize_X();
         size_Y = pBSBChart->GetSize_Y();
     }
-
+    
     int tex_dim = g_GLOptions.m_iTextureDimension;
     GrowData( 3 * tex_dim * tex_dim );
-
+    
     /* clipping is relative to rv_rect */
     OCPNRegion clipregion(region);
     clipregion.Offset(vp.rv_rect.x, vp.rv_rect.y);
     SetClipRegion( vp, clipregion );
-
+    
     //    Look for the texture factory for this chart
     wxString key = chart->GetFullPath();
     glTexFactory *pTexFact;
@@ -2542,7 +2552,7 @@ void glChartCanvas::RenderRasterChartRegionGL( ChartBase *chart, ViewPort &vp, O
     
     pTexFact = m_chart_texfactory_hash[key];
     pTexFact->SetLRUTime(wxDateTime::Now());
-
+    
     //    For underzoom cases, we will define the textures as having their base levels
     //    equivalent to a level "n" mipmap, where n is calculated, and is always binary
     //    This way we can avoid loading much texture memory
@@ -2551,62 +2561,57 @@ void glChartCanvas::RenderRasterChartRegionGL( ChartBase *chart, ViewPort &vp, O
         base_level = 0;
     if(base_level > g_mipmap_max_level)
         base_level = g_mipmap_max_level;
-
+    
     wxRect R(floor(Rp.x), floor(Rp.y), ceil(Rs.x), ceil(Rs.y));
-
+    
     //  Calculate the number of textures needed
     int nx_tex = ( size_X / tex_dim ) + 1;
     int ny_tex = ( size_Y / tex_dim ) + 1;
-
+    
     wxRect rect( 0, 0, 1, 1 );
-
+    
     glPushMatrix();
-
+    
     glScalef( 1. / scalefactor, 1. / scalefactor, 1 );
-
+    
     double xt = 0.;
     double yt = 0.;
-
+    
     double angle = vp.rotation;
     if(g_bskew_comp)
         angle -= vp.skew;
-
+    
     if(vp.b_quilt)
         angle -= skew_norm * PI / 180.;
     
+    double ddx = scalefactor * vp.pix_width / 2;
+    double ddy = scalefactor * vp.pix_height / 2;
+    
     if( angle != 0 ) /* test not really needed, but maybe a little faster for north up? */
     {
-        //    Shift texture drawing positions to account for the larger chart rectangle
-        //    needed to cover the screen on rotated images
-        double w = vp.pix_width;
-        double h = vp.pix_height;
-
-        double ddx = scalefactor * w / 2;
-        double ddy = scalefactor * h / 2;
-
         xt = Rs.x/2.0 - ddx;
         yt = Rs.y/2.0 - ddy;
-
+        
         glTranslatef( ddx, ddy, 0 );
         glRotatef( angle * 180. / PI, 0, 0, 1 );
         glTranslatef( -ddx, -ddy, 0 );
     }
-
+    
     //    Using a 2D loop, iterate thru the texture tiles of the chart
     //    For each tile, is it (1) needed and (2) present?
-
+    
     rect.y = 0;
     for( int i = 0; i < ny_tex; i++ ) {
         rect.height = tex_dim;
         rect.x = 0;
         for( int j = 0; j < nx_tex; j++ ) {
             rect.width = tex_dim;
-
+            
             // compute position, end, and size
             wxRealPoint rip(wxMax(Rp.x, rect.x), wxMax(Rp.y, rect.y));
             wxRealPoint rie(wxMin(Rp.x+Rs.x, rect.x+rect.width), wxMin(Rp.y+Rs.y, rect.y+rect.height));
             wxRealPoint ris(rie.x - rip.x, rie.y - rip.y);
-
+            
             //   Does this tile intersect the chart source rectangle?
             if( ris.x <= 0 || ris.y <= 0 ) {
                 /*   user setting is in MB while we count exact bytes */
@@ -2618,40 +2623,135 @@ void glChartCanvas::RenderRasterChartRegionGL( ChartBase *chart, ViewPort &vp, O
                 double w = ris.x, h = ris.y;
                 double x1 = rip.x - rect.x;
                 double y1 = rip.y - rect.y;
-
+                
                 double x2 = ( rip.x - Rp.x ) - xt;
                 double y2 = ( rip.y - Rp.y ) - yt;
-
+                
                 wxRect rt( floor( x2 / scalefactor),
                            floor( y2 / scalefactor),
                            ceil(w / scalefactor),
                            ceil(h / scalefactor));
                 rt.Offset( -vp.rv_rect.x, -vp.rv_rect.y ); // compensate for the adjustment made in quilt composition
-
-
+                
+                
                 //    And does this tile intersect the desired render region?
                 
                 //    Special processing for skewed charts...
                 //    We are working in "chart native" (i.e. unrotated) rectilinear coordinates for skewed charts.
-                //    But we do not have a good (cheap) way to rotate a wxRegion.
-                //    So, we therefore must include all on-screen tiles in the render loop, and count on the clipregion
-                //    set earlier to prevent drawing outside the charts own space onscreen.
-                //    This will probably be cheaper than rotating the region, even if we could do it.
+                //    We need to manually rotate the test rectangle by the chart's skew angle
+                //    before testing for inclusion in this chart's on-screen region.
+                //    This is an important memory usage factor, as we should avoid creating textures for chart
+                //    patches that will not be shown on screen, even though the clip-region would prevent their rendering.
                 
-                if((fabs(skew_norm) < 1.0) && ( region.Contains( rt ) == wxOutRegion ) ) {
-                        /*   user setting is in MB while we count exact bytes */
-                    bool bGLMemCrunch = g_tex_mem_used > g_GLOptions.m_iTextureMemorySize * 1024 * 1024;
-                        /* delete this unneeded tile if we need to free up memory */
-                    if( bGLMemCrunch )
-                        pTexFact->DeleteTexture( rect );
-                } else { // this tile is needed
-                    if(pTexFact->PrepareTexture( base_level, rect, global_color_scheme, true )){ 
+                if(vp.b_quilt && (fabs(skew_norm) > 1.0)){
                     
+                    //  transform the test rectangle
+                    double sint = sin(-skew_norm * PI / 180.);
+                    double cost = cos(-skew_norm * PI / 180.);
+                    
+                    double xmax = -10000;
+                    double ymax = -10000;
+                    double xmin = 10000;
+                    double ymin = 10000;
+                    
+                    
+                    double x22 = x2 - ddx;
+                    double y22 = y2 - ddy;
+                    double zx1 = (x22 * cost) - (y22 * sint);
+                    zx1 += ddx-vp.rv_rect.x;
+                    double zy1 = (x22 * sint) + (y22 * cost);
+                    zy1 += ddy-vp.rv_rect.y;
+                    xmax = wxMax(xmax, zx1); xmin = wxMin(xmin, zx1); ymax = wxMax(ymax, zy1); ymin = wxMin(ymin, zy1);
+                    
+                    x22 = x2 + w - ddx;
+                    y22 = y2 - ddy;
+                    double zx2 = (x22 * cost) - (y22 * sint);
+                    zx2 += ddx-vp.rv_rect.x;
+                    double zy2 = (x22 * sint) + (y22 * cost);
+                    zy2 += ddy-vp.rv_rect.y;
+                    xmax = wxMax(xmax, zx2); xmin = wxMin(xmin, zx2); ymax = wxMax(ymax, zy2); ymin = wxMin(ymin, zy2);
+                    
+                    x22 = x2 + w - ddx;
+                    y22 = y2 + w - ddy;
+                    double zx3 = (x22 * cost) - (y22 * sint);
+                    zx3 += ddx-vp.rv_rect.x;
+                    double zy3 = (x22 * sint) + (y22 * cost);
+                    zy3 += ddy-vp.rv_rect.y;
+                    xmax = wxMax(xmax, zx3); xmin = wxMin(xmin, zx3); ymax = wxMax(ymax, zy3); ymin = wxMin(ymin, zy3);
+                    
+                    x22 = x2 - ddx;
+                    y22 = y2 + w - ddy;
+                    double zx4 = (x22 * cost) - (y22 * sint);
+                    zx4 += ddx-vp.rv_rect.x;
+                    double zy4 = (x22 * sint) + (y22 * cost);
+                    zy4 += ddy-vp.rv_rect.y;
+                    xmax = wxMax(xmax, zx4); xmin = wxMin(xmin, zx4); ymax = wxMax(ymax, zy4); ymin = wxMin(ymin, zy4);
+                    
+                    wxRect tt(xmin/scalefactor, ymin/scalefactor, (xmax-xmin)/scalefactor, (ymax-ymin)/scalefactor );
+                    
+                    // replace the test rectangle
+                    rt = tt;
+                    
+#if 0 
+                    if( region.Contains( tt ) == wxOutRegion  ) {
+                        printf("skip\n");
+                    }
+                    else{
+                         printf("needed\n");
+                         bneeded = true;
+                    }
+ 
+
+//                    bneeded = true;
+                    DisableClipRegion();
+ 
+                    if(bneeded){
+                        if(pTexFact->PrepareTexture( base_level, rect, global_color_scheme, true )){ 
+                            double sx = rect.width;
+                            double sy = rect.height;
+                        
+                            glEnable( GL_TEXTURE_2D );
+                            
+                            glBegin( GL_QUADS );
+                            
+                            glTexCoord2f( x1 / sx, y1 / sy );
+                            glVertex2f( ( zx1 ), ( zy1 ) );
+                            glTexCoord2f( ( x1 + w ) / sx, y1 / sy );
+                            glVertex2f( ( zx2 ), ( zy2 ) );
+                            glTexCoord2f( ( x1 + w ) / sx, ( y1 + h ) / sy );
+                            glVertex2f( ( zx3 ), ( zy3 ) );
+                            glTexCoord2f( x1 / sx, ( y1 + h ) / sy );
+                            glVertex2f( ( zx4 ), ( zy4 ) );
+                            
+                            glEnd();
+                        }
+                    }
+                    else{
+                        glColor3ub(250, 0, 0);
+                        glDisable( GL_TEXTURE_2D );
+                        
+                        glBegin( GL_QUADS );
+                        
+                        glVertex2f( ( zx1 ), ( zy1 ) );
+                        glVertex2f( ( zx2 ), ( zy2 ) );
+                        glVertex2f( ( zx3 ), ( zy3 ) );
+                        glVertex2f( ( zx4 ), ( zy4 ) );
+                        
+                        glEnd();
+                    }
+#endif                    
+                    
+                }
+                
+                //  We can improve performance by testing first if the rectangle is anywhere on-screen.
+                if( vp.rv_rect.Intersects( rt ) && (region.Contains( rt ) != wxOutRegion) ) {
+                    // this tile is needed
+                    if(pTexFact->PrepareTexture( base_level, rect, global_color_scheme, true )){ 
                         double sx = rect.width;
                         double sy = rect.height;
-
+                        
                         glBegin( GL_QUADS );
-
+                        
                         glTexCoord2f( x1 / sx, y1 / sy );
                         glVertex2f( ( x2 ), ( y2 ) );
                         glTexCoord2f( ( x1 + w ) / sx, y1 / sy );
@@ -2660,7 +2760,7 @@ void glChartCanvas::RenderRasterChartRegionGL( ChartBase *chart, ViewPort &vp, O
                         glVertex2f( ( w + x2 ), ( h + y2 ) );
                         glTexCoord2f( x1 / sx, ( y1 + h ) / sy );
                         glVertex2f( ( x2 ), ( h + y2 ) );
-
+                        
                         glEnd();
                     }
                     else{
@@ -2675,36 +2775,40 @@ void glChartCanvas::RenderRasterChartRegionGL( ChartBase *chart, ViewPort &vp, O
                         
                         glEnd();
                     }
-                    
-                    
-                    
                 }
+                else{
+                    bool bGLMemCrunch = g_tex_mem_used > g_GLOptions.m_iTextureMemorySize * 1024 * 1024;
+                    if( bGLMemCrunch)
+                        pTexFact->DeleteTexture( rect );
+                }
+                
             }
             rect.x += rect.width;
         }
-
+        
         rect.y += rect.height;
     }
-
+    
     if( g_bDebugOGL ) {
         wxString msg;
         msg.Printf(_T("Timings: p:%ld m:%ld hwm:%ld u:%ld\tuc:%ld dc:%ld dcc: %ld rc:%ld wc:%ld   base:%d"),
                    populate_tt_total, mipmap_tt_total, hwmipmap_tt_total, upload_tt_total,
                    uploadcomp_tt_total, downloadcomp_tt_total, decompcomp_tt_total, readcomp_tt_total, writecomp_tt_total,
                    base_level);
-            wxLogMessage(msg);
-
-            printf("%s\n", (const char*)msg.ToUTF8());
-            
-            printf("texmem used: %.0fMB\n", g_tex_mem_used / 1024.0 / 1024.0);
+        wxLogMessage(msg);
+        
+        printf("%s\n", (const char*)msg.ToUTF8());
+        
+        printf("texmem used: %.0fMB\n", g_tex_mem_used / 1024.0 / 1024.0);
     }
-
+    
     glPopMatrix();
-
+    
     glDisable( GL_TEXTURE_2D );
-
+    
     DisableClipRegion();
 }
+
 
 void glChartCanvas::RenderQuiltViewGL( ViewPort &vp, const OCPNRegion &Region )
 {
@@ -2713,25 +2817,8 @@ void glChartCanvas::RenderQuiltViewGL( ViewPort &vp, const OCPNRegion &Region )
         //  render the quilt
         ChartBase *chart = cc1->m_pQuilt->GetFirstChart();
         
-        //  Check the first, smallest scale chart
-        if(chart) {
-//            if( ! cc1->IsChartLargeEnoughToRender( chart, vp ) )
-//            chart = NULL;
-        }
-            
         while( chart ) {
             
-            //  This test does not need to be done for raster charts, since
-            //  we can assume that texture binding is acceptably fast regardless of the render region,
-            //  and that the quilt zoom methods choose a reasonable reference chart.
-            if(chart->GetChartFamily() != CHART_FAMILY_RASTER)
-            {
-//                if( ! cc1->IsChartLargeEnoughToRender( chart, vp ) ) {
-//                    chart = cc1->m_pQuilt->GetNextChart();
-//                    continue;
-//                }
-            }
-
             QuiltPatch *pqp = cc1->m_pQuilt->GetCurrentPatch();
             if( pqp->b_Valid ) {
                 OCPNRegion get_region = pqp->ActiveRegion;

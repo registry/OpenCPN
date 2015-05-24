@@ -60,7 +60,7 @@
 #include <setjmp.h>
 #endif
 
-#ifdef __WXGTK__
+#ifdef OCPN_HAVE_X11
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #endif
@@ -481,6 +481,8 @@ options                   *g_options;
 int                       options_lastPage = 0;
 wxPoint                   options_lastWindowPos( 0,0 );
 wxSize                    options_lastWindowSize( 0,0 );
+
+bool                      g_bSleep;
 
 bool GetMemoryStatus(int *mem_total, int *mem_used);
 
@@ -965,9 +967,11 @@ void MyApp::OnActivateApp( wxActivateEvent& event )
     event.Skip();
 }
 
-#ifdef USE_S57
 void LoadS57()
 {
+#ifndef USE_S57
+    return;
+#else    
     if(ps52plib) // already loaded?
         return;
 
@@ -1100,8 +1104,8 @@ void LoadS57()
         delete ps52plib;
         ps52plib = NULL;
     }
+#endif    
 }
-#endif
 
 #ifdef __WXGTK__
 static char *get_X11_property (Display *disp, Window win,
@@ -1517,8 +1521,8 @@ bool MyApp::OnInit()
 #endif
 
     // Determine if a transparent toolbar is possible under linux with opengl
-#ifdef __WXGTK__
     g_bTransparentToolbarInOpenGLOK = false;
+#ifdef OCPN_HAVE_X11
     if(!g_bdisable_opengl) {
         Display *disp = XOpenDisplay(NULL);
         Window *sup_window;
@@ -3991,6 +3995,7 @@ void MyFrame::ToggleStats()
             UpdateControlBar();
             g_bShowChartBar = true;
         }
+        SendSizeEvent();
         Refresh();
         
         SetMenubarItemState( ID_MENU_UI_CHARTBAR, g_bShowChartBar );
@@ -4997,6 +5002,12 @@ int MyFrame::ProcessOptionsDialog( int rr, options* dialog )
         //      This will allow all charts to recognise new OpenGL configuration, if any
         int dbii = ChartData->FinddbIndex( chart_file_name );
         ChartsRefresh( dbii, cc1->GetVP(), true );
+    }
+
+    if(rr & REBUILD_RASTER_CACHE){
+        cc1->Disable();
+        BuildCompressedCache();
+        cc1->Enable();
     }
     
     if(g_config_display_size_mm > 0){
@@ -6023,6 +6034,9 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
         }
     }
 
+    if(g_bSleep)
+        return;
+    
 //      Update the Toolbar Status windows and lower status bar the first time watchdog times out
     if( ( gGPS_Watchdog == 0 ) || ( gSAT_Watchdog == 0 ) ) {
         wxString sogcog( _T("SOG --- ") + getUsrSpeedUnit() + _T(" COG ---\u00B0") );

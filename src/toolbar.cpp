@@ -94,6 +94,11 @@ GrabberWin::GrabberWin( wxWindow *parent, ocpnFloatingToolbarDialog *toolbar, fl
 void GrabberWin::OnPaint( wxPaintEvent& event )
 {
     wxPaintDC dc( this );
+    
+    wxColour back_color = GetGlobalColor( _T("GREY2") );
+    SetBackgroundColour( back_color );
+    ClearBackground();
+    
     dc.DrawBitmap( m_bitmap, 0, 0, true );
 }
 
@@ -177,7 +182,7 @@ void GrabberWin::MouseEvent( wxMouseEvent& event )
             
             if( !m_ptoolbar->m_bnavgrabber ){
                 m_ptoolbar->m_bnavgrabber = true;
-                m_ptoolbar->SetGrabber(_T("CompassRose") );
+                m_ptoolbar->SetGrabber(_T("4WayMove") );
             }
             else{
                 m_ptoolbar->m_bnavgrabber = false;
@@ -509,7 +514,8 @@ void ocpnFloatingToolbarDialog::SubmergeToGrabber()
     gFrame->TriggerResize(s);
     Raise();
 #endif    
-    
+
+    gFrame->Refresh();          // Needed for MSW OpenGL
 }
 
 void ocpnFloatingToolbarDialog::Surface()
@@ -2011,7 +2017,8 @@ bool ocpnToolBarSimple::GetToolEnabled( int id ) const
 void ocpnToolBarSimple::ToggleTool( int id, bool toggle )
 {
     wxToolBarToolBase *tool = FindById( id );
-    if( tool && tool->Toggle( toggle ) ) {
+        
+    if( tool && tool->CanBeToggled() && tool->Toggle( toggle ) ) {
         DoToggleTool( tool, toggle );
         if( g_toolbar ) g_toolbar->Refresh();
     }
@@ -2299,13 +2306,19 @@ void ocpnToolBarSimple::DoPluginToolUp()
 void ocpnToolBarSimple::SetToolNormalBitmapEx(wxToolBarToolBase *tool, const wxString & iconName)
 {
     if( tool ) {
-        ocpnStyle::Style *style = g_StyleManager->GetCurrentStyle();
+        ocpnToolBarTool *otool = (ocpnToolBarTool *) tool;
+        if(otool){
+            ocpnStyle::Style *style = g_StyleManager->GetCurrentStyle();
 
-        wxBitmap bmp = style->GetToolIcon( iconName, TOOLICON_NORMAL );
-        tool->SetNormalBitmap( bmp );
-        ocpnToolBarTool *otool = (ocpnToolBarTool *)tool;
-        if(otool)
+            wxBitmap bmp = style->GetToolIcon( iconName, TOOLICON_NORMAL );
+            if(m_sizefactor > 1.0 ){
+                wxImage scaled_image = bmp.ConvertToImage();
+                bmp = wxBitmap(scaled_image.Scale(otool->m_width, otool->m_height, wxIMAGE_QUALITY_HIGH));
+            }
+        
+            tool->SetNormalBitmap( bmp );
             otool->SetIconName( iconName );
+        }
     }
 }
 
