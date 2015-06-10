@@ -801,7 +801,8 @@ void MMSI_Props_Panel::UpdateMMSIList( void )
                 }
             }
                 
-        m_pListCtrlMMSI->SetItemState( item_sel,
+        if( g_MMSI_Props_Array.GetCount() != 0 ) 
+            m_pListCtrlMMSI->SetItemState( item_sel,
                     wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED,
                     wxLIST_STATE_SELECTED | wxLIST_STATE_FOCUSED );
 
@@ -873,7 +874,6 @@ options::options( MyFrame* parent, wxWindowID id, const wxString& caption, const
     CreateControls();
     RecalculateSize();
         
-    Fit();
     Center();
 }
 
@@ -936,6 +936,8 @@ void options::RecalculateSize()
         fitted_size.y = wxMin(fitted_size.y, canvas_size.y);
     
         SetSize( fitted_size );
+        
+        Fit();
     }
     else {
         wxSize esize;
@@ -946,7 +948,7 @@ void options::RecalculateSize()
         esize.y = wxMin(esize.y, dsize.y - (2 * GetCharHeight()));
         esize.x = wxMin(esize.x, dsize.x - (2 * GetCharHeight()));
         SetClientSize(esize);
-        
+
         wxSize fsize = GetSize();
         wxSize canvas_size = GetParent()->GetSize();
         wxPoint canvas_pos = GetParent()->GetPosition();
@@ -3730,7 +3732,6 @@ void options::OnCharHook( wxKeyEvent& event ) {
 void options::OnButtonaddClick( wxCommandEvent& event )
 {
     wxString selDir;
-    wxFileName dirname;
     wxDirDialog *dirSelector = new wxDirDialog( this, _("Add a directory containing chart files"),
             *pInit_Chart_Dir, wxDD_DEFAULT_STYLE | wxDD_DIR_MUST_EXIST );
 
@@ -3744,27 +3745,33 @@ void options::OnButtonaddClick( wxCommandEvent& event )
         goto done;
 
     selDir = dirSelector->GetPath();
-    dirname = wxFileName( selDir );
 
-    pInit_Chart_Dir->Empty();
-    if( !g_bportable )
-        pInit_Chart_Dir->Append( dirname.GetPath() );
-
-    if( g_bportable ) {
-        wxFileName f( selDir );
-        f.MakeRelativeTo( g_Platform->GetHomeDir() );
-        pActiveChartsList->Append( f.GetFullPath() );
-    } else
-        pActiveChartsList->Append( selDir );
-
-    k_charts |= CHANGE_CHARTS;
-
-    pScanCheckBox->Disable();
+    AddChartDir( selDir );
 
     done:
 
     delete dirSelector;
     event.Skip();
+}
+
+void options::AddChartDir( wxString &dir )
+{
+    wxFileName dirname = wxFileName( dir );
+    
+    pInit_Chart_Dir->Empty();
+    if( !g_bportable )
+        pInit_Chart_Dir->Append( dirname.GetPath() );
+
+    if( g_bportable ) {
+        wxFileName f( dir );
+        f.MakeRelativeTo( g_Platform->GetHomeDir() );
+        pActiveChartsList->Append( f.GetFullPath() );
+    } else
+        pActiveChartsList->Append( dir );
+
+    k_charts |= CHANGE_CHARTS;
+
+    pScanCheckBox->Disable();
 }
 
 void options::UpdateDisplayedChartDirList(ArrayOfCDI p)
@@ -6640,7 +6647,7 @@ void OpenGLOptionsDlg::OnButtonClear( wxCommandEvent& event )
 wxString OpenGLOptionsDlg::TextureCacheSize()
 {
     wxString path =  g_Platform->GetPrivateDataDir() + wxFileName::GetPathSeparator() + _T("raster_texture_cache");
-    int total = 0;
+    long long total = 0;
     if(::wxDirExists( path )) {
         wxArrayString files;
         size_t nfiles = wxDir::GetAllFiles(path, &files);
@@ -6648,6 +6655,10 @@ wxString OpenGLOptionsDlg::TextureCacheSize()
             total += wxFile(files[i]).Length();
         }
     }
-
-    return wxString::Format(_T("%.1f MB"), total/1024.0/1024.0);
+    double mb = total/1024.0/1024.0;
+    if (mb < 10000.0) 
+        return wxString::Format(_T("%.1f MB"), mb);
+    mb = mb / 1024.0;
+    return wxString::Format(_T("%.1f GB"), mb);
+    
 }

@@ -1948,7 +1948,6 @@ cm93chart::~cm93chart()
 
       free ( m_pDrawBuffer );
 
-      free ( m_this_chart_context );
 }
 
 void  cm93chart::Unload_CM93_Cell ( void )
@@ -3301,6 +3300,7 @@ S57Obj *cm93chart::CreateS57Obj ( int cell_index, int iobject, int subcell, Obje
             wxString msg;
             msg.Printf ( _T ( "   CM93 Error...object type %d not found in CM93OBJ.DIC" ), iclass );
             wxLogMessage ( msg );
+            delete xgeom;
             return NULL;
       }
 
@@ -3469,8 +3469,21 @@ S57Obj *cm93chart::CreateS57Obj ( int cell_index, int iobject, int subcell, Obje
                   translate_colmar ( sclass, pattValTmp );
                   sattr = _T ( "COLOUR" );
             }
-
-
+            // XXX should be done from s57 list ans cm93 list for any mismatch
+            // ie cm93 QUASOU is an enum s57 is a list
+            if ( pattValTmp->valType == OGR_INT && 
+                  (sattr.IsSameAs ( _T ( "QUASOU" ) ) || sattr.IsSameAs ( _T ( "CATLIT" ) ))
+               ) 
+            {
+                  int v = *(int*)pattValTmp->value;
+                  free(pattValTmp->value);
+                  sprintf ( val, "%d", v );
+                  int nlen = strlen ( val );
+                  pAVS = ( char * ) malloc ( nlen + 1 );          ;
+                  strcpy ( pAVS, val );
+                  pattValTmp->valType = OGR_STR;
+                  pattValTmp->value   = pAVS;
+            }
 
             //    Do CM93 $SCODE attribute substitutions
             if ( sclass.IsSameAs ( _T ( "$AREAS" ) ) && ( vtype == 'S' ) && sattr.IsSameAs ( _T ( "$SCODE" ) ) )
@@ -4004,13 +4017,7 @@ S57Obj *cm93chart::CreateS57Obj ( int cell_index, int iobject, int subcell, Obje
       //      Build/Maintain a list of found OBJL types for later use
       //      And back-reference the appropriate list index in S57Obj for Display Filtering
 
-
-      if ( pobj )
-      {
-            pobj->iOBJL = -1; // deferred, done by OBJL filtering in the PLIB as needed
-      }
-
-
+      pobj->iOBJL = -1; // deferred, done by OBJL filtering in the PLIB as needed
 
       // Everything in Xgeom that is needed later has been given to the object
       // So, the xgeom object can be deleted

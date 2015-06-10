@@ -385,7 +385,7 @@ PolyTessGeo::PolyTessGeo(unsigned char *polybuf, int nrecl, int index, int senc_
     ppg->pn_vertex = (int *)malloc(nctr * sizeof(int));
     int *pctr = ppg->pn_vertex;
 
-    size_t buf_len = wxMax(twkb_len + 2, 20 + (nctr * 4));
+    size_t buf_len = wxMax(twkb_len + 2, 20 + (nctr * 6));
     char *buf = (char *)malloc(buf_len);        // allocate a buffer guaranteed big enough
 
     my_bufgets( buf, buf_len );                 // contour nVert, as a char line
@@ -1470,7 +1470,7 @@ int PolyTessGeo::Write_PolyTriGroup( FILE *ofs)
     ostream2->Write(stemp.mb_str(), stemp.Len());
 
     int nrecl = ostream1->GetSize() + ostream2->GetSize();
-    stemp.sprintf( _T("  POLYTESSGEO  %08d %g %g\n"), nrecl, m_ref_lat, m_ref_lon);
+    stemp.sprintf( _T("  POLYTESSGEO  %08d %f %f\n"), nrecl, m_ref_lat, m_ref_lon);
 
     fwrite(stemp.mb_str(), 1, stemp.Len(), ofs);                 // Header, + record length
 

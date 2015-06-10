@@ -315,17 +315,20 @@ void Route::Draw( ocpnDC& dc, ViewPort &VP )
 {
     if( m_nPoints == 0 ) return;
 
+    int width = g_route_line_width;
+    if( m_width != STYLE_UNDEFINED ) width = m_width;
+    
     if( m_bVisible && m_bRtIsSelected ) {
-        dc.SetPen( *g_pRouteMan->GetSelectedRoutePen() );
+        wxPen spen = *g_pRouteMan->GetSelectedRoutePen();
+        spen.SetWidth( width );
+        dc.SetPen( spen );
         dc.SetBrush( *g_pRouteMan->GetSelectedRouteBrush() );
     }
     else if ( m_bVisible )
     {
         int style = wxSOLID;
-        int width = g_route_line_width;
         wxColour col;
         if( m_style != STYLE_UNDEFINED ) style = m_style;
-        if( m_width != STYLE_UNDEFINED ) width = m_width;
         if( m_Colour == wxEmptyString ) {
             col = g_pRouteMan->GetRoutePen()->GetColour();
         } else {
@@ -342,7 +345,9 @@ void Route::Draw( ocpnDC& dc, ViewPort &VP )
 
     if( m_bVisible && m_bRtIsActive )
     {
-        dc.SetPen( *g_pRouteMan->GetActiveRoutePen() );
+        wxPen spen = *g_pRouteMan->GetActiveRoutePen();
+        spen.SetWidth( width );
+        dc.SetPen( spen );
         dc.SetBrush( *g_pRouteMan->GetActiveRouteBrush() );
     }
 
@@ -464,6 +469,9 @@ void Route::DrawGLLines( ViewPort &VP, ocpnDC *dc )
         RoutePoint *prp1 = prp2;
         prp2 = node->GetData();
         unsigned short int ToSegNo = prp2->m_GPXTrkSegNo;
+
+        // Provisional, to properly set status of last point in route
+        prp2->m_pos_on_screen = false;
         
         if (FromSegNo != ToSegNo) {
             FromSegNo = ToSegNo;
@@ -479,6 +487,7 @@ void Route::DrawGLLines( ViewPort &VP, ocpnDC *dc )
             bool lat1r = prp1->m_lat > bbox.GetMaxY(), lat2r = prp2->m_lat > bbox.GetMaxY();
             if( (lat1l && lat2l) || (lat1r && lat2r) ) {
                 r1valid = false;
+                prp1->m_pos_on_screen = false;
                 continue;
             }
 
@@ -487,6 +496,7 @@ void Route::DrawGLLines( ViewPort &VP, ocpnDC *dc )
             TestLongitude(prp2->m_lon, bbox.GetMinX(), bbox.GetMaxX(), lon2l, lon2r);
             if( (lon1l && lon2l) || (lon1r && lon2r) ) {
                 r1valid = false;
+                prp1->m_pos_on_screen = false;
                 continue;
             }
 
@@ -561,23 +571,19 @@ void Route::DrawGL( ViewPort &VP, OCPNRegion &region )
     
     /* determine color and width */
     wxColour col;
-    int width;
+
+    int width = g_route_line_width;
+    if( m_width != STYLE_UNDEFINED )
+        width = m_width;
+    if(m_bIsTrack)
+        width = g_pRouteMan->GetTrackPen()->GetWidth();
+    
     if( m_bRtIsActive )
     {
-        wxPen &pen = *g_pRouteMan->GetActiveRoutePen();
-        col = pen.GetColour();
-        width = pen.GetWidth();
+        col = g_pRouteMan->GetActiveRoutePen()->GetColour();
     } else if( m_bRtIsSelected ) {
-        wxPen &pen = *g_pRouteMan->GetSelectedRoutePen();
-        col = pen.GetColour();
-        width = pen.GetWidth();
+        col = g_pRouteMan->GetSelectedRoutePen()->GetColour();
     } else {
-        if(m_bIsTrack)
-            width = g_pRouteMan->GetTrackPen()->GetWidth();
-        else
-            width = g_pRouteMan->GetRoutePen()->GetWidth();
-        
-        if( m_width != STYLE_UNDEFINED ) width = m_width;
         if( m_Colour == wxEmptyString ) {
             col = g_pRouteMan->GetRoutePen()->GetColour();
             

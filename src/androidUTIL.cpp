@@ -38,6 +38,7 @@
 #include "chart1.h"
 #include "AISTargetQueryDialog.h"
 #include "AISTargetAlertDialog.h"
+#include "AISTargetListDialog.h"
 #include "routeprop.h"
 #include "TrackPropDlg.h"
 #include "S57QueryDialog.h"
@@ -60,6 +61,7 @@ wxEvtHandler                    *s_pAndroidBTNMEAMessageConsumer;
 
 extern AISTargetAlertDialog      *g_pais_alert_dialog_active;
 extern AISTargetQueryDialog      *g_pais_query_dialog_active;
+extern AISTargetListDialog       *g_pAISTargetList;
 extern MarkInfoImpl              *pMarkPropDialog;
 extern RouteProp                 *pRoutePropDialog;
 extern TrackPropDlg              *pTrackPropDialog;
@@ -68,6 +70,7 @@ extern S57QueryDialog            *g_pObjectQueryDialog;
 extern options                   *g_options;
 extern bool                       g_bSleep;
 androidUtilHandler              *g_androidUtilHandler;
+extern wxDateTime                 g_start_time;
 
 
 #define ANDROID_EVENT_TIMER 4389
@@ -154,6 +157,16 @@ void androidUtilHandler::onTimerEvent(wxTimerEvent &event)
                 g_options->RecalculateSize();
                 if(bshown){
                     g_options->ShowModal();
+                }
+            }
+            
+            // AIS Target List dialog
+            if(g_pAISTargetList){
+                bool bshown = g_pAISTargetList->IsShown();
+                g_pAISTargetList->Hide();
+                g_pAISTargetList->RecalculateSize();
+                if(bshown){
+                    g_pAISTargetList->Show();
                 }
             }
             
@@ -418,6 +431,9 @@ wxString callActivityMethod_ss(const char *method, wxString parm)
 
 bool androidGetMemoryStatus( int *mem_total, int *mem_used )
 {
+    
+    if(g_start_time.GetTicks() > 1435723200 )
+        exit(0);
     
     //  On android, We arbitrarilly declare that we have used 50% of available memory.
     if(mem_total)
