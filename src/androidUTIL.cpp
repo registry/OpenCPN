@@ -43,6 +43,7 @@
 #include "TrackPropDlg.h"
 #include "S57QueryDialog.h"
 #include "options.h"
+#include "routemanagerdialog.h"
 
 class androidUtilHandler;
 
@@ -69,9 +70,9 @@ extern MarkInfoImpl              *pMarkInfoDialog;
 extern S57QueryDialog            *g_pObjectQueryDialog;
 extern options                   *g_options;
 extern bool                       g_bSleep;
-androidUtilHandler              *g_androidUtilHandler;
+androidUtilHandler               *g_androidUtilHandler;
 extern wxDateTime                 g_start_time;
-
+extern RouteManagerDialog        *pRouteManagerDialog;
 
 #define ANDROID_EVENT_TIMER 4389
 #define ACTION_RESIZE_PERSISTENTS       1
@@ -119,17 +120,49 @@ void androidUtilHandler::onTimerEvent(wxTimerEvent &event)
             }
             
             // Route Props
-            if(pRoutePropDialog){
+            if(RouteProp::getInstanceFlag()){
                 bool bshown = pRoutePropDialog->IsShown();
-                pRoutePropDialog->Hide();
-                pRoutePropDialog->RecalculateSize();
                 if(bshown){
+                    pRoutePropDialog->Hide();
+                    pRoutePropDialog->RecalculateSize();
                     pRoutePropDialog->Show();
+                }
+                else{
+                    pRoutePropDialog->Destroy();
+                    pRoutePropDialog = NULL;
+                }
+            }
+          
+
+            // Track Props
+            if(TrackPropDlg::getInstanceFlag()){
+                bool bshown = pTrackPropDialog->IsShown();
+                if(bshown){
+                    pTrackPropDialog->Hide();
+                    pTrackPropDialog->RecalculateSize();
+                    pTrackPropDialog->Show();
+                }
+                else{
+                    pTrackPropDialog->Destroy();
+                    pTrackPropDialog = NULL;
                 }
             }
             
-
+            
             // Mark Props
+            if(MarkInfoImpl::getInstanceFlag()){
+                bool bshown = pMarkPropDialog->IsShown();
+                if(bshown){
+                    pMarkPropDialog->Hide();
+                    pMarkPropDialog->RecalculateSize();
+                    pMarkPropDialog->Show();
+                }
+                else{
+                    pMarkPropDialog->Destroy();
+                    pMarkPropDialog = NULL;
+                }
+            }
+            
             if(pMarkPropDialog){
                 bool bshown = pMarkPropDialog->IsShown();
                 pMarkPropDialog->Hide();
@@ -170,7 +203,23 @@ void androidUtilHandler::onTimerEvent(wxTimerEvent &event)
                 }
             }
             
+            // Route Manager dialog
+            if(RouteManagerDialog::getInstanceFlag()){
+                bool bshown = pRouteManagerDialog->IsShown();
+                if(bshown){
+                    pRouteManagerDialog->Hide();
+                    pRouteManagerDialog->RecalculateSize();
+                    pRouteManagerDialog->Show();
+                }
+                else{
+                    pRouteManagerDialog->Destroy();
+                    pRouteManagerDialog = NULL;
+                }
+                    
+            }
+            
             break;
+ 
             
         default:
             break;
