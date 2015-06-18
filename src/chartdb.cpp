@@ -33,6 +33,7 @@
 
 #include <wx/stopwatch.h>
 #include <wx/regex.h>
+#include "wx/tokenzr.h"
 
 #include "chartdb.h"
 #include "chartimg.h"
@@ -50,6 +51,8 @@
 #include "s57chart.h"
 #include "cm93.h"
 #endif
+
+extern ColorScheme GetColorScheme();
 
 class s52plib;
 
@@ -215,9 +218,8 @@ void ChartStack::AddChart( int db_add )
 // ChartDB implementation
 // ============================================================================
 
-ChartDB::ChartDB(MyFrame *parent)
+ChartDB::ChartDB()
 {
-      pParent = parent;
       pChartCache = new wxArrayPtrVoid;
 
       SetValid(false);                           // until loaded or created
@@ -347,8 +349,8 @@ void ChartDB::PurgeCacheUnusedCharts( double factor)
           if( wxMUTEX_NO_ERROR == m_cache_mutex.TryLock() ){
               
             //    Check memory status to see if above limit
-                int mem_total, mem_used;
-                GetMemoryStatus(&mem_total, &mem_used);
+                int mem_used;
+                GetMemoryStatus(0, &mem_used);
                 int mem_limit = g_memCacheLimit * factor;
 
                 int nl = pChartCache->GetCount();       // max loop count, by definition
@@ -387,7 +389,7 @@ void ChartDB::PurgeCacheUnusedCharts( double factor)
 
                     }
                     
-                    GetMemoryStatus(&mem_total, &mem_used);
+                    GetMemoryStatus(0, &mem_used);
                     
                     nl--;
                 }
@@ -864,7 +866,8 @@ bool ChartDB::IsChartInCache(int dbindex)
                 CacheEntry *pce = (CacheEntry *)(pChartCache->Item(i));
                 if(pce->dbIndex == dbindex)
                 {
-                    bInCache = true;
+                    if (pce->pChart != 0 && ((ChartBase *)pce->pChart)->IsReadyToRender())
+                        bInCache = true;
                     break;
                 }
         }
@@ -887,7 +890,8 @@ bool ChartDB::IsChartInCache(wxString path)
             CacheEntry *pce = (CacheEntry *)(pChartCache->Item(i));
             if(pce->FullPath == path)
             {
-                bInCache = true;
+                if (pce->pChart != 0 && ((ChartBase *)pce->pChart)->IsReadyToRender())
+                    bInCache = true;
                 break;
             }
         }
@@ -1095,7 +1099,10 @@ ChartBase *ChartDB::OpenChartUsingCache(int dbindex, ChartInitFlag init_flag)
               }
               else
               {
+                    if(pthumbwin && pthumbwin->pThumbChart == Ch)
+                       pthumbwin->pThumbChart = NULL;
                     delete Ch;                                  // chart is not useable
+                    
                     if( wxMUTEX_NO_ERROR == m_cache_mutex.Lock() ){
                         pChartCache->Remove(pce);                   // so remove it
                         m_cache_mutex.Unlock();
@@ -1124,8 +1131,8 @@ ChartBase *ChartDB::OpenChartUsingCache(int dbindex, ChartInitFlag init_flag)
                 {
 
             //    Check memory status to see if enough room to open another chart
-                    int mem_total, mem_used;
-                    GetMemoryStatus(&mem_total, &mem_used);
+                    int mem_used;
+                    GetMemoryStatus(0, &mem_used);
     //                  printf(" ChartdB Mem_total: %d  mem_used: %d  lock: %d\n", mem_total, mem_used, m_b_locked);
                     
                     if((mem_used > g_memCacheLimit * 8 / 10) && !m_b_locked && (pChartCache->GetCount() > 2)) {
@@ -1156,7 +1163,7 @@ ChartBase *ChartDB::OpenChartUsingCache(int dbindex, ChartInitFlag init_flag)
                             pChartCache->Remove(pce);
                             delete pce;
                             
-                            GetMemoryStatus(&mem_total, &mem_used);
+                            GetMemoryStatus(0, &mem_used);
     
                             if((mem_used < g_memCacheLimit * 8 / 10) || (pChartCache->GetCount() <= 2)) 
                                 break;
@@ -1345,7 +1352,7 @@ ChartBase *ChartDB::OpenChartUsingCache(int dbindex, ChartInitFlag init_flag)
                         wxLogMessage(msg);
 
                         ir = Ch->Init(ChartFullPath, init_flag);    // using the passed flag
-                        Ch->SetColorScheme(pParent->GetColorScheme());
+                        Ch->SetColorScheme(/*pParent->*/GetColorScheme());
                   }
                   else
                   {
@@ -1360,8 +1367,9 @@ ChartBase *ChartDB::OpenChartUsingCache(int dbindex, ChartInitFlag init_flag)
                   if(INIT_OK == ir)
                   {
 
-//    Only add to cache if requesting a full init
-                        if(FULL_INIT == init_flag)
+//    always cache after a new chart has been created
+//    or it may leak CacheEntry in createthumbnail
+//                        if(FULL_INIT == init_flag)
                         {
                               pce = new CacheEntry;
                               pce->FullPath = ChartFullPath;
@@ -1456,12 +1464,6 @@ bool ChartDB::DeleteCacheChart(ChartBase *pDeleteCandidate)
                   pChartCache->Remove(pce);
                   delete pce;
                   
-                  if(pthumbwin)
-                  {
-                        if(pthumbwin->pThumbChart == pDeleteCandidate)
-                              pthumbwin->pThumbChart = NULL;
-                  }
-
                   retval = true;
             }
       }
