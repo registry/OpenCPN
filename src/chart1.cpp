@@ -44,6 +44,7 @@
 #include <wx/dialog.h>
 #include <wx/progdlg.h>
 #include <wx/clrpicker.h>
+#include <wx/tokenzr.h>
 
 #include <wx/dialog.h>
 

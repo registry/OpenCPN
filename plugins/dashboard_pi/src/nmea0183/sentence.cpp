@@ -149,8 +149,8 @@ unsigned char SENTENCE::ComputeChecksum( void ) const
 double SENTENCE::Double( int field_number ) const
 {
  //  ASSERT_VALID( this );
-    wxCharBuffer abuf = Field( field_number).ToUTF8();
-    if( !abuf.data() || abuf.length() == 0 )                            // badly formed sentence?
+    const wxCharBuffer abuf = Field( field_number).ToUTF8();
+    if( !abuf.data() || (strlen(  (const char*)abuf) == 0) )                            // badly formed sentence?
         return (999.);
  
     return( ::atof( abuf.data() ));
