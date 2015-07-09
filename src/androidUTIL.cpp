@@ -757,6 +757,11 @@ extern "C"{
     {
         qDebug() << "invokeMenuItem" << item;
         
+        // If in Route Create, disable all other menu items
+        if( gFrame->nRoute_State > 1 ) {
+            return 72;
+        }
+            
         wxCommandEvent evt(wxEVT_COMMAND_MENU_SELECTED);
         
         switch(item){
@@ -1035,6 +1040,28 @@ wxString androidGetHomeDir()
 wxString androidGetPrivateDir()                 // Used for logfile, config file, navobj, and the like
 {
     if(g_bExternalApp){
+        
+        // should check storage availability
+#if 0
+/* Checks if external storage is available for read and write */
+        public boolean isExternalStorageWritable() {
+            String state = Environment.getExternalStorageState();
+            if (Environment.MEDIA_MOUNTED.equals(state)) {
+                return true;
+            }
+            return false;
+        }
+        
+        /* Checks if external storage is available to at least read */
+        public boolean isExternalStorageReadable() {
+            String state = Environment.getExternalStorageState();
+            if (Environment.MEDIA_MOUNTED.equals(state) ||
+                Environment.MEDIA_MOUNTED_READ_ONLY.equals(state)) {
+                return true;
+                }
+                return false;
+        }
+#endif        
         if(g_androidExtFilesDir.Length())
             return g_androidExtFilesDir;
     }
@@ -1843,11 +1870,14 @@ wxString BuildAndroidSettingsString( void )
         {
             ConnectionParams *cp = g_pConnectionParams->Item(i);
             if(INTERNAL_GPS == cp->Type){
-                result += _T("prefb_internalGPS:") + cp->bEnabled ? _T("1;") : _T("0;");
+                result += _T("prefb_internalGPS:");
+                result += cp->bEnabled ? _T("1;") : _T("0;");
                 break;                  // there can only be one entry for type INTERNAL_GPS
             }                    
         }
-                    
+    
+    wxLogMessage(result);
+    
     return result;
 }
 

@@ -61,6 +61,7 @@
 #include "ais.h"
 #include "OCPNPlatform.h"
 #include "toolbar.h"
+#include "chartbarwin.h"
 
 #ifndef GL_ETC1_RGB8_OES
 #define GL_ETC1_RGB8_OES                                        0x8D64
@@ -104,6 +105,10 @@ extern bool g_bShowFPS;
 extern bool g_btouch;
 extern OCPNPlatform *g_Platform;
 extern ocpnFloatingToolbarDialog *g_FloatingToolbarDialog;
+extern ocpnStyle::StyleManager* g_StyleManager;
+extern bool             g_bShowChartBar;
+extern ChartBarWin     *g_ChartBarWin;
+extern Piano           *g_Piano;
 
 GLenum       g_texture_rectangle_format;
 
@@ -142,6 +147,8 @@ extern RouteList        *pRouteList;
 extern bool             b_inCompressAllCharts;
 extern bool             g_bexpert;
 extern bool             g_bcompression_wait;
+extern bool             g_bresponsive;
+extern int              g_ChartScaleFactor;
 
 float            g_GLMinSymbolLineWidth;
 float            g_GLMinCartographicLineWidth;
@@ -149,6 +156,7 @@ float            g_GLMinCartographicLineWidth;
 extern bool             g_fog_overzoom;
 extern double           g_overzoom_emphasis_base;
 extern bool             g_oz_vector_scale;
+
 
 ocpnGLOptions g_GLOptions;
 
@@ -509,6 +517,9 @@ void BuildCompressedCache()
         if(!pchart) /* probably a corrupt chart */
             continue;
 
+        // bad things if more than one texfactory for a chart
+        cc1->PurgeGLCanvasChartCache( pchart, true );
+
         bool skip = false;
         wxString msg;
         msg.Printf( _("Distance from Ownship:  %4.0f NMi"), distance);
@@ -791,6 +802,8 @@ glChartCanvas::glChartCanvas( wxWindow *parent ) :
 
     ownship_tex = 0;
     ownship_color = -1;
+
+    m_piano_tex = 0;
     
     m_binPinch = false;
     m_binPan = false;
@@ -860,7 +873,7 @@ void glChartCanvas::OnActivate( wxActivateEvent& event )
 void glChartCanvas::OnSize( wxSizeEvent& event )
 {
     if( !g_bopengl ) {
-        SetSize( cc1->GetVP().pix_width, cc1->GetVP().pix_height );
+        SetSize( GetSize().x, GetSize().y );
         event.Skip();
         return;
     }
@@ -871,16 +884,21 @@ void glChartCanvas::OnSize( wxSizeEvent& event )
 #endif
     
     /* expand opengl widget to fill viewport */
-    ViewPort &VP = cc1->GetVP();
-    if( GetSize().x != VP.pix_width || GetSize().y != VP.pix_height ) {
-        SetSize( VP.pix_width, VP.pix_height );
+    if( GetSize() != cc1->GetSize() ) {
+        SetSize( cc1->GetSize() );
         if( m_bsetup )
             BuildFBO();
     }
+
+    glDeleteTextures(1, &m_piano_tex);
+    m_piano_tex = 0;
 }
 
 void glChartCanvas::MouseEvent( wxMouseEvent& event )
 {
+    if(cc1->MouseEventChartBar( event ))
+        return;
+
 #ifndef __OCPN__ANDROID__
     if(cc1->MouseEventSetup( event )) 
         return;                 // handled, no further action required
@@ -1990,6 +2008,13 @@ void glChartCanvas::ShipDraw(ocpnDC& dc)
 
     if( cc1->GetVP().chart_scale > 300000 )             // According to S52, this should be 50,000
     {
+        if(g_bresponsive){
+            float scale =  exp( g_ChartScaleFactor * (0.693 / 5.0) );       //  exp(2)
+            scale = wxMax(scale, .5);
+            scale = wxMin(scale, 4.);
+            glScalef(scale, scale, 1);
+        }
+        
         const int v = 12;
         // start with cross
         float vertexes[4*v+8] = {-12, 0, 12, 0, 0, -12, 0, 12};
@@ -2131,6 +2156,14 @@ void glChartCanvas::ShipDraw(ocpnDC& dc)
 
         glScalef(scale_factor_x, scale_factor_y, 1);
 
+        if(g_bresponsive){
+            float scale =  exp( g_ChartScaleFactor * (0.693 / 5.0) );       //  exp(2)
+            scale = wxMax(scale, .5);
+            scale = wxMin(scale, 4.);
+            glScalef(scale, scale, 1);
+        }
+        
+        
         if( g_OwnShipIconType < 2 ) { // Bitmap
 
             glEnable(GL_TEXTURE_2D);
@@ -2240,8 +2273,6 @@ void glChartCanvas::DrawFloatingOverlayObjects( ocpnDC &dc, OCPNRegion &region )
     s57_DrawExtendedLightSectors( dc, cc1->VPoint, cc1->extendedSectorLegs );
 #endif
 
-    DisableClipRegion();
-
     /* This should be converted to opengl, it is currently caching screen
        outside render, so the viewport can change without updating, (incorrect)
        doing alpha blending in software with it and draw pixels (very slow) */
@@ -2256,6 +2287,20 @@ void glChartCanvas::DrawFloatingOverlayObjects( ocpnDC &dc, OCPNRegion &region )
                        cc1->m_pAISRolloverWin->GetPosition().x,
                        cc1->m_pAISRolloverWin->GetPosition().y, false );
     }
+
+    // render the chart bar
+    if(g_bShowChartBar && !g_ChartBarWin)
+        DrawChartBar(dc);
+}
+
+void glChartCanvas::DrawChartBar( ocpnDC &dc )
+{
+#if 0
+    // this works but is inconsistent across drivers and really slow if there are icons
+    g_Piano->Paint(cc1->m_canvas_height - g_Piano->GetHeight(), dc);
+#else
+    g_Piano->DrawGL(cc1->m_canvas_height - g_Piano->GetHeight());
+#endif
 }
 
 void glChartCanvas::DrawQuiting()
@@ -3493,11 +3538,12 @@ void glChartCanvas::Render()
 //        return;
     
     ViewPort VPoint = cc1->VPoint;
+
     ViewPort svp = VPoint;
     svp.pix_width = svp.rv_rect.width;
     svp.pix_height = svp.rv_rect.height;
 
-    OCPNRegion chart_get_region( 0, 0, cc1->VPoint.rv_rect.width, cc1->VPoint.rv_rect.height );
+    OCPNRegion chart_get_region( 0, 0, VPoint.rv_rect.width, VPoint.rv_rect.height );
 
     ocpnDC gldc( *this );
 
