@@ -93,7 +93,6 @@ public:
     void FastPan(int dx, int dy);
     void FastZoom(float factor);
     void RenderCanvasBackingChart( ocpnDC dc, OCPNRegion chart_get_region);
-    void RenderLast();
     
 #ifdef __OCPN__ANDROID__    
     void OnEvtPanGesture( wxQT_PanGestureEvent &event);
@@ -102,6 +101,7 @@ public:
 #endif
     
     wxString GetRendererString(){ return m_renderer; }
+    wxString GetVersionString(){ return m_version; }
     void EnablePaint(bool b_enable){ m_b_paint_enable = b_enable; }
 
     static void Invalidate();
@@ -209,6 +209,7 @@ protected:
     
     wxTimer     m_gestureEeventTimer;
     bool        m_bgestureGuard;
+    bool        m_bpinchGuard;
     
     OCPNRegion  m_canvasregion;
     TexFont     m_gridfont;
