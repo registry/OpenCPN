@@ -2283,7 +2283,7 @@ MyFrame::MyFrame( wxFrame *frame, const wxString& title, const wxPoint& pos, con
     m_ulLastNEMATicktime = 0;
 
     m_pStatusBar = NULL;
-    m_StatusBarFieldCount = STAT_FIELD_COUNT;
+    m_StatusBarFieldCount = g_Platform->GetStatusBarFieldCount();
 
     m_pMenuBar = NULL;
     g_toolbar = NULL;
@@ -3435,6 +3435,9 @@ void MyFrame::ODoSetSize( void )
 //      Resize the children
 
         if( m_pStatusBar != NULL ) {
+            m_StatusBarFieldCount = g_Platform->GetStatusBarFieldCount();
+            m_pStatusBar->SetFieldsCount(m_StatusBarFieldCount);
+            
             if(m_StatusBarFieldCount){
 
                 //  If the status bar layout is "complex", meaning more than two columns,
@@ -3461,6 +3464,9 @@ void MyFrame::ODoSetSize( void )
                 int styles[] = { wxSB_FLAT, wxSB_FLAT, wxSB_FLAT, wxSB_FLAT, wxSB_FLAT, wxSB_FLAT };
                 m_pStatusBar->SetStatusStyles( m_StatusBarFieldCount, styles );
 
+                wxString sogcog( _T("SOG --- ") + getUsrSpeedUnit() + + _T("  ") + _T(" COG ---\u00B0") );
+                m_pStatusBar->SetStatusText( sogcog, STAT_FIELD_SOGCOG );
+                                    
             }
         }
 
@@ -3507,7 +3513,7 @@ void MyFrame::ODoSetSize( void )
 #ifdef __OCPN__ANDROID__
         min_height = ( pstat_font->GetPointSize() * getAndroidDisplayDensity() ) + 10;
         m_pStatusBar->SetMinHeight( min_height );
-        qDebug() <<"StatusBar min height:" << min_height << "StatusBar font points:" << pstat_font->GetPointSize();
+//        qDebug() <<"StatusBar min height:" << min_height << "StatusBar font points:" << pstat_font->GetPointSize();
 #endif
 //        wxString msg;
 //        msg.Printf(_T("StatusBar min height: %d    StatusBar font points: %d"), min_height, pstat_font->GetPointSize());
@@ -4059,6 +4065,13 @@ void MyFrame::OnToolLeftClick( wxCommandEvent& event )
 
         case ID_CMD_SETVP:{
             setStringVP(event.GetString());
+            break;
+        }
+
+        case ID_CMD_INVALIDATE:{
+            if(cc1)
+                cc1->InvalidateGL();
+            Refresh(true);
             break;
         }
         
@@ -4668,7 +4681,7 @@ void MyFrame::SetToolbarItemBitmaps( int tool_id, wxBitmap *bmp, wxBitmap *bmpRo
 void MyFrame::ApplyGlobalSettings( bool bFlyingUpdate, bool bnewtoolbar )
 {
     //             ShowDebugWindow as a wxStatusBar
-    m_StatusBarFieldCount = STAT_FIELD_COUNT;
+    m_StatusBarFieldCount = g_Platform->GetStatusBarFieldCount();
 
 #ifdef __WXMSW__
     UseNativeStatusBar( false );              // better for MSW, undocumented in frame.cpp
@@ -6272,7 +6285,7 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
 
 //      Update the Toolbar Status windows and lower status bar the first time watchdog times out
     if( ( gGPS_Watchdog == 0 ) || ( gSAT_Watchdog == 0 ) ) {
-        wxString sogcog( _T("SOG --- ") + getUsrSpeedUnit() + _T(" COG ---\u00B0") );
+        wxString sogcog( _T("SOG --- ") + getUsrSpeedUnit() + + _T("  ") + _T(" COG ---\u00B0") );
         if( GetStatusBar() ) SetStatusText( sogcog, STAT_FIELD_SOGCOG );
 
         gCog = 0.0;                                 // say speed is zero to kill ownship predictor
@@ -7280,14 +7293,14 @@ void MyFrame::selectChartDisplay( int type, int family)
         }
 
         if(sel_dbIndex >= 0){
-            SelectQuiltRefdbChart( sel_dbIndex );
+            SelectQuiltRefdbChart( sel_dbIndex, false );  // no autoscale
+            //  Re-qualify the quilt reference chart selection
+            cc1->AdjustQuiltRefChart(  );
         }
 
-        //  Now adjust the scale to the target...
+        //  Now reset the scale to the target...
         cc1->SetVPScale(target_scale);
 
-        //  Re-qualify the quilt reference chart selection
-        cc1->AdjustQuiltRefChart(  );
 
 
 
@@ -9334,6 +9347,8 @@ void MyFrame::applySettingsString( wxString settings)
             _DisCat nset = DISPLAYBASE;
             if(wxNOT_FOUND != val.Lower().Find(_T("base")))
                 nset = DISPLAYBASE;
+            else if(wxNOT_FOUND != val.Lower().Find(_T("mariner")))
+                nset = MARINERS_STANDARD;
             else if(wxNOT_FOUND != val.Lower().Find(_T("standard")))
                 nset = STANDARD;
             else if(wxNOT_FOUND != val.Lower().Find(_T("all")))
