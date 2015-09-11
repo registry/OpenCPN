@@ -626,6 +626,7 @@ int                       g_AisTargetList_count;
 bool                      g_bAisTargetList_autosort;
 
 bool                      g_bGarminHostUpload;
+bool                      g_bFullscreen;
 
 wxAuiManager              *g_pauimgr;
 wxAuiDefaultDockArt       *g_pauidockart;
@@ -3464,7 +3465,7 @@ void MyFrame::ODoSetSize( void )
                 int styles[] = { wxSB_FLAT, wxSB_FLAT, wxSB_FLAT, wxSB_FLAT, wxSB_FLAT, wxSB_FLAT };
                 m_pStatusBar->SetStatusStyles( m_StatusBarFieldCount, styles );
 
-                wxString sogcog( _T("SOG --- ") + getUsrSpeedUnit() + + _T("  ") + _T(" COG ---\u00B0") );
+                wxString sogcog( _T("SOG --- ") + getUsrSpeedUnit() + + _T("     ") + _T(" COG ---\u00B0") );
                 m_pStatusBar->SetStatusText( sogcog, STAT_FIELD_SOGCOG );
                                     
             }
@@ -3596,7 +3597,11 @@ void MyFrame::PositionConsole( void )
 
     console->GetSize( &consx, &consy );
 
-    wxPoint screen_pos = ClientToScreen( wxPoint( ccx + ccsx - consx - 2, ccy + 45 ) );
+    int yOffset = 45;
+    if(g_Compass)
+        yOffset = g_Compass->GetRect().y + g_Compass->GetRect().height + 45;
+    
+    wxPoint screen_pos = ClientToScreen( wxPoint( ccx + ccsx - consx - 2, ccy + yOffset ) );
     console->Move( screen_pos );
 }
 
@@ -3958,7 +3963,7 @@ void MyFrame::OnToolLeftClick( wxCommandEvent& event )
         }
 
         case wxID_HELP: {
-            LaunchLocalHelp();
+            g_Platform->LaunchLocalHelp();
             break;
         }
 
@@ -5261,32 +5266,6 @@ int MyFrame::ProcessOptionsDialog( int rr, ArrayOfCDI *pNewDirArray )
     return 0;
 }
 
-void MyFrame::LaunchLocalHelp( void ) {
-
-    wxString def_lang_canonical = _T("en_US");
-
-#if wxUSE_XLOCALE
-    if(plocale_def_lang)
-        def_lang_canonical = plocale_def_lang->GetCanonicalName();
-#endif
-
-    wxString help_locn = g_Platform->GetSharedDataDir() + _T("doc/help_");
-
-    wxString help_try = help_locn + def_lang_canonical + _T(".html");
-
-    if( ! ::wxFileExists( help_try ) ) {
-        help_try = help_locn + _T("en_US") + _T(".html");
-
-        if( ! ::wxFileExists( help_try ) ) {
-            help_try = help_locn + _T("web") + _T(".html");
-        }
-
-        if( ! ::wxFileExists( help_try ) ) return;
-    }
-
-    wxLaunchDefaultBrowser(wxString( _T("file:///") ) + help_try );
-}
-
 
 wxString MyFrame::GetGroupName( int igroup )
 {
@@ -5778,6 +5757,9 @@ void MyFrame::OnInitTimer(wxTimerEvent& event)
     switch(m_iInitCount++) {
     case 0:
     {
+        // Set persistent Fullscreen mode
+        g_Platform->SetFullscreen(g_bFullscreen);
+        
         // Load the waypoints.. both of these routines are very slow to execute which is why
         // they have been to defered until here
         pWayPointMan = new WayPointman();
@@ -6285,7 +6267,7 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
 
 //      Update the Toolbar Status windows and lower status bar the first time watchdog times out
     if( ( gGPS_Watchdog == 0 ) || ( gSAT_Watchdog == 0 ) ) {
-        wxString sogcog( _T("SOG --- ") + getUsrSpeedUnit() + + _T("  ") + _T(" COG ---\u00B0") );
+        wxString sogcog( _T("SOG --- ") + getUsrSpeedUnit() + + _T("     ") + _T(" COG ---\u00B0") );
         if( GetStatusBar() ) SetStatusText( sogcog, STAT_FIELD_SOGCOG );
 
         gCog = 0.0;                                 // say speed is zero to kill ownship predictor
@@ -8827,7 +8809,7 @@ void MyFrame::PostProcessNNEA( bool pos_valid, const wxString &sfixtime )
             SetStatusText( s1, STAT_FIELD_TICK );
 
         wxString sogcog;
-        if( wxIsNaN(gSog) ) sogcog.Printf( _T("SOG --- ") + getUsrSpeedUnit() + _T("  ") );
+        if( wxIsNaN(gSog) ) sogcog.Printf( _T("SOG --- ") + getUsrSpeedUnit() + _T("     ") );
         else
             sogcog.Printf( _T("SOG %2.2f ") + getUsrSpeedUnit() + _T("  "), toUsrSpeed( gSog ) );
 
