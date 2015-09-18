@@ -4462,6 +4462,7 @@ void options::OnGLClicked( wxCommandEvent& event )
 
 void options::OnOpenGLOptions( wxCommandEvent& event )
 {
+#ifdef ocpnUSE_GL
     OpenGLOptionsDlg dlg( this );
 
     if ( dlg.ShowModal() == wxID_OK ) {
@@ -4490,6 +4491,7 @@ void options::OnOpenGLOptions( wxCommandEvent& event )
         m_returnChanges = REBUILD_RASTER_CACHE;
         Finish();
     }
+#endif
 }
 
 void options::OnChartDirListSelect( wxCommandEvent& event )
@@ -4982,8 +4984,6 @@ void options::OnApplyClick( wxCommandEvent& event )
     g_fog_overzoom = !pOverzoomEmphasis->GetValue();
     g_oz_vector_scale = !pOZScaleVector->GetValue();
 
-    g_bopengl = pOpenGL->GetValue();
-
     g_bsmoothpanzoom = pSmoothPanZoom->GetValue();
 
     long update_val = 1;
@@ -5098,6 +5098,10 @@ void options::OnApplyClick( wxCommandEvent& event )
 
     g_TalkerIdText = m_TalkerIdText->GetValue().MakeUpper();
 
+    if ( g_bopengl != pOpenGL->GetValue() )
+        m_returnChanges |= GL_CHANGED;
+    g_bopengl = pOpenGL->GetValue();
+    
 #ifdef USE_S57
     //   Handle Vector Charts Tab
     g_cm93_zoom_factor = m_pSlider_CM93_Zoom->GetValue();
@@ -5116,15 +5120,13 @@ void options::OnApplyClick( wxCommandEvent& event )
     }
 
     if ( ps52plib ) {
-        if ( g_bopengl != pOpenGL->GetValue() ) {
+        if ( m_returnChanges & GL_CHANGED) {
             // Do this now to handle the screen refresh that is automatically
             // generated on Windows at closure of the options dialog...
             ps52plib->FlushSymbolCaches();
             // some CNSY depends on renderer (e.g. CARC)
             ps52plib->ClearCNSYLUPArray();
             ps52plib->GenerateStateHash();
-
-            m_returnChanges |= GL_CHANGED;
         }
 
         enum _DisCat nset = OTHER;
@@ -7082,6 +7084,7 @@ void SentenceListDlg::OnCheckAllClick( wxCommandEvent& event )
 // OpenGLOptionsDlg
 enum { ID_BUTTON_REBUILD, ID_BUTTON_CLEAR };
 
+#ifdef ocpnUSE_GL
 BEGIN_EVENT_TABLE( OpenGLOptionsDlg, wxDialog )
     EVT_BUTTON( ID_BUTTON_REBUILD, OpenGLOptionsDlg::OnButtonRebuild )
     EVT_BUTTON( ID_BUTTON_CLEAR, OpenGLOptionsDlg::OnButtonClear )
@@ -7286,3 +7289,5 @@ const wxString OpenGLOptionsDlg::GetTextureCacheSize( void )
     mb = mb / 1024.0;
     return wxString::Format( _T( "%.1f GB" ), mb );
 }
+
+#endif // ocpnUSE_GL

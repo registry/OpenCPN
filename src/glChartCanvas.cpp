@@ -65,6 +65,7 @@
 #include "tcmgr.h"
 #include "compass.h"
 #include "FontMgr.h"
+#include "mipmap/mipmap.h"
 
 #ifndef GL_ETC1_RGB8_OES
 #define GL_ETC1_RGB8_OES                                        0x8D64
@@ -272,6 +273,7 @@ bool CompressChart(wxThread *pThread, ChartBase *pchart, wxString CompressedCach
         for( int y = 0; y < ny_tex; y++ ) {
             rect.height = tex_dim;
             rect.x = 0;
+            bool b_compressed = false;
             for( int x = 0; x < nx_tex; x++ ) {
                 rect.width = tex_dim;
       
@@ -284,6 +286,7 @@ bool CompressChart(wxThread *pThread, ChartBase *pchart, wxString CompressedCach
                 }
                 
                 if(b_needCompress){
+                    b_compressed = true;
                     tex_fact->DoImmediateFullCompress(rect);
                     for(int level = 0; level < g_mipmap_max_level + 1; level++ ) {
                         tex_fact->UpdateCacheLevel( rect, level, global_color_scheme );
@@ -302,15 +305,15 @@ bool CompressChart(wxThread *pThread, ChartBase *pchart, wxString CompressedCach
                 nd++;
                 rect.x += rect.width;
                 
-                if( pThread )
+                if( pThread && thread == 0)
                     pThread->Sleep(1);
             }
 
             
             
-            if(pMessageTarget){
+            if(pMessageTarget && (b_compressed || y == 0)){
                 wxString m1;
-                m1.Printf(_T("%04d/%04d \n"), nd, nt);
+                m1.Printf(_T("%04d/%04d \n"), b_compressed?nd:0, nt);
                 m1 += msg;
                 
                 std::string stlstring = std::string(m1.mb_str());
@@ -1311,6 +1314,7 @@ void glChartCanvas::SetupOpenGL()
     
 #endif
 
+    MipMap_ResolveRoutines();
     SetupCompression();
 
     //  Some platforms under some conditions, require a full set of MipMaps, from 0
@@ -3228,7 +3232,7 @@ void glChartCanvas::RenderCharts(ocpnDC &dc, OCPNRegion &region)
                                     pd = (unsigned char *) malloc( dim * dim * 3 );
                                     HalfScaleChartBits( 2*dim, 2*dim, ps, pd );
 
-                                    glTexImage2D( GL_TEXTURE_2D, level, GL_RGB, dim, dim, 0, GL_RGB, GL_UNSIGNED_BYTE, pd );
+                                    MipMap_24( GL_TEXTURE_2D, level, GL_RGB, dim, dim, 0, GL_RGB, GL_UNSIGNED_BYTE, pd );
                                     
                                     free(ps);
                                     ps = pd;
