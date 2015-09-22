@@ -573,11 +573,51 @@ void OCPNPlatform::SetDefaultOptions( void )
     g_nTrackPrecision = 2;
     
 
+#ifdef __WXMSW__
     //  Enable some default PlugIns, and their default options
+    if(pConfig){
+        pConfig->SetPath( _T ( "/PlugIns/chartdldr_pi.dll" ) );
+        pConfig->Write( _T ( "bEnabled" ), true );
+
+        pConfig->SetPath( _T ( "/PlugIns/wmm_pi.dll" ) );
+        pConfig->Write( _T ( "bEnabled" ), true );
+        
+        pConfig->SetPath ( _T ( "/Settings/WMM" ) );
+        pConfig->Write ( _T ( "ShowIcon" ), false );
+        
+    }
+#endif
+
+#ifdef __WXOSX__
+//  Enable some default PlugIns, and their default options
+    if(pConfig){
+        pConfig->SetPath( _T ( "/PlugIns/libchartdldr_pi.dylib" ) );
+        pConfig->Write( _T ( "bEnabled" ), true );
+        
+        pConfig->SetPath( _T ( "/PlugIns/libwmm_pi.dylib" ) );
+        pConfig->Write( _T ( "bEnabled" ), true );
+        
+        pConfig->SetPath ( _T ( "/Settings/WMM" ) );
+        pConfig->Write ( _T ( "ShowIcon" ), false );
+        
+    }
+#endif
+
+#ifdef __LINUX__
+//  Enable some default PlugIns, and their default options
     if(pConfig){
         pConfig->SetPath( _T ( "/PlugIns/libchartdldr_pi.so" ) );
         pConfig->Write( _T ( "bEnabled" ), true );
+        
+        pConfig->SetPath( _T ( "/PlugIns/libwmm_pi.so" ) );
+        pConfig->Write( _T ( "bEnabled" ), true );
+        
+        pConfig->SetPath ( _T ( "/Settings/WMM" ) );
+        pConfig->Write ( _T ( "ShowIcon" ), false );
+        
     }
+#endif
+
         
 #ifdef __OCPN__ANDROID__
     
