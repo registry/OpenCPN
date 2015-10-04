@@ -681,7 +681,7 @@ bool             g_btouch;
 bool             g_bresponsive;
 
 bool             b_inCompressAllCharts;
-bool             g_bexpert;
+bool             g_bGLexpert;
 bool             g_bUIexpert;
 
 int              g_chart_zoom_modifier;
