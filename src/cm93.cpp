@@ -6316,9 +6316,6 @@ ListOfObjRazRules *cm93compchart::GetObjRuleListAtLatLon ( float lat, float lon,
 {
       float alon = lon;
 
-      while ( alon < 0 )            // CM93 longitudes are all positive
-            alon += 360;
-
       ViewPort vp;          // needs a new ViewPort also for ObjectRenderCheck()
       vp = *VPoint;
 
@@ -6345,7 +6342,10 @@ ListOfObjRazRules *cm93compchart::GetObjRuleListAtLatLon ( float lat, float lon,
                         if ( !m_pcm93chart_array[i]->m_render_region.IsEmpty() )
                         {
                               if ( wxInRegion == m_pcm93chart_array[i]->m_render_region.Contains ( p ) )
-                                    return  m_pcm93chart_array[i]->GetObjRuleListAtLatLon ( lat, alon, select_radius, &vp );
+                                    return  m_pcm93chart_array[i]->GetObjRuleListAtLatLon ( lat, alon,
+                                                                                            select_radius, &vp,
+                                                                                            selection_mask
+                                                                                          );
                         }
                   }
             }
