@@ -107,6 +107,7 @@
 #include "crashprint.h"
 #include "AISTargetQueryDialog.h"
 #include "S57QueryDialog.h"
+#include "glTexCache.h"
 
 #ifdef ocpnUSE_GL
 #include "glChartCanvas.h"
