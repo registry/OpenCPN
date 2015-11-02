@@ -149,12 +149,8 @@
 #include "crashprint.h"
 #endif
 
-WX_DECLARE_OBJARRAY(wxDialog *, MyDialogPtrArray);
-
 #include <wx/arrimpl.cpp>
 WX_DEFINE_OBJARRAY( ArrayOfCDI );
-WX_DEFINE_OBJARRAY( ArrayOfRect );
-WX_DEFINE_OBJARRAY( MyDialogPtrArray );
 
 #ifdef __WXMSW__
 void RedirectIOToConsole();
@@ -649,7 +645,6 @@ float                     g_compass_scalefactor;
 
 ocpnCompass              *g_Compass;
 
-MyDialogPtrArray          g_MacShowDialogArray;
 bool                      g_benable_rotate;
 
 bool                      g_bShowMag;
@@ -1410,16 +1405,14 @@ bool MyApp::OnInit()
     //  Get the default language info
     wxString def_lang_canonical;
 #ifdef __WXMSW__
-	LANGID lang_id = GetUserDefaultUILanguage();
-	wxChar lngcp[100];
-	const wxLanguageInfo* languageInfo = 0;
-	if (0 != GetLocaleInfo(MAKELCID(lang_id, SORT_DEFAULT), LOCALE_SENGLANGUAGE, lngcp, 100))
-	{
-		languageInfo = wxLocale::FindLanguageInfo(lngcp);
-		g_locale = wxString(lngcp);
-	}
-	else
-		languageInfo = wxLocale::GetLanguageInfo(wxLANGUAGE_DEFAULT);
+    LANGID lang_id = GetUserDefaultUILanguage();
+    wxChar lngcp[100];
+    const wxLanguageInfo* languageInfo = 0;
+    if (0 != GetLocaleInfo(MAKELCID(lang_id, SORT_DEFAULT), LOCALE_SENGLANGUAGE, lngcp, 100)){
+        languageInfo = wxLocale::FindLanguageInfo(lngcp);
+    }
+    else
+        languageInfo = wxLocale::GetLanguageInfo(wxLANGUAGE_DEFAULT);
 #else
     const wxLanguageInfo* languageInfo = wxLocale::GetLanguageInfo(wxLANGUAGE_DEFAULT);
 #endif
@@ -2386,7 +2379,8 @@ MyFrame::MyFrame( wxFrame *frame, const wxString& title, const wxPoint& pos, con
     Connect( wxEVT_OCPN_DATASTREAM, (wxObjectEventFunction) (wxEventFunction) &MyFrame::OnEvtOCPN_NMEA );
 
     bFirstAuto = true;
-
+    b_autofind = false;
+    
     //  Create/connect a dynamic event handler slot for OCPN_MsgEvent(s) coming from PlugIn system
     Connect( wxEVT_OCPN_MSG, (wxObjectEventFunction) (wxEventFunction) &MyFrame::OnEvtPlugInMessage );
 
@@ -4602,21 +4596,17 @@ void MyFrame::ToggleAnchor( void )
         else if(OTHER == ps52plib->GetDisplayCategory())
             old_vis = true;
 
-        const char * categories[] = { "ACHBRT", "ACHARE", "CBLSUB", "PIPARE", "PIPSOL", "TUNNEL" };
+        const char * categories[] = { "ACHBRT", "ACHARE", "CBLSUB", "PIPARE", "PIPSOL", "TUNNEL", "SBDARE" };
         unsigned int num = sizeof(categories) / sizeof(categories[0]);
 
         old_vis &= !ps52plib->IsObjNoshow("SBDARE");
 
         if(old_vis){                            // On, going off
-            ps52plib->AddObjNoshow("SBDARE");
             for( unsigned int c = 0; c < num; c++ ) {
                 ps52plib->AddObjNoshow(categories[c]);
             }
         }
         else{                                   // Off, going on
-            if(pOLE)
-                pOLE->nViz = 1;
-            ps52plib->RemoveObjNoshow("SBDARE");
             for( unsigned int c = 0; c < num; c++ ) {
                 ps52plib->RemoveObjNoshow(categories[c]);
             }
