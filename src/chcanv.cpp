@@ -34,7 +34,7 @@
 #include <wx/listbook.h>
 #include <wx/clipbrd.h>
 #include <wx/aui/aui.h>
-
+#include "wx/progdlg.h"
 #include "dychart.h"
 #include "OCPNPlatform.h"
 
@@ -1644,6 +1644,7 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
             break;
 
         case 'D': {
+#ifdef USE_S57
                 int x,y;
                 event.GetPosition( &x, &y );
                 bool cm93IsAvailable = ( Current_Ch && ( Current_Ch->GetChartType() == CHART_TYPE_CM93COMP ) );
@@ -1664,6 +1665,7 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
                     }
                     pCM93DetailSlider->Show( !pCM93DetailSlider->IsShown() );
                 }
+#endif                
                 break;
             }
 
@@ -1829,9 +1831,11 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
             break;
 
         case 9:                      // Ctrl I
-            g_Compass->Show(!g_Compass->IsShown());
-            m_brepaint_piano = true;
-            Refresh( false );
+            if (g_Compass) {
+                g_Compass->Show(!g_Compass->IsShown());
+                m_brepaint_piano = true;
+                Refresh( false );
+            }
             break;
 
         default:
@@ -7969,6 +7973,8 @@ void ChartCanvas::LostMouseCapture( wxMouseCaptureLostEvent& event )
 
 void ChartCanvas::ShowObjectQueryWindow( int x, int y, float zlat, float zlon )
 {
+#ifdef USE_S57
+    
     ChartPlugInWrapper *target_plugin_chart = NULL;
     s57chart *Chs57 = NULL;
 
@@ -8136,6 +8142,7 @@ void ChartCanvas::ShowObjectQueryWindow( int x, int y, float zlat, float zlon )
 
         SetCursor( wxCURSOR_ARROW );
     }
+#endif    
 }
 
 void ChartCanvas::RemovePointFromRoute( RoutePoint* point, Route* route ) {
@@ -10342,6 +10349,7 @@ void ChartCanvas::DrawAllTidesInBBox( ocpnDC& dc, LLBBox& BBox )
 
         double lon_last = 0.;
         double lat_last = 0.;
+        double marge = 0.05;
         for( int i = 1; i < ptcmgr->Get_max_IDX() + 1; i++ ) {
             const IDX_entry *pIDX = ptcmgr->GetIDX_entry( i );
 
@@ -10353,13 +10361,13 @@ void ChartCanvas::DrawAllTidesInBBox( ocpnDC& dc, LLBBox& BBox )
                 bool b_inbox = false;
                 double nlon;
 
-                if( BBox.PointInBox( lon, lat, 0 ) ) {
+                if( BBox.PointInBox( lon, lat, marge ) ) {
                     nlon = lon;
                     b_inbox = true;
-                } else if( BBox.PointInBox( lon + 360., lat, 0 ) ) {
+                } else if( BBox.PointInBox( lon + 360., lat, marge ) ) {
                     nlon = lon + 360.;
                     b_inbox = true;
-                } else if( BBox.PointInBox( lon - 360., lat, 0 ) ) {
+                } else if( BBox.PointInBox( lon - 360., lat, marge ) ) {
                     nlon = lon - 360.;
                     b_inbox = true;
                 }
@@ -10548,6 +10556,8 @@ void ChartCanvas::DrawAllCurrentsInBBox( ocpnDC& dc, LLBBox& BBox )
     wxFont *pTCFont;
     double lon_last = 0.;
     double lat_last = 0.;
+    // arrow size for Raz Blanchard : 12 knots north
+    double marge = 0.2;
 
     double true_scale_display = floor( VPoint.chart_scale / 100. ) * 100.;
     bDrawCurrentValues =  true_scale_display < g_Show_Target_Name_Scale;
@@ -10588,7 +10598,7 @@ void ChartCanvas::DrawAllCurrentsInBBox( ocpnDC& dc, LLBBox& BBox )
                 bool b_dup = false;
                 if( ( type == 'c' ) && ( lat == lat_last ) && ( lon == lon_last ) ) b_dup = true;
 
-                if( !b_dup && ( BBox.PointInBox( lon, lat, 0 ) ) ) {
+                if( !b_dup && ( BBox.PointInBox( lon, lat, marge ) ) ) {
 
                     wxPoint r;
                     GetCanvasPointPix( lat, lon, &r );
