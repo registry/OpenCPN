@@ -258,7 +258,6 @@ extern PlugInManager    *g_pi_manager;
 
 extern wxAuiManager      *g_pauimgr;
 
-extern bool             g_bskew_comp;
 extern bool             g_bopengl;
 extern bool             g_bdisable_opengl;
 
@@ -2537,14 +2536,13 @@ void ChartCanvas::GetDoubleCanvasPointPixVP( ViewPort &vp, double rlat, double r
     
     // If for some reason the chart rejects the request by returning an error,
     // then fall back to Viewport Projection estimate from canvas parameters
-    if(!g_bopengl && Current_Ch && ( Current_Ch->GetChartFamily() == CHART_FAMILY_RASTER )
-        && ( ( ( fabs( vp.rotation ) < .0001 ) &&
-               ( ( !g_bskew_comp || ( fabs( vp.skew ) < .0001 ) ) ) )
-             || ( ( Current_Ch->GetChartProjectionType() != PROJECTION_MERCATOR )
-                  && ( Current_Ch->GetChartProjectionType() != PROJECTION_TRANSVERSE_MERCATOR )
-                  && ( Current_Ch->GetChartProjectionType() != PROJECTION_POLYCONIC ) ) )
+    if( !g_bopengl && Current_Ch && ( Current_Ch->GetChartFamily() == CHART_FAMILY_RASTER )
+        && ( ( ( fabs( vp.rotation ) < .0001 ) && ( fabs( vp.skew ) < .0001 ) )
+        || ( ( Current_Ch->GetChartProjectionType() != PROJECTION_MERCATOR )
+        && ( Current_Ch->GetChartProjectionType() != PROJECTION_TRANSVERSE_MERCATOR )
+        && ( Current_Ch->GetChartProjectionType() != PROJECTION_POLYCONIC ) ) )
         && ( Current_Ch->GetChartProjectionType() == vp.m_projection_type )
-        && (Current_Ch->GetChartType() != CHART_TYPE_PLUGIN) )
+        && ( Current_Ch->GetChartType() != CHART_TYPE_PLUGIN) )
     {
         ChartBaseBSB *Cur_BSB_Ch = dynamic_cast<ChartBaseBSB *>( Current_Ch );
         //                        bool bInside = G_FloatPtInPolygon ( ( MyFlPoint * ) Cur_BSB_Ch->GetCOVRTableHead ( 0 ),
@@ -2608,15 +2606,14 @@ void ChartCanvas::GetCanvasPixPoint( double x, double y, double &lat, double &lo
     // then fall back to Viewport Projection  estimate from canvas parameters
     bool bUseVP = true;
 
-    if(!g_bopengl && Current_Ch && ( Current_Ch->GetChartFamily() == CHART_FAMILY_RASTER )
-        && ( ( ( fabs( GetVP().rotation ) < .0001 ) &&
-               ( ( !g_bskew_comp || ( fabs( GetVP().skew ) < .0001 ) ) ) )
-             || ( ( Current_Ch->GetChartProjectionType() != PROJECTION_MERCATOR )
-                  && ( Current_Ch->GetChartProjectionType() != PROJECTION_TRANSVERSE_MERCATOR )
-                  && ( Current_Ch->GetChartProjectionType() != PROJECTION_POLYCONIC ) ) )
+    if( !g_bopengl && Current_Ch && ( Current_Ch->GetChartFamily() == CHART_FAMILY_RASTER )
+        && ( ( ( fabs( GetVP().rotation ) < .0001 ) && ( fabs( GetVP().skew ) < .0001 ) )
+        || ( ( Current_Ch->GetChartProjectionType() != PROJECTION_MERCATOR )
+        && ( Current_Ch->GetChartProjectionType() != PROJECTION_TRANSVERSE_MERCATOR )
+        && ( Current_Ch->GetChartProjectionType() != PROJECTION_POLYCONIC ) ) )
         && ( Current_Ch->GetChartProjectionType() == GetVP().m_projection_type )
-        && (Current_Ch->GetChartType() != CHART_TYPE_PLUGIN) )
-       {
+        && ( Current_Ch->GetChartType() != CHART_TYPE_PLUGIN ) )
+    {
         ChartBaseBSB *Cur_BSB_Ch = dynamic_cast<ChartBaseBSB *>( Current_Ch );
 
         // TODO     maybe need iterative process to validate bInside
@@ -3765,8 +3762,9 @@ void ChartCanvas::ShipDraw( ocpnDC& dc )
     float icon_rad = atan2f( (float) ( osd_head_point.y - lShipMidPoint.y ),
                              (float) ( osd_head_point.x - lShipMidPoint.x ) );
     icon_rad += (float)PI;
+    double rotate = GetVP().rotation;
 
-    if( pSog < 0.2 ) icon_rad = ( ( icon_hdt + 90. ) * PI / 180. ) + GetVP().rotation;
+    if (pSog < 0.2) icon_rad = ((icon_hdt + 90.) * PI / 180) + rotate;
 
 //    Calculate ownship Heading pointer as a predictor
     double hdg_pred_lat, hdg_pred_lon;
@@ -4056,8 +4054,8 @@ wxString CalcGridText( float latlon, float spacing, bool bPostfix )
  ************************************************************************/
 void ChartCanvas::GridDraw( ocpnDC& dc )
 {
-    if( !( g_bDisplayGrid && ( fabs( GetVP().rotation ) < 1e-5 )
-            && ( ( fabs( GetVP().skew ) < 1e-9 ) || g_bskew_comp ) ) ) return;
+    if( !( g_bDisplayGrid && ( fabs( GetVP().rotation ) < 1e-5 ) ) )
+        return;
 
     double nlat, elon, slat, wlon;
     float lat, lon;
@@ -4177,8 +4175,7 @@ void ChartCanvas::ScaleBarDraw( ocpnDC& dc )
 
     GetCanvasPixPoint( x_origin, y_origin, blat, blon );
     double rotation = -VPoint.rotation;
-    if(!g_bskew_comp)
-        rotation -= VPoint.skew;
+
     ll_gc_ll( blat, blon, rotation * 180 / PI, dist, &tlat, &tlon );
     GetCanvasPointPix( tlat, tlon, &r );
     int l1 = ( y_origin - r.y ) / count;
@@ -9179,10 +9176,10 @@ void ChartCanvas::OnPaint( wxPaintEvent& event )
 
     //  If the ViewPort is rotated, we may be able to use the cached rotated bitmap
     bool b_rcache_ok = false;
-    if( fabs( VPoint.rotation ) > 0.01 ) b_rcache_ok = !b_newview;
+    b_rcache_ok = !b_newview;
 
     //  If in skew compensation mode, with a skewed VP shown, we may be able to use the cached rotated bitmap
-    if( g_bskew_comp && ( fabs( VPoint.skew ) > 0.01 ) ) b_rcache_ok = !b_newview;
+    if(  fabs( VPoint.skew ) > 0.01 ) b_rcache_ok = !b_newview;
 
     //  Make a special VP
     if( VPoint.b_MercatorProjectionOverride ) VPoint.SetProjectionType( PROJECTION_MERCATOR );
@@ -9369,8 +9366,7 @@ void ChartCanvas::OnPaint( wxPaintEvent& event )
         if( chartValidRegion.IsOk() )
             backgroundRegion.Subtract( chartValidRegion );
 
-        if( ( ( fabs( GetVP().skew ) < .01 ) || ! g_bskew_comp )
-            && ! backgroundRegion.IsEmpty() ) {
+        if( ! backgroundRegion.IsEmpty() ) {
         
             //    Draw the Background Chart only in the areas NOT covered by the current chart view
 
@@ -9392,8 +9388,9 @@ void ChartCanvas::OnPaint( wxPaintEvent& event )
             delete clip_region;
 
             ocpnDC bgdc( temp_dc );
-            double r =         VPoint.rotation;
-            SetVPRotation( 0.0 );
+            double r = VPoint.rotation;
+            SetVPRotation(VPoint.skew);
+
             pWorldBackgroundChart->RenderViewOnDC( bgdc, VPoint );
             SetVPRotation( r );
         }
@@ -9401,9 +9398,6 @@ void ChartCanvas::OnPaint( wxPaintEvent& event )
 
     wxMemoryDC *pChartDC = &temp_dc;
     wxMemoryDC rotd_dc;
-
-    if( ( ( fabs( GetVP().rotation ) > 0.01 ) )
-            || ( g_bskew_comp && ( fabs( GetVP().skew ) > 0.01 ) ) ) {
 
         //  Can we use the current rotated image cache?
         if( !b_rcache_ok ) {
@@ -9422,19 +9416,14 @@ void ChartCanvas::OnPaint( wxPaintEvent& event )
 
             //    Use a local static image rotator to improve wxWidgets code profile
             //    Especially, on GTK the wxRound and wxRealPoint functions are very expensive.....
-            double angle;
-            angle = -GetVP().rotation;
-            if(g_bskew_comp)
-                angle += GetVP().skew;
 
+            double angle = GetVP().skew - GetVP().rotation;
             wxImage ri;
             bool b_rot_ok = false;
             if( base_image.IsOk() ) {
                 ViewPort rot_vp = GetVP();
 
                 m_b_rot_hidef = false;
-//                              if(g_bskew_comp && (fabs(GetVP().skew) > 0.01))
-//                                    m_b_rot_hidef = true;
 
                 ri = Image_Rotate( base_image, angle,
                                    wxPoint( GetVP().rv_rect.width / 2, GetVP().rv_rect.height / 2 ),
@@ -9465,12 +9454,6 @@ void ChartCanvas::OnPaint( wxPaintEvent& event )
             pChartDC = &temp_dc;
             m_roffset = wxPoint( 0, 0 );
         }
-
-    } else {
-        pChartDC = &temp_dc;
-        m_roffset = wxPoint( 0, 0 );
-
-    }
 
     wxPoint offset = m_roffset;
 
@@ -10656,9 +10639,6 @@ void ChartCanvas::DrawAllCurrentsInBBox( ocpnDC& dc, LLBBox& BBox )
                             wxBRUSHSTYLE_SOLID );
 
     double skew_angle = GetVPRotation();
-
-    if( !g_bskew_comp )
-        skew_angle += GetVPSkew();
 
     pTCFont = FontMgr::Get().GetFont( _("CurrentValue") );
     

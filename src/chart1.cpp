@@ -559,6 +559,8 @@ bool                      g_bTrackActive;
 bool                      g_bTrackCarryOver;
 bool                      g_bDeferredStartTrack;
 bool                      g_bTrackDaily;
+int                       g_track_rotate_time;
+int                       g_track_rotate_time_type;
 bool                      g_bHighliteTracks;
 int                       g_route_line_width;
 int                       g_track_line_width;
@@ -2056,7 +2058,8 @@ extern ocpnGLOptions g_GLOptions;
 
     gFrame->DoChartUpdate();
 
-    FontMgr::Get().ScrubList(); // is this needed?
+    // Remove to allow restoration of font information for objects created by plugins
+    //FontMgr::Get().ScrubList(); // is this needed?
 
 //      Start up the ticker....
     gFrame->FrameTimer1.Start( TIMER_GFRAME_1, wxTIMER_CONTINUOUS );
@@ -2324,6 +2327,7 @@ MyFrame::MyFrame( wxFrame *frame, const wxString& title, const wxPoint& pos, con
         wxFrame( frame, -1, title, pos, size, style ) //wxSIMPLE_BORDER | wxCLIP_CHILDREN | wxRESIZE_BORDER)
 //wxCAPTION | wxSYSTEM_MENU | wxRESIZE_BORDER
 {
+    m_last_track_rotation_ts = 0;
     m_ulLastNEMATicktime = 0;
 
     m_pStatusBar = NULL;
@@ -4464,7 +4468,48 @@ Track *MyFrame::TrackOff( bool do_add_point )
     return return_val;
 }
 
-void MyFrame::TrackMidnightRestart( void )
+bool MyFrame::ShouldRestartTrack( void )
+{
+    if( !g_pActiveTrack || !g_bTrackDaily)
+        return false;
+    time_t now = wxDateTime::Now().GetTicks();
+    time_t today = wxDateTime::Today().GetTicks();
+    int rotate_at = 0;
+    switch( g_track_rotate_time_type )
+    {
+        case TIME_TYPE_LMT:
+            rotate_at = g_track_rotate_time + wxRound(gLon * 3600. / 15.);
+            break;
+        case TIME_TYPE_COMPUTER:
+            rotate_at = g_track_rotate_time;
+            break;
+        case TIME_TYPE_UTC:
+            int utc_offset = wxDateTime::Now().GetTicks() - wxDateTime::Now().ToUTC().GetTicks();
+            rotate_at = g_track_rotate_time + utc_offset;
+            break;
+    }
+    if( rotate_at > 86400 )
+        rotate_at -= 86400;
+    else if (rotate_at < 0 )
+        rotate_at += 86400;
+    if( now >= m_last_track_rotation_ts + 86400 - 3600 &&
+        now - today >= rotate_at )
+    {
+        if( m_last_track_rotation_ts == 0 )
+        {
+            if( now - today > rotate_at)
+                m_last_track_rotation_ts = today + rotate_at;
+            else
+                m_last_track_rotation_ts = today + rotate_at - 86400;
+            return false;
+        }
+        m_last_track_rotation_ts = now;
+        return true;
+    }
+    return false;
+}
+
+void MyFrame::TrackDailyRestart( void )
 {
     if( !g_pActiveTrack )
         return;
@@ -4501,8 +4546,13 @@ void MyFrame::ToggleCourseUp( void )
         }
         g_COGAvg = stuff;
         gFrame->FrameCOGTimer.Start( 100, wxTIMER_CONTINUOUS );
-    } else
-        cc1->SetVPRotation(0); /* reset to north up */
+    } else {
+        if ( !g_bskew_comp && (fabs(cc1->GetVPSkew()) > 0.0001))
+            cc1->SetVPRotation(cc1->GetVPSkew());
+        else
+            cc1->SetVPRotation(0); /* reset to north up */
+    }
+
 
     SetMenubarItemState( ID_MENU_CHART_COGUP, g_bCourseUp );
     SetMenubarItemState( ID_MENU_CHART_NORTHUP, !g_bCourseUp );
@@ -6328,9 +6378,6 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
             wxLogMessage( navmsg );
             g_loglast_time = lognow;
 
-            if( hourLOC == 0 && minuteLOC == 0 && g_bTrackDaily )
-                TrackMidnightRestart();
-
             int bells = ( hourLOC % 4 ) * 2;     // 2 bells each hour
             if( minuteLOC != 0 ) bells++;       // + 1 bell on 30 minutes
             if( !bells ) bells = 8;     // 0 is 8 bells
@@ -6341,6 +6388,9 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
             }
         }
     }
+    
+    if( ShouldRestartTrack() )
+        TrackDailyRestart();
 
     if(g_bSleep){
         FrameTimer1.Start( TIMER_GFRAME_1, wxTIMER_CONTINUOUS );
@@ -6669,8 +6719,6 @@ void MyFrame::DoCOGSet( void )
 
     double old_VPRotate = g_VPRotate;
     g_VPRotate = -g_COGAvg * PI / 180.;
-    if(!g_bskew_comp)
-        g_VPRotate -= cc1->GetVPSkew();
 
     cc1->SetVPRotation( g_VPRotate );
     bool bnew_chart = DoChartUpdate();
@@ -7077,9 +7125,18 @@ void MyFrame::SelectChartFromStack( int index, bool bDir, ChartTypeEnum New_Type
         }
 
         double best_scale = GetBestVPScale( Current_Ch );
+        double rotation = cc1->GetVPRotation();
+        double oldskew = cc1->GetVPSkew();
+        double newskew = Current_Ch->GetChartSkew() * PI / 180.0;
 
-        cc1->SetViewPoint( zLat, zLon, best_scale, Current_Ch->GetChartSkew() * PI / 180.,
-                cc1->GetVPRotation() );
+        if (!g_bskew_comp) {
+            if (fabs(oldskew) > 0.0001)
+                rotation = 0.0;
+            if (fabs(newskew) > 0.0001)
+                rotation = newskew;
+        }
+
+        cc1->SetViewPoint( zLat, zLon, best_scale, newskew, rotation );
 
         SetChartUpdatePeriod( cc1->GetVP() );
 
@@ -7153,10 +7210,9 @@ void MyFrame::SetChartUpdatePeriod( ViewPort &vp )
 
     g_ChartUpdatePeriod = 1;            // General default
 
-    if( !vp.b_quilt ) {
-        if( g_bskew_comp && ( fabs( vp.skew ) ) > 0.01 ) g_ChartUpdatePeriod =
-                g_SkewCompUpdatePeriod;
-    }
+    if (!g_bopengl && !vp.b_quilt)
+        if ( fabs(vp.skew) > 0.0001)
+            g_ChartUpdatePeriod = g_SkewCompUpdatePeriod;
 
     m_ChartUpdatePeriod = g_ChartUpdatePeriod;
 }
