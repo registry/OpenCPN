@@ -2058,8 +2058,7 @@ extern ocpnGLOptions g_GLOptions;
 
     gFrame->DoChartUpdate();
 
-    // Remove to allow restoration of font information for objects created by plugins
-    //FontMgr::Get().ScrubList(); // is this needed?
+    FontMgr::Get().ScrubList(); // Clean the font list, removing nonsensical entries
 
 //      Start up the ticker....
     gFrame->FrameTimer1.Start( TIMER_GFRAME_1, wxTIMER_CONTINUOUS );
@@ -5254,6 +5253,12 @@ int MyFrame::DoOptionsDialog()
 
     if (NMEALogWindow::Get().Active())
         NMEALogWindow::Get().GetTTYWindow()->Raise();
+
+    //  Force reload of options dialog to pick up font changes
+    if(rr & FONT_CHANGED){
+        delete g_options;
+        g_options = NULL;
+    }
 
     return ret_val;
 }
