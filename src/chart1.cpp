@@ -1518,6 +1518,8 @@ bool MyApp::OnInit()
 #ifdef ocpnUSE_GL
 
 #ifdef __WXMSW__
+#if !wxCHECK_VERSION(2, 9, 0)           // The OpenGL test app only runs on wx 2.8, unavailable on wx3.x
+        
     if( /*g_bopengl &&*/ !g_bdisable_opengl ) {
         wxFileName fn(g_Platform->GetExePath());
         bool b_test_result = TestGLCanvas(fn.GetPathWithSep() );
@@ -1527,6 +1529,7 @@ bool MyApp::OnInit()
 
         g_bdisable_opengl = !b_test_result;
     }
+#endif
 #endif
 
 #else
@@ -2366,6 +2369,8 @@ MyFrame::MyFrame( wxFrame *frame, const wxString& title, const wxPoint& pos, con
     //      Set up some assorted member variables
     nRoute_State = 0;
     m_bTimeIsSet = false;
+    nBlinkerTick = 0;
+
     m_bdefer_resize = false;
 
     //    Clear the NMEA Filter tables
@@ -7155,7 +7160,7 @@ void MyFrame::SelectChartFromStack( int index, bool bDir, ChartTypeEnum New_Type
         double oldskew = cc1->GetVPSkew();
         double newskew = Current_Ch->GetChartSkew() * PI / 180.0;
 
-        if (!g_bskew_comp) {
+        if (!g_bskew_comp && !g_bCourseUp) {
             if (fabs(oldskew) > 0.0001)
                 rotation = 0.0;
             if (fabs(newskew) > 0.0001)

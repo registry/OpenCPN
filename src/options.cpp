@@ -1639,11 +1639,11 @@ void options::CreatePanel_NMEA_Compact(size_t parent, int border_size,
                            wxCommandEventHandler(options::OnValChange), NULL,
                            this);
 
-#if wxCHECK_VERSION(2, 9, 0)
   m_lcSources->Connect(wxEVT_LEFT_DOWN,
                        wxMouseEventHandler(options::OnConnectionToggleEnableMouse),
                        NULL, this);
-  m_lcSources->Connect(wxEVT_LIST_ITEM_ACTIVATED,
+#if wxCHECK_VERSION(2, 9, 0)
+    m_lcSources->Connect(wxEVT_LIST_ITEM_ACTIVATED,
                        wxListEventHandler(options::OnConnectionToggleEnable),
                        NULL, this);
 #endif
@@ -2253,10 +2253,10 @@ void options::CreatePanel_NMEA(size_t parent, int border_size,
                            wxCommandEventHandler(options::OnValChange), NULL,
                            this);
 
-#if wxCHECK_VERSION(2, 9, 0)
   m_lcSources->Connect(wxEVT_LEFT_DOWN,
                        wxMouseEventHandler(options::OnConnectionToggleEnableMouse),
                        NULL, this);
+#if wxCHECK_VERSION(2, 9, 0)
   m_lcSources->Connect(wxEVT_LIST_ITEM_ACTIVATED,
                        wxListEventHandler(options::OnConnectionToggleEnable),
                        NULL, this);
@@ -4252,7 +4252,7 @@ void options::CreatePanel_UI(size_t parent, int border_size,
   m_itemBoxSizerFontPanel->Add(itemFontStaticBoxSizer, 0, wxEXPAND | wxALL,
                                border_size);
 
-  m_itemFontElementListBox = new wxChoice(itemPanelFont, ID_CHOICE_FONTELEMENT);
+  m_itemFontElementListBox = new wxChoice(itemPanelFont, ID_CHOICE_FONTELEMENT, wxDefaultPosition, wxDefaultSize, 0, NULL, wxCB_SORT);
 
   int nFonts = FontMgr::Get().GetNumFonts();
   for (int it = 0; it < nFonts; it++) {

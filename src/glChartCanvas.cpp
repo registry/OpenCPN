@@ -539,7 +539,7 @@ void BuildCompressedCache()
         wxString CompressedCacheFilePath = CompressedCachePath(filename);
         double distance = ct_array.Item(j).distance;
 
-        ChartBase *pchart = ChartData->OpenChartFromDB( filename, FULL_INIT );
+        ChartBase *pchart = ChartData->OpenChartFromDBAndLock( filename, FULL_INIT );
         if(!pchart) /* probably a corrupt chart */
             continue;
 
@@ -1367,9 +1367,21 @@ void glChartCanvas::SetupOpenGL()
     s_b_UploadFullMipmaps = true;
 #endif
         
-        
     if(!g_bGLexpert)
         g_GLOptions.m_bUseAcceleratedPanning =  !m_b_DisableFBO && m_b_BuiltFBO;
+    
+    //  Windows GDI Generic OpenGL driver is non-compliant in mipmap support.
+    //  It needs the entire mipmap pyramid to be complete, and fully uploaded.    
+#ifdef __WXMSW__        
+    if( GetRendererString().Find( _T("Generic") ) != wxNOT_FOUND ) {
+        s_b_UploadFullMipmaps = true;
+        int max_level = 0;
+        int tex_dim = g_GLOptions.m_iTextureDimension;
+        for(int dim=tex_dim; dim>0; dim/=2)
+            max_level++;
+        g_mipmap_max_level = max_level - 1;
+    }   
+#endif            
 }
 
 void glChartCanvas::SetupCompression()
