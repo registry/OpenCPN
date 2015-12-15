@@ -3499,9 +3499,14 @@ static int s_ownship_icon[] = { 5, -42, 11, -28, 11, 42, -11, 42, -11, -28, -5, 
 
 wxColour ChartCanvas::PredColor()
 { 
+    //  RAdjust predictor color change on LOW_ACCURACY ship state in interests of visibility.
     if( SHIP_NORMAL == m_ownship_state )
         return GetGlobalColor( _T ( "URED" ) );
-    return GetGlobalColor( _T ( "GREY1" ) );
+
+    else if( SHIP_LOWACCURACY == m_ownship_state ) 
+        return GetGlobalColor( _T ( "YELO1" ) );
+         
+    return GetGlobalColor( _T ( "NODTA" ) );
 }
 
 wxColour ChartCanvas::ShipColor()
@@ -4760,10 +4765,6 @@ bool ChartCanvas::MouseEventSetup( wxMouseEvent& event,  bool b_handle_dclick )
 
     event.GetPosition( &x, &y );
     
-    //  Occasionally, MSW will produce nonsense events on right click....
-    if((x == -1) || (y == -1))
-        return true;
-    
     //  Some systems produce null drag events, where the pointer position has not changed from the previous value.
     //  Detect this case, and abort further processing (FS#1748)
 #ifdef __WXMSW__    
@@ -4916,8 +4917,12 @@ bool ChartCanvas::MouseEventSetup( wxMouseEvent& event,  bool b_handle_dclick )
 #endif
 
     //  Send the current cursor lat/lon to all PlugIns requesting it
-    if( g_pi_manager )
-        g_pi_manager->SendCursorLatLonToAllPlugIns( m_cursor_lat, m_cursor_lon );
+    if( g_pi_manager ){
+        //  Occasionally, MSW will produce nonsense events on right click....
+        //  This results in an error in cursor geo position, so we skip this case
+        if( (x >= 0) && (y >= 0) )
+            g_pi_manager->SendCursorLatLonToAllPlugIns( m_cursor_lat, m_cursor_lon );
+    }
     
     
     if(!g_btouch){
@@ -8328,11 +8333,11 @@ void ChartCanvas::ShowTrackPropertiesDialog( Route* selected )
 }
 
 void pupHandler_PasteWaypoint() {
-    Kml* kml = new Kml();
+    Kml kml;
     OCPNPlatform::ShowBusySpinner();
 
-    int pasteBuffer = kml->ParsePasteBuffer();
-    RoutePoint* pasted = kml->GetParsedRoutePoint();
+    int pasteBuffer = kml.ParsePasteBuffer();
+    RoutePoint* pasted = kml.GetParsedRoutePoint();
 
     int nearby_sel_rad_pix = 8;
     double nearby_radius_meters = nearby_sel_rad_pix / cc1->GetCanvasTrueScale();
@@ -8365,16 +8370,15 @@ void pupHandler_PasteWaypoint() {
 
     cc1->InvalidateGL();
     cc1->Refresh( false );
-    delete kml;
     OCPNPlatform::HideBusySpinner();
 }
 
 void pupHandler_PasteRoute() {
-    Kml* kml = new Kml();
+    Kml kml;
     OCPNPlatform::ShowBusySpinner();
 
-    int pasteBuffer = kml->ParsePasteBuffer();
-    Route* pasted = kml->GetParsedRoute();
+    int pasteBuffer = kml.ParsePasteBuffer();
+    Route* pasted = kml.GetParsedRoute();
     if( ! pasted ) return;
 
     int nearby_sel_rad_pix = 8;
@@ -8409,7 +8413,6 @@ void pupHandler_PasteRoute() {
         answer = OCPNMessageBox( cc1, msg, _("Merge waypoints?"), (long) wxYES_NO | wxCANCEL | wxYES_DEFAULT );
 
         if( answer == wxID_CANCEL ) {
-            delete kml;
             return;
         }
     }
@@ -8485,16 +8488,15 @@ void pupHandler_PasteRoute() {
         cc1->Refresh( false );
     }
 
-    delete kml;
     OCPNPlatform::HideBusySpinner();
 }
 
 void pupHandler_PasteTrack() {
-    Kml* kml = new Kml();
+    Kml kml;
     OCPNPlatform::ShowBusySpinner();
 
-    int pasteBuffer = kml->ParsePasteBuffer();
-    Track* pasted = kml->GetParsedTrack();
+    int pasteBuffer = kml.ParsePasteBuffer();
+    Track* pasted = kml.GetParsedTrack();
     if( ! pasted ) return;
 
     RoutePoint* curPoint;
@@ -8537,7 +8539,6 @@ void pupHandler_PasteTrack() {
 
     cc1->InvalidateGL();
     cc1->Refresh( false );
-    delete kml;
     OCPNPlatform::HideBusySpinner();
 }
 

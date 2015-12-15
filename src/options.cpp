@@ -358,9 +358,10 @@ bool OCPNCheckedListCtrl::Create(wxWindow* parent, wxWindowID id,
 unsigned int OCPNCheckedListCtrl::Append(wxString& label) {
   wxCheckBox* cb = new wxCheckBox(this, wxID_ANY, label);
   m_sizer->Add(cb);
-
+  m_sizer->Layout();  
+  
   m_list.Append(cb);
-
+  
   return m_list.GetCount() - 1;
 }
 
@@ -542,8 +543,18 @@ void MMSIEditDialog::OnMMSIEditOKClick(wxCommandEvent& event) {
     m_props->m_bVDM = m_VDMButton->GetValue();
     m_props->m_bFollower = m_FollowerButton->GetValue();
     m_props->m_bPersistentTrack = m_cbTrackPersist->GetValue();
+    if (m_props->m_ShipName == wxEmptyString) {
+        AIS_Target_Data *proptarget = g_pAIS->Get_Target_Data_From_MMSI(nmmsi);
+        if (proptarget) {
+            wxString s = proptarget->GetFullName();
+            m_props->m_ShipName = s;
+        }
+        else {
+            wxString GetShipNameFromFile(int);
+            m_props->m_ShipName = GetShipNameFromFile(nmmsi);
+        }
+    }
   }
-
   EndModal(wxID_OK);
 }
 
@@ -604,6 +615,9 @@ wxString MMSIListCtrl::OnGetItemText(long item, long column) const {
     case mlFollower:
       if (props->m_bFollower) ret = _T("X");
       break;
+    case mlShipName:
+        ret = props->m_ShipName;
+        break;
     default:
       ret = _T( "??" );
       break;
@@ -687,7 +701,7 @@ MMSI_Props_Panel::MMSI_Props_Panel(wxWindow* parent)
   wxBoxSizer* topSizer = new wxBoxSizer(wxVERTICAL);
   SetSizer(topSizer);
 
-  wxString MMSI_props_column_spec = _T("120;120;100;100;100;100;100");
+  wxString MMSI_props_column_spec = _T("120;120;100;100;100;100;100;100");
   //  Parse the global column width string as read from config file
   wxStringTokenizer tkz(MMSI_props_column_spec, _T(";"));
   wxString s_width = tkz.GetNextToken();
@@ -695,7 +709,7 @@ MMSI_Props_Panel::MMSI_Props_Panel(wxWindow* parent)
   long lwidth;
 
   m_pListCtrlMMSI = new MMSIListCtrl(
-      this, ID_MMSI_PROPS_LIST, wxDefaultPosition, wxSize(-1, 400),
+      this, ID_MMSI_PROPS_LIST, wxDefaultPosition, wxSize(-1, 450),
       wxLC_REPORT | wxLC_SINGLE_SEL | wxLC_HRULES | wxLC_VRULES |
           wxBORDER_SUNKEN | wxLC_VIRTUAL);
   wxImageList* imglist = new wxImageList(16, 16, TRUE, 2);
@@ -707,58 +721,62 @@ MMSI_Props_Panel::MMSI_Props_Panel(wxWindow* parent)
   // m_pListCtrlMMSI->AssignImageList( imglist, wxIMAGE_LIST_SMALL );
   int dx = GetCharWidth();
 
-  width = dx * 12;
+  width = dx * 5;
   if (s_width.ToLong(&lwidth)) {
     width = wxMax(dx * 2, lwidth);
-    width = wxMin(width, dx * 30);
+    width = wxMin(width, dx * 13);
   }
   m_pListCtrlMMSI->InsertColumn(tlMMSI, _("MMSI"), wxLIST_FORMAT_LEFT, width);
+  
   s_width = tkz.GetNextToken();
-
   width = dx * 12;
   if (s_width.ToLong(&lwidth)) {
     width = wxMax(dx * 2, lwidth);
-    width = wxMin(width, dx * 30);
+    width = wxMin(width, dx * 25);
   }
-  m_pListCtrlMMSI->InsertColumn(tlCLASS, _("Track Mode"), wxLIST_FORMAT_CENTER,
-                                width);
-  s_width = tkz.GetNextToken();
+  m_pListCtrlMMSI->InsertColumn(tlCLASS, _("Track Mode"), wxLIST_FORMAT_CENTER, width);
 
+  s_width = tkz.GetNextToken();
   width = dx * 8;
   if (s_width.ToLong(&lwidth)) {
     width = wxMax(dx * 2, lwidth);
-    width = wxMin(width, dx * 30);
+    width = wxMin(width, dx * 10);
   }
   m_pListCtrlMMSI->InsertColumn(tlTYPE, _("Ignore"), wxLIST_FORMAT_CENTER,
                                 width);
-  s_width = tkz.GetNextToken();
 
+  s_width = tkz.GetNextToken();
   width = dx * 8;
   if (s_width.ToLong(&lwidth)) {
     width = wxMax(dx * 2, lwidth);
-    width = wxMin(width, dx * 30);
+    width = wxMin(width, dx * 10);
   }
   m_pListCtrlMMSI->InsertColumn(tlTYPE, _("MOB"), wxLIST_FORMAT_CENTER, width);
-  s_width = tkz.GetNextToken();
 
+  s_width = tkz.GetNextToken();
+  width = dx * 8;
+  if (s_width.ToLong(&lwidth)) {
+    width = wxMax(dx * 2, lwidth);
+    width = wxMin(width, dx * 15);
+  }
+  m_pListCtrlMMSI->InsertColumn(tlTYPE, _("VDM->VDO"), wxLIST_FORMAT_CENTER, width);
+
+  s_width = tkz.GetNextToken();
   width = dx * 8;
   if (s_width.ToLong(&lwidth)) {
     width = wxMax(dx * 2, lwidth);
     width = wxMin(width, dx * 30);
   }
-  m_pListCtrlMMSI->InsertColumn(tlTYPE, _("VDM->VDO"), wxLIST_FORMAT_CENTER,
-                                width);
-  s_width = tkz.GetNextToken();
+  m_pListCtrlMMSI->InsertColumn(tlTYPE, _("Ship name"), wxLIST_FORMAT_CENTER, width);
 
-  width = dx * 8;
+  s_width = tkz.GetNextToken();
+  width = dx * 8;  
   if (s_width.ToLong(&lwidth)) {
-    width = wxMax(dx * 2, lwidth);
-    width = wxMin(width, dx * 30);
+      width = wxMax(dx * 2, lwidth);
+      width = wxMin(width, dx * 10);
   }
-  m_pListCtrlMMSI->InsertColumn(tlTYPE, _("Follower"), wxLIST_FORMAT_CENTER,
-                                width);
-  s_width = tkz.GetNextToken();
-
+  m_pListCtrlMMSI->InsertColumn(tlTYPE, _("Follower"), wxLIST_FORMAT_CENTER, width);  //Has
+  
   topSizer->Add(m_pListCtrlMMSI, 1, wxEXPAND | wxALL, 0);
 
   m_pButtonNew = new wxButton(this, wxID_ANY, _("New..."), wxDefaultPosition,
@@ -4727,6 +4745,8 @@ void options::SetInitialSettings(void) {
   wxString s;
 
   m_returnChanges = 0;                  // reset the flags
+  m_bfontChanged = false;
+  
   
   // ChartsLoad
   int nDir = m_CurrentDirList.GetCount();
@@ -5525,6 +5545,10 @@ void options::OnApplyClick(wxCommandEvent& event) {
 
   m_pText_ACRadius->GetValue().ToDouble(&g_n_arrival_circle_radius);
 
+  //  Any Font changes?
+  if(m_bfontChanged)
+      m_returnChanges |= FONT_CHANGED;
+  
   // Handle Chart Tab
   if (pActiveChartsList) {
     UpdateWorkArrayFromTextCtl();
@@ -5995,6 +6019,11 @@ void options::OnApplyClick(wxCommandEvent& event) {
 
   if (event.GetId() == ID_APPLY) {
     gFrame->ProcessOptionsDialog(m_returnChanges, m_pWorkDirList);
+    
+    //  We can clear a few flag bits on "Apply", so they won't be recognised at the "OK" click.
+    //  Their actions have already been accomplished once...
+    m_returnChanges &= ~( FORCE_UPDATE | SCAN_UPDATE );
+    
     cc1->ReloadVP();
   }
 
@@ -6156,7 +6185,7 @@ void options::OnChooseFont(wxCommandEvent& event) {
     wxColor color = font_data.GetColour();
     FontMgr::Get().SetFont(sel_text_element, psfont, color);
     pParent->UpdateAllFonts();
-    m_returnChanges |= FONT_CHANGED;
+    m_bfontChanged = true;
   }
 
   event.Skip();
@@ -6184,7 +6213,7 @@ void options::OnChooseFontColor(wxCommandEvent& event) {
     FontMgr::Get().SetFont(sel_text_element, pif, color);
 
     pParent->UpdateAllFonts();
-    m_returnChanges |= FONT_CHANGED;
+    m_bfontChanged = true;
   }
 
   event.Skip();
@@ -6938,7 +6967,10 @@ void ChartGroupsUI::OnNodeExpanded(wxTreeEvent& event) {
   }
 }
 
-void ChartGroupsUI::BuildNotebookPages(ChartGroupArray* pGroupArray) {
+void ChartGroupsUI::BuildNotebookPages(ChartGroupArray* pGroupArray)
+{
+  ClearGroupPages();
+  
   for (unsigned int i = 0; i < pGroupArray->GetCount(); i++) {
     ChartGroup* pGroup = pGroupArray->Item(i);
     wxTreeCtrl* ptc = AddEmptyGroupPage(pGroup->m_group_name);
@@ -6977,6 +7009,15 @@ wxTreeCtrl* ChartGroupsUI::AddEmptyGroupPage(const wxString& label) {
   return ptree;
 }
 
+void ChartGroupsUI::ClearGroupPages()
+{
+    for(unsigned int i = m_GroupNB->GetPageCount()-1 ; i > 0 ; i--){
+        m_DirCtrlArray.RemoveAt(i);
+        m_GroupNB->DeletePage(i);
+    }
+}
+
+            
 void options::OnInsertTideDataLocation(wxCommandEvent& event) {
   wxString sel_file;
   int response = wxID_CANCEL;
