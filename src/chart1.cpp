@@ -4226,6 +4226,9 @@ void MyFrame::setStringVP(wxString VPS)
 
 void MyFrame::DoSettings()
 {
+    if (g_boptionsactive)
+        return;
+
     bool bnewtoolbar = !( DoOptionsDialog() == 0 );
 
     //              Apply various system settings
@@ -5125,6 +5128,9 @@ void MyFrame::JumpToPosition( double lat, double lon, double scale )
 
 int MyFrame::DoOptionsDialog()
 {
+    if (g_boptionsactive)
+        return 0;
+
     g_boptionsactive = true;
 
 
@@ -5254,7 +5260,6 @@ int MyFrame::DoOptionsDialog()
 
     Refresh( false );
 
-    g_boptionsactive = false;
 
     if (NMEALogWindow::Get().Active())
         NMEALogWindow::Get().GetTTYWindow()->Raise();
@@ -5265,6 +5270,7 @@ int MyFrame::DoOptionsDialog()
         g_options = NULL;
     }
 
+    g_boptionsactive = false;
     return ret_val;
 }
 
