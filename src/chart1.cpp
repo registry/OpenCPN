@@ -683,6 +683,7 @@ static int tick_idx;
 int               g_sticky_chart;
 
 extern wxString OpenCPNVersion; //Gunther
+extern options          *g_pOptions;
 
 int n_NavMessageShown;
 wxString g_config_version_string;
@@ -3107,8 +3108,16 @@ void MyFrame::OnCloseWindow( wxCloseEvent& event )
         return;
     }
 
-    if(g_options)
+    // If Options dialog is not fully initialized, just cancel the close request. 
+    //  This is only reachable on slow hardware...
+    if(!g_options)
+        return;
+    
+    if(g_options){
         delete g_options;
+        g_options = NULL;
+        g_pOptions = NULL;
+    }
     
     //  If the multithread chart compressor engine is running, cancel the close command
     if( b_inCompressAllCharts ) {
@@ -4856,6 +4865,9 @@ void MyFrame::ApplyGlobalSettings( bool bFlyingUpdate, bool bnewtoolbar )
 #endif
 
     if ( showMenuBar ) {
+        //  Menu bar has some dependencies on S52 PLIB, so be sure it is loaded.
+        LoadS57();
+        
         if ( !m_pMenuBar ) {    // add the menu bar if it is enabled
             m_pMenuBar = new wxMenuBar();
             RegisterGlobalMenuItems();

@@ -244,6 +244,8 @@ class options : private Uncopyable,
 
   void SetInitChartDir(const wxString &dir) { m_init_chart_dir = dir; }
   void SetInitialSettings(void);
+  void SetInitialVectorSettings(void);
+  
   void SetCurrentDirList(ArrayOfCDI p) { m_CurrentDirList = p; }
   void SetWorkDirListPtr(ArrayOfCDI *p) { m_pWorkDirList = p; }
   ArrayOfCDI *GetWorkDirListPtr(void) { return m_pWorkDirList; }
@@ -564,6 +566,7 @@ class options : private Uncopyable,
   int m_fontHeight, m_scrollRate, m_BTscanning, m_btNoChangeCounter;
   int m_btlastResultCount;
   bool m_bfontChanged;
+  bool m_bVectorInit;
   
   DECLARE_EVENT_TABLE()
 };
