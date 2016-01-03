@@ -2749,7 +2749,17 @@ ocpnToolBarSimple *MyFrame::CreateAToolbar()
             style->GetToolIcon( _T("settings"), TOOLICON_NORMAL ), tipString, wxITEM_NORMAL );
 
     CheckAndAddPlugInTool( tb );
-    tipString = wxString( _("Show ENC Text") ) << _T(" (T)");
+    bool gs = false;
+#ifdef USE_S57
+    if (ps52plib)
+        gs = ps52plib->GetShowS57Text();
+#endif
+
+    if (gs)
+        tipString = wxString( _("Hide ENC Text") ) << _T(" (T)");
+    else
+        tipString = wxString( _("Show ENC Text") ) << _T(" (T)");
+
     if( _toolbarConfigMenuUtil( ID_ENC_TEXT, tipString ) )
         tb->AddTool( ID_ENC_TEXT, _T("text"),
             style->GetToolIcon( _T("text"), TOOLICON_NORMAL ),
@@ -2822,6 +2832,7 @@ ocpnToolBarSimple *MyFrame::CreateAToolbar()
 
 
 // Realize() the toolbar
+    style->Unload();
     g_FloatingToolbarDialog->Realize();
 
 //      Set up the toggle states
@@ -3923,8 +3934,8 @@ void MyFrame::OnToolLeftClick( wxCommandEvent& event )
 #endif
 
         case ID_MENU_AIS_TARGETS: {
-            if ( g_bShowAIS ) SetAISDisplayStyle(0);
-            else SetAISDisplayStyle(1);
+            if ( g_bShowAIS ) SetAISDisplayStyle(2);
+            else SetAISDisplayStyle(0);
             break;
         }
          case ID_MENU_AIS_MOORED_TARGETS: {
@@ -5209,12 +5220,10 @@ int MyFrame::DoOptionsDialog()
 
     g_boptionsactive = true;
 
-
-    g_Platform->ShowBusySpinner();
-
-    if(NULL == g_options)
+    if(NULL == g_options) {
+        g_Platform->ShowBusySpinner();
         g_options = new options( this, -1, _("Options") );
-
+    }
     g_Platform->HideBusySpinner();
 
 //    Set initial Chart Dir
@@ -6599,6 +6608,10 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
 
     FrameTimer1.Start( TIMER_GFRAME_1, wxTIMER_CONTINUOUS );
 
+    //  Make sure we get a redraw and alert sound on AnchorWatch excursions.
+    if(AnchorAlertOn1 || AnchorAlertOn2)
+        bnew_view = true;
+    
     if(g_bopengl) {
 #ifdef ocpnUSE_GL
         if(m_fixtime - cc1->GetglCanvas()->m_last_render_time > 0)
