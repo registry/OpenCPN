@@ -917,6 +917,13 @@ options::~options(void) {
   
 }
 
+// with AIS it's called very often
+bool options::SendIdleEvents(wxIdleEvent &event )  { 
+   if (IsShown())
+       return wxDialog::SendIdleEvents(event);
+   return false;
+}
+
 void options::RecalculateSize(void) {
   if (!g_bresponsive) {
     wxSize canvas_size = cc1->GetSize();
@@ -6483,7 +6490,7 @@ void options::OnButtonSelectSound(wxCommandEvent& event) {
 
 #else
   response =
-      g_Platform->DoFileSelectorDialog(NULL, &sel_file, _("Select Sound File"),
+      g_Platform->DoFileSelectorDialog(this, &sel_file, _("Select Sound File"),
                                        sound_dir, wxEmptyString, wxT("*.*"));
 #endif
 
@@ -7073,7 +7080,7 @@ void options::OnInsertTideDataLocation(wxCommandEvent& event) {
 
 #else
   wxString path;
-  response = g_Platform->DoFileSelectorDialog(NULL, &path,
+  response = g_Platform->DoFileSelectorDialog(this, &path,
                                               _("Select Tide/Current Data"),
                                               g_TCData_Dir, _T(""), wxT("*.*"));
   sel_file = path;
