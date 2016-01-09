@@ -916,7 +916,7 @@ ChartCanvas::ChartCanvas ( wxFrame *frame ) :
         m_pQuilt->EnableHighDefinitionZoom( true );
 #endif    
 
-    m_pgridFont = wxTheFontList->FindOrCreateFont( 8, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL,
+    m_pgridFont = FontMgr::Get().FindOrCreateFont( 8, wxFONTFAMILY_SWISS, wxFONTSTYLE_NORMAL,
          wxFONTWEIGHT_NORMAL, FALSE, wxString( _T ( "Arial" ) ) );
         
 }
@@ -2223,7 +2223,7 @@ wxBitmap ChartCanvas::CreateDimBitmap( wxBitmap &Bitmap, double factor )
 
 void ChartCanvas::ShowBrightnessLevelTimedPopup( int brightness, int min, int max )
 {
-    wxFont *pfont = wxTheFontList->FindOrCreateFont( 40, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD );
+    wxFont *pfont = FontMgr::Get().FindOrCreateFont( 40, wxFONTFAMILY_DEFAULT, wxFONTSTYLE_NORMAL, wxFONTWEIGHT_BOLD );
 
     if( !m_pBrightPopup ) {
         //    Calculate size
@@ -2324,7 +2324,8 @@ void ChartCanvas::OnRolloverPopupTimerEvent( wxTimerEvent& event )
                     m_pAISRolloverWin->SetString( s );
 
                     wxSize win_size = GetSize();
-                    if( console->IsShown() ) win_size.x -= console->GetSize().x;
+                    if( console && console->IsShown() ) win_size.x -= console->GetSize().x;
+
                     m_pAISRolloverWin->SetBestPosition( mouse_x, mouse_y, 16, 16, AIS_ROLLOVER, win_size );
 
                     m_pAISRolloverWin->SetBitmap( AIS_ROLLOVER );
@@ -9177,12 +9178,10 @@ void ChartCanvas::OnPaint( wxPaintEvent& event )
         b_newview = false;
     }
 
-    //  If the ViewPort is rotated, we may be able to use the cached rotated bitmap
+    //  If the ViewPort is skewed or rotated, we may be able to use the cached rotated bitmap.
     bool b_rcache_ok = false;
-    b_rcache_ok = !b_newview;
-
-    //  If in skew compensation mode, with a skewed VP shown, we may be able to use the cached rotated bitmap
-    if(  fabs( VPoint.skew ) > 0.01 ) b_rcache_ok = !b_newview;
+    if( fabs( VPoint.skew ) > 0.01 || fabs( VPoint.rotation ) > 0.01)
+        b_rcache_ok = !b_newview;
 
     //  Make a special VP
     if( VPoint.b_MercatorProjectionOverride ) VPoint.SetProjectionType( PROJECTION_MERCATOR );
@@ -9401,7 +9400,10 @@ void ChartCanvas::OnPaint( wxPaintEvent& event )
 
     wxMemoryDC *pChartDC = &temp_dc;
     wxMemoryDC rotd_dc;
-
+    
+    if( ( ( fabs( GetVP().rotation ) > 0.01 ) )
+        ||   ( fabs( GetVP().skew ) > 0.01 ) )  {
+        
         //  Can we use the current rotated image cache?
         if( !b_rcache_ok ) {
 #ifdef __WXMSW__
@@ -9457,7 +9459,11 @@ void ChartCanvas::OnPaint( wxPaintEvent& event )
             pChartDC = &temp_dc;
             m_roffset = wxPoint( 0, 0 );
         }
-
+    } else {            // unrotated
+        pChartDC = &temp_dc;
+        m_roffset = wxPoint( 0, 0 );
+    }
+        
     wxPoint offset = m_roffset;
 
     //        Save the PixelCache viewpoint for next time
@@ -10385,7 +10391,7 @@ void ChartCanvas::DrawAllTidesInBBox( ocpnDC& dc, LLBBox& BBox )
     wxFont *dFont = FontMgr::Get().GetFont( _("ExtendedTideIcon") );
     dc.SetTextForeground( FontMgr::Get().GetFontColor( _("ExtendedTideIcon") ) );
     int font_size = wxMax(8, dFont->GetPointSize());
-    wxFont *plabelFont = wxTheFontList->FindOrCreateFont( font_size, dFont->GetFamily(),
+    wxFont *plabelFont = FontMgr::Get().FindOrCreateFont( font_size, dFont->GetFamily(),
                          dFont->GetStyle(), dFont->GetWeight() );
 
     dc.SetPen( *pblack_pen );

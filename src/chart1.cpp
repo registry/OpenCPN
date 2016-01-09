@@ -708,6 +708,7 @@ wxString         g_TalkerIdText;
 bool             g_bAdvanceRouteWaypointOnArrivalOnly;
 
 wxArrayString    g_locale_catalog_array;
+bool             b_reloadForPlugins;
 
 #ifdef LINUX_CRASHRPT
 wxCrashPrint g_crashprint;
@@ -3629,7 +3630,7 @@ void MyFrame::ODoSetSize( void )
 #endif
 
 
-        wxFont *pstat_font = wxTheFontList->FindOrCreateFont( font_size,
+        wxFont *pstat_font = FontMgr::Get().FindOrCreateFont( font_size,
               wxFONTFAMILY_DEFAULT, templateFont->GetStyle(), templateFont->GetWeight(), false,
               templateFont->GetFaceName() );
 
@@ -6110,6 +6111,15 @@ void MyFrame::OnInitTimer(wxTimerEvent& event)
             g_pi_manager->NotifyAuiPlugIns();
             g_pi_manager->ShowDeferredBlacklistMessages(); //  Give the use dialog on any blacklisted PlugIns
             g_pi_manager->CallLateInit();
+            
+            //  If any PlugIn implements PlugIn Charts, we need to re-run the initial chart load logic
+            //  to select the correct chart as saved from the last run of the app.
+            //  This will be triggered at the next DoChartUpdate()
+            if( g_pi_manager->IsAnyPlugInChartEnabled() ){
+                bFirstAuto = true;
+                b_reloadForPlugins = true;
+            }
+                
             break;
         }
 
@@ -6139,6 +6149,9 @@ void MyFrame::OnInitTimer(wxTimerEvent& event)
 
             InitTimer.Stop(); // Initialization complete
             g_bDeferredInitDone = true;
+            
+            if(b_reloadForPlugins)
+                ChartsRefresh(g_restore_dbindex, cc1->GetVP());            
             break;
         }
     }   // switch
@@ -11690,7 +11703,7 @@ wxFont *GetOCPNScaledFont( wxString item, int default_size )
             if(req_size >= nscaled_font_size)
                 return dFont;
             else{
-                wxFont *qFont = wxTheFontList->FindOrCreateFont( nscaled_font_size,
+                wxFont *qFont = FontMgr::Get().FindOrCreateFont( nscaled_font_size,
                                                              dFont->GetFamily(),
                                                              dFont->GetStyle(),
                                                              dFont->GetWeight());
