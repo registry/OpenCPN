@@ -201,8 +201,10 @@ class PlugInToolbarToolContainer
             wxBitmap          *bitmap_day;
             wxBitmap          *bitmap_dusk;
             wxBitmap          *bitmap_night;
-            wxBitmap          *bitmap_Rollover;
-
+            wxBitmap          *bitmap_Rollover_day;
+            wxBitmap          *bitmap_Rollover_dusk;
+            wxBitmap          *bitmap_Rollover_night;
+            
             wxItemKind        kind;
             wxString          shortHelp;
             wxString          longHelp;
@@ -211,7 +213,10 @@ class PlugInToolbarToolContainer
             bool              b_viz;
             bool              b_toggle;
             int               tool_sel;
-
+            wxString          pluginNormalIconSVG;
+            wxString          pluginRolloverIconSVG;
+            wxString          pluginToggledIconSVG;
+            
 };
 
 //    Define an array of PlugIn ToolbarTool Containers
@@ -251,7 +256,7 @@ public:
       void CloseAllPlugInPanels( int );
 
       ArrayOfPlugInToolbarTools &GetPluginToolbarToolArray(){ return m_PlugInToolbarTools; }
-      int AddToolbarTool(wxString label, wxBitmap *bitmap, wxBitmap *bmpDisabled,
+      int AddToolbarTool(wxString label, wxBitmap *bitmap, wxBitmap *bmpRollover,
                          wxItemKind kind, wxString shortHelp, wxString longHelp,
                          wxObject *clientData, int position,
                          int tool_sel, opencpn_plugin *pplugin );
@@ -260,6 +265,16 @@ public:
       void SetToolbarToolViz(int tool_id, bool viz);
       void SetToolbarItemState(int tool_id, bool toggle);
       void SetToolbarItemBitmaps(int item, wxBitmap *bitmap, wxBitmap *bmpDisabled);
+      
+      int AddToolbarTool(wxString label, wxString SVGfile, wxString SVGRolloverfile, wxString SVGToggledfile,
+                         wxItemKind kind, wxString shortHelp, wxString longHelp,
+                         wxObject *clientData, int position,
+                         int tool_sel, opencpn_plugin *pplugin );
+      
+      void SetToolbarItemBitmaps(int item, wxString SVGfile,
+                                 wxString SVGfileRollover,
+                                 wxString SVGfileToggled);
+      
       opencpn_plugin *FindToolOwner(const int id);
       wxString GetToolOwnerCommonName(const int id);
       void ShowDeferredBlacklistMessages();
