@@ -3048,7 +3048,7 @@ void MyFrame::UpdateToolbar( ColorScheme cs )
             if( g_FloatingToolbarDialog->IsToolbarShown() ) {
                 DestroyMyToolbar();
                 g_toolbar = CreateAToolbar();
-                if (g_FloatingToolbarDialog->m_bsubmerged) 
+                if (g_FloatingToolbarDialog->isSubmergedToGrabber()) 
                     g_FloatingToolbarDialog->SubmergeToGrabber(); //Surface(); //SubmergeToGrabber();
             
             }
@@ -5839,8 +5839,7 @@ void MyFrame::SetupQuiltMode( void )
     //    When shifting from quilt to single chart mode, select the "best" single chart to show
     if( !cc1->GetQuiltMode() ) {
         if( ChartData && ChartData->IsValid() ) {
-            ChartData->UnLockCache();
-            ChartData->UnLockAllCacheCharts();
+            cc1->UnlockQuilt();
 
             double tLat, tLon;
             if( cc1->m_bFollow == true ) {
