@@ -1467,6 +1467,8 @@ bool MyApp::OnInit()
         // of the wxWidgets strings is not present.
         // So try again, without attempting to load defaults wxstd.mo.
         if( !b_initok ){
+            delete plocale_def_lang;
+            plocale_def_lang = new wxLocale;
             b_initok = plocale_def_lang->Init( pli->Language, 0 );
         }
         loc_lang_canonical = pli->CanonicalName;
@@ -5900,6 +5902,10 @@ void MyFrame::SetupQuiltMode( void )
                 one_array.Add( dbi );
                 g_Piano->SetActiveKeyArray( one_array );
             }
+            
+            if( Current_Ch ) {
+                cc1->GetVP().SetProjectionType(Current_Ch->GetChartProjectionType());
+            }
 
         }
         //    Invalidate the current stack so that it will be rebuilt on next tick
@@ -7091,6 +7097,10 @@ void MyFrame::HandlePianoClick( int selected_index, int selected_dbIndex )
             SelectChartFromStack( selected_index );
             g_sticky_chart = selected_dbIndex;
         }
+
+        if( Current_Ch )
+            cc1->GetVP().SetProjectionType(Current_Ch->GetChartProjectionType());
+        
     } else {
         if( cc1->IsChartQuiltableRef( selected_dbIndex ) ){
             if( ChartData ) ChartData->PurgeCache();
