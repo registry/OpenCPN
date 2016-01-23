@@ -3725,7 +3725,7 @@ void MyFrame::ODoSetSize( void )
     }
 
     if( pthumbwin )
-        pthumbwin->SetMaxSize( cc1->GetParent()->GetSize() );
+        pthumbwin->SetMaxSize( cc1->GetParent()->GetClientSize() );
 
     //  Reset the options dialog size logic
     options_lastWindowSize = wxSize(0,0);
@@ -5386,6 +5386,14 @@ int MyFrame::DoOptionsDialog()
         g_options = NULL;
         g_pOptions = NULL;
     }
+    
+    //  Pick up chart object icon size changes (g_ChartScaleFactorExp)
+    if( pMarkPropDialog ) {
+        pMarkPropDialog->Hide();
+        pMarkPropDialog->Destroy();
+        pMarkPropDialog = NULL;
+    }
+    
 
     g_boptionsactive = false;
     return ret_val;
@@ -7482,10 +7490,11 @@ void MyFrame::SetChartThumbnail( int index )
                 
                 // Simplistic overlap avoidance works best when toolbar is horizontal near the top of screen.
                 // Other difficult cases simply center the thumbwin on the canvas....
-                if( g_FloatingToolbarDialog ){
+                if( g_FloatingToolbarDialog && !g_FloatingToolbarDialog->isSubmergedToGrabber()){
                     if( g_FloatingToolbarDialog->GetScreenRect().Intersects( tRect ) ) {
                         wxPoint tbpos = cc1->ScreenToClient(g_FloatingToolbarDialog->GetPosition());
                         pos = wxPoint(4, g_FloatingToolbarDialog->GetSize().y + tbpos.y + 4);
+                        tLocn = ClientToScreen(pos);
                     }
                 }
                 
@@ -7494,9 +7503,9 @@ void MyFrame::SetChartThumbnail( int index )
                     int piano_height = g_Piano->GetHeight() + 4;
                     wxPoint cbarLocn = ClientToScreen(wxPoint(0, cc1->GetCanvasHeight() - piano_height));
                     wxRect cbarRect = wxRect(cbarLocn.x, cbarLocn.y, cc1->GetCanvasWidth(), piano_height);
-                    if( cbarRect.Intersects( wxRect(pos.x, pos.y, pthumbwin->GetSize().x, pthumbwin->GetSize().y))){
+                    if( cbarRect.Intersects( wxRect(tLocn.x, tLocn.y, pthumbwin->GetSize().x, pthumbwin->GetSize().y))){
                         pos = wxPoint((cc1->GetCanvasWidth() - pthumbwin->GetSize().x)/2,
-                                      (cc1->GetCanvasHeight() - pthumbwin->GetSize().y)/2);
+                                      (cc1->GetCanvasHeight() - pthumbwin->GetSize().y)/2 - piano_height);
                     }
                 }
                 pthumbwin->Move( pos );
