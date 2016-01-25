@@ -181,6 +181,9 @@ private:
     WMMtype_GeoMagneticElements m_boatVariation;
 
     bool m_bComputingPlot;
+    wxFont        *pFontSmall;
+    double        m_scale;
+    wxString      m_shareLocn;
 };
 
 int WMM_setupMagneticModel(char *data, WMMtype_MagneticModel * MagneticModel);
