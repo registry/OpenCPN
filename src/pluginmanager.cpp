@@ -2176,7 +2176,7 @@ wxBitmap GetBitmapFromSVGFile(wxString filename, unsigned int width, unsigned in
 
 bool IsTouchInterface_PlugIn(void)
 {
-    return g_btouch;
+    return false; //g_btouch;
 }
 
 wxColour GetFontColour_PlugIn(wxString TextElement)
