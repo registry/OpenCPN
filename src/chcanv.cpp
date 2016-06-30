@@ -62,6 +62,7 @@
 #include "ocpn_pixel.h"
 #include "ocpndc.h"
 #include "undo.h"
+#include "bbox.h"
 #include "toolbar.h"
 #include "multiplexer.h"
 #include "timers.h"

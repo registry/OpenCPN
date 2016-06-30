@@ -90,6 +90,16 @@ class LLBBox : public wxBoundingBox
 public:
     bool PointInBox(double Lon, double Lat, double Marge);
 
+LLBBox() : m_valid(FALSE) {}
+    void Set(double minlat, double minlon, double maxlat, double maxlon);
+    void SetFromSegment(double lat1, double lon1, double lat2, double lon2);
+    void Expand(const LLBBox& bbox);
+    bool Contains(double Lat, double Lon) const;
+    bool ContainsMarge(double Lat, double Lon, double Marge) const;
+    bool GetValid() const { return m_valid; }
+    void Invalidate() { m_valid = false; }
+
+
     // allow -180 to 180 or 0 to 360
     virtual inline bool IntersectOut( const wxBoundingBox &other ) const {
         if( !GetValid() || !other.GetValid() )
@@ -106,6 +116,45 @@ public:
 
         return (minx > other.GetMaxX()) || (maxx < other.GetMinX());
     }
+
+ bool IntersectIn( const LLBBox &other ) const;
+    inline bool IntersectOut( const LLBBox &other ) const
+    {
+        // allow -180 to 180 or 0 to 360
+        if( !GetValid() || !other.GetValid() )
+            return true;
+
+        if((m_maxlat < other.m_minlat) || (m_minlat > other.m_maxlat))
+            return true;
+
+        double minlon = m_minlon, maxlon = m_maxlon;
+        if(m_maxlon < other.m_minlon)
+            minlon += 360, maxlon += 360;
+        else if(m_minlon > other.m_maxlon)
+            minlon -= 360, maxlon -= 360;
+
+        return (minlon > other.m_maxlon) || (maxlon < other.m_minlon);
+    }
+
+
+
+    bool IntersectOutGetBias( const LLBBox &other, double bias ) const;
+    
+    double GetMinLat() const {return m_minlat;};
+    double GetMinLon() const {return m_minlon;};
+    double GetMaxLat() const {return m_maxlat;};
+    double GetMaxLon() const {return m_maxlon;};
+
+    void EnLarge(const double Marge);
+    double GetLonRange() const {return m_maxlon - m_minlon; }
+    double GetLatRange() const {return m_maxlat - m_minlat;};
+
+protected:
+    double        m_minlat;
+    double        m_minlon;
+    double        m_maxlat;
+    double        m_maxlon;
+    bool          m_valid;
 };
 
 
