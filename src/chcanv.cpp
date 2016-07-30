@@ -302,12 +302,14 @@ extern bool              g_bShowFPS;
 extern double            g_gl_ms_per_frame;
 extern bool              g_benable_rotate;
 
+#if 0
 wxProgressDialog *pprog;
 bool b_skipout;
 wxSize pprog_size;
 int pprog_count;
 int pprog_threads;
 wxArrayString compress_msg_array;
+#endif
 
 //  TODO why are these static?
 static int mouse_x;
@@ -1142,7 +1144,7 @@ void ChartCanvas::SetDisplaySizeMM( double size )
     
     
 }
-
+#if 0
 void ChartCanvas::OnEvtCompressProgress( OCPN_CompressProgressEvent & event )
 {
     wxString msg(event.m_string.c_str(), wxConvUTF8);
@@ -1172,7 +1174,7 @@ void ChartCanvas::OnEvtCompressProgress( OCPN_CompressProgressEvent & event )
     if(skip)
         b_skipout = skip;
 }
-
+#endif
 void ChartCanvas::InvalidateGL()
 {
 #ifdef ocpnUSE_GL
@@ -2202,7 +2204,7 @@ void ChartCanvas::SetColorScheme( ColorScheme cs )
 #ifdef ocpnUSE_GL
     if( g_bopengl && m_glcc ){
         m_glcc->SetColorScheme( cs );
-        m_glcc->ClearAllRasterTextures();
+        g_glTextureManager->ClearAllRasterTextures();
         m_glcc->FlushFBO(); 
     }
 #endif
@@ -8912,15 +8914,6 @@ void ChartCanvas::RenderChartOutline( ocpnDC &dc, int dbIndex, ViewPort& vp )
         }
     }
 
-}
-
-bool ChartCanvas::PurgeGLCanvasChartCache( ChartBase *pc, bool b_purge_full )
-{
-#ifdef ocpnUSE_GL
-    if( g_bopengl && m_glcc )
-        m_glcc->PurgeChartTextures( pc, b_purge_full );
-#endif
-    return true;
 }
 
 wxString ChartCanvas::FormatDistanceAdaptive( double distance ) {
