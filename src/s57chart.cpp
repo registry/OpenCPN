@@ -2075,9 +2075,9 @@ void s57chart::AssembleLineGeometry( void )
                         edge_dir = false;
                     }
 
-
                     VE_Element *pedge = 0;
-                    pedge = m_ve_hash[venode];
+                    if(venode)
+                        pedge = m_ve_hash[venode];
 
                     //  Get end connected node
                     unsigned int enode = *index_run++;
@@ -2323,6 +2323,7 @@ void s57chart::AssembleLineGeometry( void )
     //      and recording each segment's offset in the array
     for( it = m_ve_hash.begin(); it != m_ve_hash.end(); ++it ) {
         VE_Element *pedge = it->second;
+        int key = it->first;
         if( pedge ) {
             memcpy(lvr, pedge->pPoints, pedge->nCount * 2 * sizeof(float));
             lvr += pedge->nCount * 2;
@@ -2330,6 +2331,8 @@ void s57chart::AssembleLineGeometry( void )
             pedge->vbo_offset = offset;
             offset += pedge->nCount * 2 * sizeof(float);
         }
+//         else
+//             int yyp = 4;        //TODO Why are zero elements being inserted into m_ve_hash?
     }
 
     //      Now iterate on the hashmaps, adding the connector segments in the temporary vector to the VBO buffer
@@ -2391,9 +2394,10 @@ void s57chart::AssembleLineGeometry( void )
     // are now in the VBO buffer
     for( it = m_ve_hash.begin(); it != m_ve_hash.end(); ++it ) {
         VE_Element *pedge = it->second;
-        m_pve_vector.push_back(pedge);
-
-        free(pedge->pPoints);
+        if(pedge){
+            m_pve_vector.push_back(pedge);
+            free(pedge->pPoints);
+        }
     }
     m_ve_hash.clear();
 
@@ -3803,6 +3807,12 @@ InitReturn s57chart::FindOrCreateSenc( const wxString& name, bool b_progress )
                 else if( !senc_base_edtn.IsSameAs( m_edtn000 ) ){
                     bbuild_new_senc = true;
                     wxLogMessage(_T("    Rebuilding SENC due to cell edition update."));
+                    wxString msg;
+                    msg = _T("    Last edition recorded in SENC: ");
+                    msg += senc_base_edtn;
+                    msg += _T("  most recent edition cell file: ");
+                    msg += m_edtn000;
+                    wxLogMessage(msg);
                 }
                 else {
                     //    See if there are any new update files  in the ENC directory
@@ -3811,6 +3821,9 @@ InitReturn s57chart::FindOrCreateSenc( const wxString& name, bool b_progress )
                     if( last_update != most_recent_update_file ){
                         bbuild_new_senc = true;
                         wxLogMessage(_T("    Rebuilding SENC due to incremental cell update."));
+                        wxString msg;
+                        msg.Printf(_T("    Last update recorded in SENC: %d   most recent update file: %d"), last_update, most_recent_update_file);
+                        wxLogMessage(msg);
                     }
 
 //          Make simple tests to see if the .000 file is "newer" than the SENC file representation
@@ -5188,7 +5201,7 @@ int s57chart::BuildRAZFromSENCFile( const wxString& FullPath )
     for( int i = 0; i < n_ve_elements; i++ ) {
 
         VE_Element *vep = VEs.at( i );
-        if(vep->nCount){
+        if(vep && vep->nCount){
             //  Get a bounding box for the edge
             double east_max = -1e7; double east_min = 1e7;
             double north_max = -1e7; double north_min = 1e7;
