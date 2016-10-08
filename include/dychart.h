@@ -168,7 +168,7 @@
 
 #ifdef USE_S57
 #define USE_CPL
-#include "cpl_port.h"
+#include "mygdal/cpl_port.h"
 #endif
 
 #ifndef NULL
@@ -221,14 +221,6 @@
 
 #ifdef __OCPN__ANDROID__
 #include "qdebug.h"
-#endif
-
-#ifndef __WXMSW__
-using namespace std;
-#include <cmath>
-
-#undef wxIsNaN
-#define wxIsNaN std::isnan
 #endif
 
 #endif      // __FILE__
