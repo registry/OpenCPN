@@ -46,6 +46,17 @@
 #include "WMMHeader.h"
 #include "MagneticPlotMap.h"
 
+
+#ifndef __WXMSW__
+using namespace std;
+#include <cmath>
+
+#undef wxIsNaN
+#define wxIsNaN std::isnan
+#endif
+
+
+
 #if defined(__WIN32__)
 #define isnan(x) _isnan(x)
 #endif  // __WIN32__
