@@ -1038,6 +1038,7 @@ bool ChartDatabase::Read(const wxString &filePath)
     if(0 == cth.GetDirEntries())
           wxLogMessage(_T("  Nil"));
 
+    int ind = 0;
     for (int iDir = 0; iDir < cth.GetDirEntries(); iDir++) {
         wxString dir;
         int dirlen;
@@ -1060,8 +1061,11 @@ bool ChartDatabase::Read(const wxString &filePath)
 
     entries = cth.GetTableEntries();
     active_chartTable.Alloc(entries);
-    while (entries-- && entry.Read(this, ifs))
+    active_chartTable_pathindex.clear();
+    while (entries-- && entry.Read(this, ifs)) {
+        active_chartTable_pathindex[wxString(entry.GetpFullPath(), wxConvUTF8)] = ind++;
         active_chartTable.Add(entry);
+    }
 
     entry.Clear();
     bValid = true;
@@ -1226,9 +1230,9 @@ wxString ChartDatabase::GetFullChartInfo(ChartBase *pc, int dbIndex, int *char_w
             lc++;
 
             if(pc)      // chart is loaded and available
-                  line.Printf(_(" Scale:  1:%d"), pc->GetNativeScale() );
+                  line.Printf(_T(" %s:  1:%d"), _("Scale"), pc->GetNativeScale() );
             else
-                  line.Printf(_(" Scale:  1:%d"), cte.GetScale() );
+                  line.Printf(_T(" %s:  1:%d"), _("Scale"), cte.GetScale() );
 
             line += _T("\n");
             max_width = wxMax(max_width, line.Len());
@@ -1329,7 +1333,7 @@ wxString ChartDatabase::GetFullChartInfo(ChartBase *pc, int dbIndex, int *char_w
 // Create Chart Table Database by directory search
 //    resulting in valid pChartTable in (this)
 // ----------------------------------------------------------------------------
-bool ChartDatabase::Create(ArrayOfCDI &dir_array, wxProgressDialog *pprog)
+bool ChartDatabase::Create(ArrayOfCDI &dir_array, wxGenericProgressDialog *pprog)
 {
       m_dir_array = dir_array;
 
@@ -1337,6 +1341,8 @@ bool ChartDatabase::Create(ArrayOfCDI &dir_array, wxProgressDialog *pprog)
 
       m_chartDirs.Clear();
       active_chartTable.Clear();
+      active_chartTable_pathindex.clear();
+
       Update(dir_array, true, pprog);                   // force the update the reload everything
 
       bValid = true;
@@ -1355,7 +1361,7 @@ bool ChartDatabase::Create(ArrayOfCDI &dir_array, wxProgressDialog *pprog)
 // Update existing ChartTable Database by directory search
 //    resulting in valid pChartTable in (this)
 // ----------------------------------------------------------------------------
-bool ChartDatabase::Update(ArrayOfCDI& dir_array, bool bForce, wxProgressDialog *pprog)
+bool ChartDatabase::Update(ArrayOfCDI& dir_array, bool bForce, wxGenericProgressDialog *pprog)
 {
       m_dir_array = dir_array;
 
@@ -1407,14 +1413,16 @@ bool ChartDatabase::Update(ArrayOfCDI& dir_array, bool bForce, wxProgressDialog 
           if(!active_chartTable[i].GetbValid())
             {
                 active_chartTable.RemoveAt(i);
-                  i--;                 // entry is gone, recheck this index for next entry
+                i--;                 // entry is gone, recheck this index for next entry
             }
       }
 
       //    And once more, setting the Entry index field
-      for(unsigned int i=0 ; i<active_chartTable.GetCount() ; i++)
+      active_chartTable_pathindex.clear();
+      for(unsigned int i=0 ; i<active_chartTable.GetCount() ; i++) {
+          active_chartTable_pathindex[wxString(active_chartTable[i].GetpFullPath(), wxConvUTF8)] = i;
           active_chartTable[i].SetEntryOffset( i );
-
+      }
 
       m_nentries = active_chartTable.GetCount();
       
@@ -1428,6 +1436,7 @@ bool ChartDatabase::Update(ArrayOfCDI& dir_array, bool bForce, wxProgressDialog 
 
 int ChartDatabase::FinddbIndex(wxString PathToFind)
 {
+#if 0
       //    Find the chart
       for(unsigned int i=0 ; i<active_chartTable.GetCount() ; i++)
       {
@@ -1437,6 +1446,10 @@ int ChartDatabase::FinddbIndex(wxString PathToFind)
                   return i;
             }
       }
+#else
+      if(active_chartTable_pathindex.find(PathToFind) != active_chartTable_pathindex.end())
+          return active_chartTable_pathindex[PathToFind];
+#endif
 
       return -1;
 }
@@ -1449,19 +1462,13 @@ int ChartDatabase::FinddbIndex(wxString PathToFind)
 
 int ChartDatabase::DisableChart(wxString& PathToDisable)
 {
-      //    Find the chart
-      for(unsigned int i=0 ; i<active_chartTable.GetCount() ; i++)
-      {
-          if(PathToDisable.IsSameAs(wxString(active_chartTable[i].GetpFullPath(), wxConvUTF8)))
-            {
-                ChartTableEntry *pentry = &active_chartTable[i];
-                  pentry->Disable();
-
-                  return 1;
-            }
-      }
-
-      return 0;
+    int index = FinddbIndex(PathToDisable);
+    if( index != -1 ) {
+        ChartTableEntry *pentry = &active_chartTable[index];
+        pentry->Disable();
+        return 1;
+    }
+    return 0;
 }
 
 // ----------------------------------------------------------------------------
@@ -1470,7 +1477,7 @@ int ChartDatabase::DisableChart(wxString& PathToDisable)
 //  If target chart is already in database, mark the entry valid and skip additional processing
 // ----------------------------------------------------------------------------
 
-int ChartDatabase::TraverseDirAndAddCharts(ChartDirInfo& dir_info, wxProgressDialog *pprog, wxString &dir_magic, bool bForce)
+int ChartDatabase::TraverseDirAndAddCharts(ChartDirInfo& dir_info, wxGenericProgressDialog *pprog, wxString &dir_magic, bool bForce)
 {
       //    Extract the true dir name and magic number from the compound string
       wxString dir_path = dir_info.fullpath;
@@ -1554,7 +1561,7 @@ int ChartDatabase::TraverseDirAndAddCharts(ChartDirInfo& dir_info, wxProgressDia
       return nAdd;
 }
 
-bool ChartDatabase::DetectDirChange(const wxString & dir_path, const wxString & magic, wxString &new_magic, wxProgressDialog *pprog)
+bool ChartDatabase::DetectDirChange(const wxString & dir_path, const wxString & magic, wxString &new_magic, wxGenericProgressDialog *pprog)
 {
       if(pprog)
             pprog->SetTitle(_("OpenCPN Directory Scan...."));
@@ -1812,7 +1819,7 @@ WX_DECLARE_STRING_HASH_MAP( int, ChartCollisionsHashMap );
 
 int ChartDatabase::SearchDirAndAddCharts(wxString& dir_name_base,
                                          ChartClassDescriptor &chart_desc,
-                                         wxProgressDialog *pprog)
+                                         wxGenericProgressDialog *pprog)
 {
       wxString msg(_T("Searching directory: "));
       msg += dir_name_base;
@@ -2054,7 +2061,7 @@ int ChartDatabase::SearchDirAndAddCharts(wxString& dir_name_base,
 }
 
 
-bool ChartDatabase::AddChart( wxString &chartfilename, ChartClassDescriptor &chart_desc, wxProgressDialog *pprog,
+bool ChartDatabase::AddChart( wxString &chartfilename, ChartClassDescriptor &chart_desc, wxGenericProgressDialog *pprog,
     int isearch, bool bthis_dir_in_dB)
 {
     bool rv = false;
