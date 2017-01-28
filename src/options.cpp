@@ -4027,9 +4027,13 @@ void options::CreatePanel_Units(size_t parent, int border_size,
                                 _("Show true bearings and headings"));
     bearingsSizer->Add(pCBTrueShow, 0, wxALL, group_item_spacing);
     pCBMagShow = new wxCheckBox(panelUnits, ID_MAGSHOWCHECKBOX,
-                                _("Show magnetic bearings and headings"));
+                                _("Show magnetic bearings and headings."));
     bearingsSizer->Add(pCBMagShow, 0, wxALL, group_item_spacing);
 
+    bearingsSizer->Add(new wxStaticText(panelUnits, wxID_ANY, _("")), labelFlags);
+    
+    bearingsSizer->Add(new wxStaticText(panelUnits, wxID_ANY, _(" To set the magnetic variation manually,\n you must disable the WMM plugin.")));
+    
     //  Mag Heading user variation
     wxBoxSizer* magVarSizer = new wxBoxSizer(wxHORIZONTAL);
     bearingsSizer->Add(magVarSizer, 0, wxALL, group_item_spacing);
@@ -4732,10 +4736,19 @@ void options::CreateControls(void) {
   CreatePanel_TidesCurrents(m_pageCharts, border_size, group_item_spacing);
 
   wxNotebook* nb = dynamic_cast<wxNotebook*>(m_pListbook->GetPage(m_pageCharts));
-  if (nb)
+  if (nb){
+      
+#ifdef __OCPN__OPTIONS_USE_LISTBOOK__      
       nb->Connect(wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGED,
                                   wxListbookEventHandler(options::OnChartsPageChange),
                                   NULL, this);
+#else
+      nb->Connect(wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGED,
+                  wxNotebookEventHandler(options::OnChartsPageChange),
+                  NULL, this);
+      
+#endif
+  }
       
       
   m_pageConnections = CreatePanel(_("Connections"));
@@ -4887,7 +4900,7 @@ void options::SetInitialSettings(void) {
       wxString::Format(_T("%.1f"), g_n_gps_antenna_offset_y));
   m_pOSMinSize->SetValue(wxString::Format(_T("%d"), g_n_ownship_min_mm));
   m_pText_ACRadius->SetValue(
-      wxString::Format(_T("%.2f"), g_n_arrival_circle_radius));
+      wxString::Format(_T("%.3f"), g_n_arrival_circle_radius));
 
   wxString buf;
   if (g_iNavAidRadarRingsNumberVisible > 10)
@@ -6672,7 +6685,7 @@ void options::OnChooseFontColor(wxCommandEvent& event) {
 
 void options::OnChartsPageChange(wxListbookEvent& event) {
   unsigned int i = event.GetSelection();
-
+  
   //    User selected Chart Groups Page?
   //    If so, build the remaining UI elements
   if (2 == i) {  // 2 is the index of "Chart Groups" page
@@ -6692,8 +6705,6 @@ void options::OnChartsPageChange(wxListbookEvent& event) {
     if (!m_bVectorInit)
         SetInitialVectorSettings();
   }
-
-  event.Skip();  // Allow continued event processing
 }
 
 void options::OnPageChange(wxListbookEvent& event) {
@@ -6706,6 +6717,11 @@ void options::OnNBPageChange(wxNotebookEvent& event) {
 
 void options::DoOnPageChange(size_t page) {
   unsigned int i = page;
+
+  //  Sometimes there is a (-1) page selected.
+  if(page > 10)
+      return;
+  
   lastPage = i;
   
   //    User selected Chart Page?
