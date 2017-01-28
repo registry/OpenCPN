@@ -73,7 +73,7 @@
 #include "gshhs.h"
 #include "mygeom.h"
 #include "OCPNPlatform.h"
-#include "version.h"
+#include "main_version.h"
 
 #ifdef __OCPN__ANDROID__
 #include "androidUTIL.h"

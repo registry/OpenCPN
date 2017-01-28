@@ -29,6 +29,14 @@
 #include <wx/curl/base.h>
 #include <wx/filename.h>
 
+#ifndef __WXMSW__
+using namespace std;
+#include <cmath>
+
+#undef wxIsNaN
+#define wxIsNaN std::isnan
+#endif
+
 
 //////////////////////////////////////////////////////////////////////
 // Constants

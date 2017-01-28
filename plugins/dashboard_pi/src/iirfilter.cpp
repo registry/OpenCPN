@@ -1,5 +1,15 @@
 #include "iirfilter.h"
 
+#ifndef __WXMSW__
+using namespace std;
+#include <cmath>
+
+#undef wxIsNaN
+#define wxIsNaN std::isnan
+#endif
+
+
+
 #include <wx/math.h>
 
 iirfilter::iirfilter(double fc, int tp) {

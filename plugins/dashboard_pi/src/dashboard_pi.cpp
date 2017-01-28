@@ -41,6 +41,16 @@
 #include "wxJSON/jsonreader.h"
 #include "wxJSON/jsonwriter.h"
 
+#ifndef __WXMSW__
+using namespace std;
+#include <cmath>
+
+#undef wxIsNaN
+#define wxIsNaN std::isnan
+#endif
+
+
+
 wxFont *g_pFontTitle;
 wxFont *g_pFontData;
 wxFont *g_pFontLabel;

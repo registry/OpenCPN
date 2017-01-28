@@ -45,6 +45,16 @@
 
 #include "wx/tokenzr.h"
 
+#ifndef __WXMSW__
+using namespace std;
+#include <cmath>
+
+#undef wxIsNaN
+#define wxIsNaN std::isnan
+#endif
+
+
+
 double rad2deg(double angle)
 {
       return angle*180.0/M_PI;

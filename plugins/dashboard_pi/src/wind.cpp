@@ -41,6 +41,16 @@
 #endif
 #include "wx/tokenzr.h"
 
+#ifndef __WXMSW__
+using namespace std;
+#include <cmath>
+
+#undef wxIsNaN
+#define wxIsNaN std::isnan
+#endif
+
+
+
 // Display the arrow for MainValue (wind angle)
 // We also want the extra value (wind speed) displayed inside the dial
 

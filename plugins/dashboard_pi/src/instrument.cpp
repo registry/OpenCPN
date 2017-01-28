@@ -34,6 +34,16 @@
 #include "instrument.h"
 #include "wx28compat.h"
 
+#ifndef __WXMSW__
+using namespace std;
+#include <cmath>
+
+#undef wxIsNaN
+#define wxIsNaN std::isnan
+#endif
+
+
+
 //----------------------------------------------------------------
 //
 //    Generic DashboardInstrument Implementation
