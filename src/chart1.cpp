@@ -190,6 +190,7 @@ wxString                  *pdir_list[20];
 int                       g_restore_stackindex;
 int                       g_restore_dbindex;
 double                    g_ChartNotRenderScaleFactor;
+int                       g_nDepthUnitDisplay;
 
 RouteList                 *pRouteList;
 TrackList                 *pTrackList;
@@ -1292,17 +1293,22 @@ void ParseAllENC()
     for(int t = 0; t < thread_count; t++)
         workers[t] = NULL;
     #endif
-        
+    
+    wxGenericProgressDialog *prog = 0;
+    wxSize csz = GetOCPNCanvasWindow()->GetClientSize();
+    
+    if(1){    
         long style =  wxPD_SMOOTH | wxPD_ELAPSED_TIME | wxPD_ESTIMATED_TIME | wxPD_REMAINING_TIME | wxPD_CAN_SKIP ;
         
-        wxGenericProgressDialog *prog = new wxGenericProgressDialog();
+        style |= wxSTAY_ON_TOP;
+        
+        prog = new wxGenericProgressDialog();
         wxFont *qFont = GetOCPNScaledFont(_("Dialog"));
         prog->SetFont( *qFont );
         
         prog->Create(_("OpenCPN ENC Prepare"), _T("Longgggggggggggggggggggggggggggg"), count+1, NULL, style );
         
         // make wider to show long filenames
-        wxSize csz = GetOCPNCanvasWindow()->GetClientSize();
         wxSize sz = prog->GetSize();
         sz.x = csz.x * 8 / 10;
         prog->SetSize( sz );
@@ -1313,8 +1319,8 @@ void ParseAllENC()
         //  Move the Progress dialog out of the center of the screen, so that the SENC creation dialog has a place to be seen.
         int yp = wxMax(0, prog->GetPosition().y - prog->GetSize().y);
         prog->Move( -1, yp );
-        
-        
+    }
+    
         // parse targets
         bool skip = false;
         count = 0;
@@ -1333,15 +1339,18 @@ void ParseAllENC()
             
             wxString msg;
             msg.Printf( _("Distance from Ownship:  %4.0f NMi"), distance);
-            if(sz.x > 600){
-                msg += _T("   Chart:");
-                msg += filename;
-            }
-            
+             
             count++;
             if(wxThread::IsMain()){
-                prog->Update(count, msg, &skip );
-                prog->Raise();
+                if(prog){
+                    wxSize sz = prog->GetSize();
+                    if(sz.x > 600){
+                        msg += _T("   Chart:");
+                        msg += filename;
+                    }
+                    prog->Update(count, msg, &skip );
+                    prog->Raise();
+                }
                 if(skip)
                     break;
             }
@@ -1358,8 +1367,10 @@ void ParseAllENC()
                 
                 if(wxThread::IsMain()){
                     msg.Printf( _("ENC Completed.") );
-                    prog->Update(count, msg, &skip );
-                    prog->Raise();
+                    if(prog){
+                        prog->Update(count, msg, &skip );
+                        prog->Raise();
+                    }
                     if(skip)
                         break;
                 }
@@ -12311,10 +12322,10 @@ void ApplyLocale()
     pConfig->SetPath( _T ( "/AUI" ) );
     pConfig->Read( _T ( "AUIPerspective" ), &perspective );
     
-    
-    
-    g_pi_manager->UnLoadAllPlugIns();
-    g_pi_manager->LoadAllPlugIns( g_Platform->GetPluginDir(), true, false );
+    //  Compliant Plugins will reload their locale message catalog during the Init() method.
+    //  So it is sufficient to simply deactivate, and then re-activate, all "active" plugins.
+    g_pi_manager->DeactivateAllPlugIns();
+    g_pi_manager->UpdatePlugIns();
     
     
     //         // Make sure the perspective saved in the config file is "reasonable"

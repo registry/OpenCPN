@@ -112,6 +112,7 @@ extern double g_UserVar;
 extern int g_chart_zoom_modifier;
 extern int g_NMEAAPBPrecision;
 extern wxString g_TalkerIdText;
+extern int g_nDepthUnitDisplay;
 
 extern wxString* pInit_Chart_Dir;
 extern wxArrayOfConnPrm* g_pConnectionParams;
@@ -2955,8 +2956,8 @@ void options::CreatePanel_Advanced(size_t parent, int border_size,
     itemBoxSizerUI->Add(0, border_size * 3);
     wxStaticText* zoomText =
         new wxStaticText(m_ChartDisplayPage, wxID_ANY,
-                         _("With a lower value, the same zoom level shows a less detailed chart.\n \
-                         With a higher value, the same zoom level shows a more detailed chart."));
+                         _("With a lower value, the same zoom level shows a less detailed chart.\n\
+With a higher value, the same zoom level shows a more detailed chart."));
 
     smallFont = new wxFont(*dialogFont);  // we can't use Smaller() because
                                           // wx2.8 doesn't support it
@@ -4032,7 +4033,6 @@ void options::CreatePanel_Units(size_t parent, int border_size,
 
     bearingsSizer->Add(new wxStaticText(panelUnits, wxID_ANY, _("")), labelFlags);
     
-    bearingsSizer->Add(new wxStaticText(panelUnits, wxID_ANY, _(" To set the magnetic variation manually,\n you must disable the WMM plugin.")));
     
     //  Mag Heading user variation
     wxBoxSizer* magVarSizer = new wxBoxSizer(wxHORIZONTAL);
@@ -4049,6 +4049,16 @@ void options::CreatePanel_Units(size_t parent, int border_size,
 
 	itemStaticTextUserVar2 = new wxStaticText(panelUnits, wxID_ANY, _("deg (-W, +E)"));
     magVarSizer->Add(itemStaticTextUserVar2, 0, wxALL | wxALIGN_CENTRE_VERTICAL, group_item_spacing);
+    
+    bearingsSizer->AddSpacer(10);
+    
+    wxStaticText *varText = new wxStaticText(panelUnits, wxID_ANY, _(" To set the magnetic variation manually,\n you must disable the WMM plugin."));
+    smallFont = new wxFont(*dialogFont);  
+    smallFont->SetPointSize((smallFont->GetPointSize() / 1.2) +  0.5);  // + 0.5 to round instead of truncate
+    varText->SetFont(*smallFont);
+    
+    bearingsSizer->Add(varText);
+    
   }
 }
 
@@ -4746,7 +4756,7 @@ void options::CreateControls(void) {
       nb->Connect(wxEVT_COMMAND_NOTEBOOK_PAGE_CHANGED,
                   wxNotebookEventHandler(options::OnChartsPageChange),
                   NULL, this);
-      
+
 #endif
   }
       
@@ -5044,6 +5054,9 @@ void options::SetInitialSettings(void) {
 
   m_TalkerIdText->SetValue(g_TalkerIdText.MakeUpper());
 
+  pDepthUnitSelect->SetSelection(g_nDepthUnitDisplay);
+  UpdateOptionsUnits();  // sets depth values using the user's unit preference
+  
   SetInitialVectorSettings();
 
   pToolbarAutoHideCB->SetValue(g_bAutoHideToolbar);
@@ -5207,9 +5220,6 @@ void options::SetInitialVectorSettings(void)
         else
             p24Color->SetSelection(1);
         
-        // Depths
-            pDepthUnitSelect->SetSelection(ps52plib->m_nDepthUnitDisplay);
-            UpdateOptionsUnits();  // sets depth values using the user's unit preference
     }
 #endif
 }
@@ -5255,13 +5265,15 @@ void options::UpdateOptionsUnits(void) {
   //disable input for variation if WMM is available
   bool havewmm = g_pi_manager && g_pi_manager->IsPlugInAvailable(_T("WMM"));
   if(havewmm)
-      itemStaticTextUserVar->SetLabel(_("WMM Plugin for magnetic variation"));
+      itemStaticTextUserVar->SetLabel(_("WMM Plugin calculated magnetic variation"));
   else
-      itemStaticTextUserVar->SetLabel(_("Assumed magnetic variation"));
+      itemStaticTextUserVar->SetLabel(_("User set magnetic variation"));
 
   // size hack to adjust change in static text size
+#ifdef __WXMSW__      
   wxSize sz = this->GetSize(); this->SetSize(sz.x+1, sz.y); this->SetSize(sz);
-
+#endif
+  
   itemStaticTextUserVar2->Enable(!havewmm);
   pMagVar->Enable(!havewmm);
 } 
@@ -6029,6 +6041,9 @@ void options::OnApplyClick(wxCommandEvent& event) {
     pOLE->nViz = ps57CtlListBox->IsChecked(iPtr);
   }
 
+  int depthUnit = pDepthUnitSelect->GetSelection();
+  g_nDepthUnitDisplay = depthUnit;
+  
   if (ps52plib) {
     if (m_returnChanges & GL_CHANGED) {
       // Do this now to handle the screen refresh that is automatically
@@ -6078,7 +6093,6 @@ void options::OnApplyClick(wxCommandEvent& event) {
 
     // Depths
     double dval;
-    int depthUnit = pDepthUnitSelect->GetSelection();
     float conv = 1;
 
     if (depthUnit == 0)  // feet
@@ -6101,6 +6115,7 @@ void options::OnApplyClick(wxCommandEvent& event) {
 
     ps52plib->UpdateMarinerParams();
     ps52plib->m_nDepthUnitDisplay = depthUnit;
+    
     ps52plib->GenerateStateHash();
   }
 #endif
@@ -6247,7 +6262,15 @@ void options::OnButtonParseENC(wxCommandEvent &event)
     cc1->EnablePaint(false);
     
     extern void ParseAllENC();
+#ifdef __WXOSX__
+    HideWithEffect(wxSHOW_EFFECT_BLEND );
+#endif
+        
     ParseAllENC();
+#ifdef __WXOSX__
+    ShowWithEffect(wxSHOW_EFFECT_BLEND );
+#endif
+    
     ViewPort vp;
     gFrame->ChartsRefresh(-1, vp, true);
     
@@ -6705,6 +6728,8 @@ void options::OnChartsPageChange(wxListbookEvent& event) {
     if (!m_bVectorInit)
         SetInitialVectorSettings();
   }
+  
+  event.Skip();  // Allow continued event processing
 }
 
 void options::OnPageChange(wxListbookEvent& event) {
