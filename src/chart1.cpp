@@ -700,6 +700,7 @@ bool             g_bGLexpert;
 bool             g_bUIexpert;
 
 int              g_chart_zoom_modifier;
+int              g_chart_zoom_modifier_vector;
 
 int              g_NMEAAPBPrecision;
 
@@ -1375,6 +1376,7 @@ void ParseAllENC()
                         break;
                 }
                 
+                
             }
             
             
@@ -1396,7 +1398,11 @@ void ParseAllENC()
                     wxThread::Sleep(1); /* wait for a worker to finish */
                 }
             }
-            #endif        
+            #endif 
+            
+#ifdef __WXMSW__            
+            ::wxSafeYield();
+#endif            
         }
         
         #if 0    
@@ -5137,35 +5143,7 @@ void MyFrame::ApplyGlobalSettings( bool bFlyingUpdate, bool bnewtoolbar )
 
     SendSizeEvent();
 
-    /*
-     * Menu Bar - add or remove it if necessary, and update the state of the menu items
-     */
-#ifdef __WXOSX__
-    bool showMenuBar = true;    // the menu bar is always visible in OS X
-#else
-    bool showMenuBar = pConfig->m_bShowMenuBar; // get visibility from options
-
-    if (!showMenuBar && g_bTempShowMenuBar)     // allows pressing alt to temporarily show
-        showMenuBar = true;
-#endif
-
-    if ( showMenuBar ) {
-        //  Menu bar has some dependencies on S52 PLIB, so be sure it is loaded.
-        LoadS57();
-        
-        if ( !m_pMenuBar ) {    // add the menu bar if it is enabled
-            m_pMenuBar = new wxMenuBar();
-            RegisterGlobalMenuItems();
-            SetMenuBar(m_pMenuBar); // must be after RegisterGlobalMenuItems for wx to populate the OS X App Menu correctly
-        }
-        UpdateGlobalMenuItems(); // update the state of the menu items (checkmarks etc)
-    } else {
-        if ( m_pMenuBar ) {     // remove the menu bar if it is disabled
-            SetMenuBar( NULL );
-            m_pMenuBar->Destroy();
-            m_pMenuBar = NULL;
-        }
-    }
+    BuildMenuBar();
 
     SendSizeEvent();
 
@@ -5183,6 +5161,40 @@ wxString _menuText( wxString name, wxString shortcut ) {
     if(!g_bresponsive)
         menutext << _T("\t") << shortcut;
     return menutext;
+}
+
+void MyFrame::BuildMenuBar( void )
+{
+    /*
+     * Menu Bar - add or remove it if necessary, and update the state of the menu items
+     */
+#ifdef __WXOSX__
+    bool showMenuBar = true;    // the menu bar is always visible in OS X
+#else
+    bool showMenuBar = pConfig->m_bShowMenuBar; // get visibility from options
+    
+    if (!showMenuBar && g_bTempShowMenuBar)     // allows pressing alt to temporarily show
+        showMenuBar = true;
+#endif
+        
+    if ( showMenuBar ) {
+        //  Menu bar has some dependencies on S52 PLIB, so be sure it is loaded.
+        LoadS57();
+            
+        if ( !m_pMenuBar ) {    // add the menu bar if it is enabled
+            m_pMenuBar = new wxMenuBar();
+            RegisterGlobalMenuItems();
+            SetMenuBar(m_pMenuBar); // must be after RegisterGlobalMenuItems for wx to populate the OS X App Menu correctly
+        }
+
+        UpdateGlobalMenuItems(); // update the state of the menu items (checkmarks etc)
+    } else {
+        if ( m_pMenuBar ) {     // remove the menu bar if it is disabled
+            SetMenuBar( NULL );
+            m_pMenuBar->Destroy();
+            m_pMenuBar = NULL;
+        }
+    }
 }
 
 void MyFrame::RegisterGlobalMenuItems()
@@ -12315,6 +12327,13 @@ void ApplyLocale()
         g_pAISTargetList = NULL;
     }
     
+    //  Process the menubar, if present.
+    if ( gFrame->m_pMenuBar ) {     // remove the menu bar if it is presently enabled
+            gFrame->SetMenuBar( NULL );
+            gFrame->m_pMenuBar->Destroy();
+            gFrame->m_pMenuBar = NULL;
+    }
+    gFrame->BuildMenuBar();
     
     // Capture a copy of the current perspective
     //  So that we may restore PlugIn window sizes, position, visibility, etc.

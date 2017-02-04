@@ -109,7 +109,9 @@ extern bool g_bopengl;
 extern bool g_bsmoothpanzoom;
 extern bool g_bShowTrue, g_bShowMag;
 extern double g_UserVar;
+extern double gVar;
 extern int g_chart_zoom_modifier;
+extern int g_chart_zoom_modifier_vector;
 extern int g_NMEAAPBPrecision;
 extern wxString g_TalkerIdText;
 extern int g_nDepthUnitDisplay;
@@ -1009,6 +1011,9 @@ void options::Init(void) {
   m_stBTPairs = 0;
   m_choiceBTDataSources = 0;
 
+  b_haveWMM = g_pi_manager && g_pi_manager->IsPlugInAvailable(_T("WMM"));
+  b_oldhaveWMM = b_haveWMM;
+  
   lastPage = 0;
 
   // for deferred loading
@@ -2823,8 +2828,7 @@ void options::CreatePanel_Advanced(size_t parent, int border_size,
 
     // Chart Zoom Scale Weighting
     itemBoxSizerUI->Add(new wxStaticText(m_ChartDisplayPage, wxID_ANY,
-                                         _("Chart Zoom/Scale Weighting")),
-                        0, wxEXPAND);
+                                         _("Chart Zoom/Scale Weighting")), 0, wxEXPAND);
     m_pSlider_Zoom = new wxSlider(
         m_ChartDisplayPage, ID_CM93ZOOM, 0, -5, 5, wxDefaultPosition,
         wxSize(300, 50), wxSL_HORIZONTAL | wxSL_AUTOTICKS | wxSL_LABELS);
@@ -2936,15 +2940,17 @@ void options::CreatePanel_Advanced(size_t parent, int border_size,
         inputFlags);
 
     // spacer
-    itemBoxSizerUI->Add(0, border_size * 3);
-    itemBoxSizerUI->Add(0, border_size * 3);
+    itemBoxSizerUI->Add(0, border_size * 8);
+    itemBoxSizerUI->Add(0, border_size * 8);
 
+    wxStaticText* zoomTextHead =  new wxStaticText(m_ChartDisplayPage, wxID_ANY, _("Chart Zoom/Scale Weighting"));
+    itemBoxSizerUI->Add(zoomTextHead, labelFlags);
+    itemBoxSizerUI->Add(0, border_size * 1);
+    
+    
     // Chart Zoom Scale Weighting
-    itemBoxSizerUI->Add(new wxStaticText(m_ChartDisplayPage, wxID_ANY,
-                                         _("Chart Zoom/Scale Weighting")),
-                        labelFlags);
-    m_pSlider_Zoom = new wxSlider(
-        m_ChartDisplayPage, ID_CM93ZOOM, 0, -5, 5, wxDefaultPosition,
+    itemBoxSizerUI->Add(new wxStaticText(m_ChartDisplayPage, wxID_ANY, _("Raster")), labelFlags);
+    m_pSlider_Zoom = new wxSlider(m_ChartDisplayPage, ID_CM93ZOOM, 0, -5, 5, wxDefaultPosition,
         wxSize(300, 50), wxSL_HORIZONTAL | wxSL_AUTOTICKS | wxSL_LABELS);
 
 #ifdef __OCPN__ANDROID__
@@ -2953,6 +2959,16 @@ void options::CreatePanel_Advanced(size_t parent, int border_size,
 
     itemBoxSizerUI->Add(m_pSlider_Zoom, inputFlags);
 
+    itemBoxSizerUI->Add(new wxStaticText(m_ChartDisplayPage, wxID_ANY, _("Vector")), labelFlags);
+    m_pSlider_Zoom_Vector = new wxSlider(m_ChartDisplayPage, ID_VECZOOM, 0, -5, 5, wxDefaultPosition,
+        wxSize(300, 50), wxSL_HORIZONTAL | wxSL_AUTOTICKS | wxSL_LABELS);
+    
+#ifdef __OCPN__ANDROID__
+    m_pSlider_Zoom_Vector->GetHandle()->setStyleSheet(getQtStyleSheet());
+#endif
+    
+    itemBoxSizerUI->Add(m_pSlider_Zoom_Vector, inputFlags);
+    
     itemBoxSizerUI->Add(0, border_size * 3);
     wxStaticText* zoomText =
         new wxStaticText(m_ChartDisplayPage, wxID_ANY,
@@ -2967,8 +2983,8 @@ With a higher value, the same zoom level shows a more detailed chart."));
     itemBoxSizerUI->Add(zoomText, 0, wxALL | wxEXPAND, group_item_spacing);
 
     // spacer
-    itemBoxSizerUI->Add(0, border_size * 3);
-    itemBoxSizerUI->Add(0, border_size * 3);
+    itemBoxSizerUI->Add(0, border_size * 8);
+    itemBoxSizerUI->Add(0, border_size * 8);
 
     // Control Options
     itemBoxSizerUI->Add(
@@ -4031,15 +4047,16 @@ void options::CreatePanel_Units(size_t parent, int border_size,
                                 _("Show magnetic bearings and headings."));
     bearingsSizer->Add(pCBMagShow, 0, wxALL, group_item_spacing);
 
-    bearingsSizer->Add(new wxStaticText(panelUnits, wxID_ANY, _("")), labelFlags);
+    bearingsSizer->Add(new wxStaticText(panelUnits, wxID_ANY, _T("")), labelFlags);
     
     
     //  Mag Heading user variation
     wxBoxSizer* magVarSizer = new wxBoxSizer(wxHORIZONTAL);
     bearingsSizer->Add(magVarSizer, 0, wxALL, group_item_spacing);
 
-    itemStaticTextUserVar =
-        new wxStaticText(panelUnits, wxID_ANY, wxEmptyString);
+    itemStaticTextUserVar = new wxStaticText(panelUnits, wxID_ANY, wxEmptyString);
+    itemStaticTextUserVar->SetLabel(_("WMM Plugin calculated magnetic variation"));
+        
     magVarSizer->Add(itemStaticTextUserVar, 0, wxALL | wxALIGN_CENTRE_VERTICAL,
                      group_item_spacing);
 
@@ -4822,6 +4839,8 @@ void options::SetInitialSettings(void) {
   m_returnChanges = 0;                  // reset the flags
   m_bfontChanged = false;
   
+  b_oldhaveWMM = b_haveWMM;
+  b_haveWMM = g_pi_manager && g_pi_manager->IsPlugInAvailable(_T("WMM"));
   
   // ChartsLoad
   int nDir = m_CurrentDirList.GetCount();
@@ -4875,9 +4894,34 @@ void options::SetInitialSettings(void) {
   pCBTrueShow->SetValue(g_bShowTrue);
   pCBMagShow->SetValue(g_bShowMag);
 
-  s.Printf(_T("%4.1f"), g_UserVar);
-  pMagVar->SetValue(s);
-
+  int oldLength = itemStaticTextUserVar->GetLabel().Length();
+  
+  //disable input for variation if WMM is available
+  if(b_haveWMM){
+      itemStaticTextUserVar->SetLabel(_("WMM Plugin calculated magnetic variation"));
+      wxString s;
+      s.Printf(_T("%4.1f"), gVar);
+      pMagVar->SetValue(s);
+  }
+  else{
+      itemStaticTextUserVar->SetLabel(_("User set magnetic variation"));
+      wxString s;
+      s.Printf(_T("%4.1f"), g_UserVar);
+      pMagVar->SetValue(s);
+  }
+  
+  int newLength = itemStaticTextUserVar->GetLabel().Length();
+  
+  // size hack to adjust change in static text size
+  if( (newLength != oldLength) || (b_oldhaveWMM != b_haveWMM) ){
+      wxSize sz = GetSize();
+      SetSize(sz.x+1, sz.y);
+      SetSize(sz);
+  }
+  
+  itemStaticTextUserVar2->Enable(!b_haveWMM);
+  pMagVar->Enable(!b_haveWMM);
+  
   pSDisplayGrid->SetValue(g_bDisplayGrid);
 
   pCBCourseUp->SetValue(g_bCourseUp);
@@ -5035,7 +5079,8 @@ void options::SetInitialSettings(void) {
   m_pCheck_Rollover_CPA->SetValue(g_bAISRolloverShowCPA);
 
   m_pSlider_Zoom->SetValue(g_chart_zoom_modifier);
-
+  m_pSlider_Zoom_Vector->SetValue(g_chart_zoom_modifier_vector);
+  
   m_pSlider_GUI_Factor->SetValue(g_GUIScaleFactor);
   m_pSlider_Chart_Factor->SetValue(g_ChartScaleFactor);
 
@@ -5261,21 +5306,35 @@ void options::UpdateOptionsUnits(void) {
   s.Trim(FALSE);
   m_DeepCtl->SetValue(s);
 #endif
+/*
+  int oldLength = itemStaticTextUserVar->GetLabel().Length();
 
   //disable input for variation if WMM is available
-  bool havewmm = g_pi_manager && g_pi_manager->IsPlugInAvailable(_T("WMM"));
-  if(havewmm)
+  if(b_haveWMM){
       itemStaticTextUserVar->SetLabel(_("WMM Plugin calculated magnetic variation"));
-  else
+      wxString s;
+      s.Printf(_T("%4.1f"), gVar);
+      pMagVar->SetValue(s);
+  }
+  else{
       itemStaticTextUserVar->SetLabel(_("User set magnetic variation"));
+      wxString s;
+      s.Printf(_T("%4.1f"), g_UserVar);
+      pMagVar->SetValue(s);
+  }
 
-  // size hack to adjust change in static text size
-#ifdef __WXMSW__      
-  wxSize sz = this->GetSize(); this->SetSize(sz.x+1, sz.y); this->SetSize(sz);
-#endif
+  int newLength = itemStaticTextUserVar->GetLabel().Length();
   
-  itemStaticTextUserVar2->Enable(!havewmm);
-  pMagVar->Enable(!havewmm);
+  // size hack to adjust change in static text size
+  if( (newLength != oldLength) || (b_oldhaveWMM != b_haveWMM) ){
+    wxSize sz = GetSize();
+    SetSize(sz.x+1, sz.y);
+    SetSize(sz);
+  }
+  
+  itemStaticTextUserVar2->Enable(!b_haveWMM);
+  pMagVar->Enable(!b_haveWMM);
+*/  
 } 
 
 void options::OnSizeAutoButton(wxCommandEvent& event) {
@@ -5894,7 +5953,10 @@ void options::OnApplyClick(wxCommandEvent& event) {
 
   g_bShowTrue = pCBTrueShow->GetValue();
   g_bShowMag = pCBMagShow->GetValue();
-  pMagVar->GetValue().ToDouble(&g_UserVar);
+  
+  b_haveWMM = g_pi_manager && g_pi_manager->IsPlugInAvailable(_T("WMM"));
+  if(!b_haveWMM  && !b_oldhaveWMM)
+    pMagVar->GetValue().ToDouble(&g_UserVar);
 
   m_pText_OSCOG_Predictor->GetValue().ToDouble(&g_ownship_predictor_minutes);
   m_pText_OSHDT_Predictor->GetValue().ToDouble(&g_ownship_HDTpredictor_miles);
@@ -6012,6 +6074,7 @@ void options::OnApplyClick(wxCommandEvent& event) {
   g_bAISRolloverShowCPA = m_pCheck_Rollover_CPA->GetValue();
 
   g_chart_zoom_modifier = m_pSlider_Zoom->GetValue();
+  g_chart_zoom_modifier_vector = m_pSlider_Zoom_Vector->GetValue();
   g_GUIScaleFactor = m_pSlider_GUI_Factor->GetValue();
   g_ChartScaleFactor = m_pSlider_Chart_Factor->GetValue();
   g_ChartScaleFactorExp =
@@ -6183,7 +6246,8 @@ void options::OnApplyClick(wxCommandEvent& event) {
 
     //  We can clear a few flag bits on "Apply", so they won't be recognised at the "OK" click.
     //  Their actions have already been accomplished once...
-    m_returnChanges &= ~( FORCE_UPDATE | SCAN_UPDATE );
+    m_returnChanges &= ~( CHANGE_CHARTS | FORCE_UPDATE | SCAN_UPDATE );
+    k_charts = 0;
     
     cc1->ReloadVP();
   }
