@@ -5741,7 +5741,14 @@ int MyFrame::ProcessOptionsDialog( int rr, ArrayOfCDI *pNewDirArray )
     
     //  The zoom-scale factor may have changed
     //  so, trigger a recalculation of the reference chart
+    
+    bool ztc = g_bEnableZoomToCursor;     // record the present state 
+    g_bEnableZoomToCursor = false;        // since we don't want to pan to an unknown cursor position
+    
     cc1->DoZoomCanvas(1.0001);
+    
+    g_bEnableZoomToCursor = ztc;
+    
 
     return 0;
 }
@@ -9074,7 +9081,7 @@ void MyFrame::OnEvtOCPN_NMEA( OCPN_DataStreamEvent & event )
     if( m_NMEA0183.PreParse() )
     {
         wxString IDs[] = {_T("RMC"), _T("HDT"), _T("HDG"), _T("HDM"),
-                          _T("VTG"), _T("GSV"), _T("GLL"), _T("GGA")};
+                          _T("VTG"), _T("GSV"), _T("GGA"), _T("GLL")};
         enum {RMC, HDT, HDG, HDM, VTG, GSV, GGA, GLL, ID_NUM };
 
         int id;
