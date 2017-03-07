@@ -506,6 +506,7 @@ bool PlugInManager::CallLateInit(void)
             case 111:
             case 112:
             case 113:
+            case 114:
                 if(pic->m_cap_flag & WANTS_LATE_INIT) {
                     wxString msg(_T("PlugInManager: Calling LateInit PlugIn: "));
                     msg += pic->m_plugin_file;
@@ -537,6 +538,7 @@ void PlugInManager::SendVectorChartObjectInfo(const wxString &chart, const wxStr
                 {
                 case 112:
                 case 113:
+                case 114:
                 {
                     opencpn_plugin_112 *ppi = dynamic_cast<opencpn_plugin_112 *>(pic->m_pplugin);
                     if(ppi)
@@ -1296,6 +1298,10 @@ PlugInContainer *PlugInManager::LoadPlugIn(wxString plugin_file)
     case 113:
         pic->m_pplugin = dynamic_cast<opencpn_plugin_113*>(plug_in);
         break;
+
+    case 114:
+        pic->m_pplugin = dynamic_cast<opencpn_plugin_114*>(plug_in);
+        break;
         
     default:
         break;
@@ -1360,6 +1366,7 @@ bool PlugInManager::RenderAllCanvasOverlayPlugIns( ocpnDC &dc, const ViewPort &v
                     case 111:
                     case 112:
                     case 113:
+                    case 114:
                     {
                         opencpn_plugin_18 *ppi = dynamic_cast<opencpn_plugin_18 *>(pic->m_pplugin);
                         if(ppi)
@@ -1412,6 +1419,7 @@ bool PlugInManager::RenderAllCanvasOverlayPlugIns( ocpnDC &dc, const ViewPort &v
                     case 111:
                     case 112:
                     case 113:
+                    case 114:
                     {
                         opencpn_plugin_18 *ppi = dynamic_cast<opencpn_plugin_18 *>(pic->m_pplugin);
                         if(ppi)
@@ -1474,6 +1482,7 @@ bool PlugInManager::RenderAllGLCanvasOverlayPlugIns( wxGLContext *pcontext, cons
                 case 111:
                 case 112:
                 case 113:
+                case 114:
                 {
                     opencpn_plugin_18 *ppi = dynamic_cast<opencpn_plugin_18 *>(pic->m_pplugin);
                     if(ppi)
@@ -1504,6 +1513,7 @@ bool PlugInManager::SendMouseEventToPlugins( wxMouseEvent &event)
                 {
                     case 112:
                     case 113:
+                    case 114:
                     {
                         opencpn_plugin_112 *ppi = dynamic_cast<opencpn_plugin_112*>(pic->m_pplugin);
                             if(ppi)
@@ -1536,6 +1546,7 @@ bool PlugInManager::SendKeyEventToPlugins( wxKeyEvent &event)
                     switch(pic->m_api_version)
                     {
                         case 113:
+                        case 114:
                         {
                             opencpn_plugin_113 *ppi = dynamic_cast<opencpn_plugin_113*>(pic->m_pplugin);
                             if(ppi && ppi->KeyboardEventHook( event ))
@@ -1597,6 +1608,7 @@ void NotifySetupOptionsPlugin( PlugInContainer *pic )
             case 111:
             case 112:
             case 113:
+            case 114:
             {
                 opencpn_plugin_19 *ppi = dynamic_cast<opencpn_plugin_19 *>(pic->m_pplugin);
                 if(ppi) {
@@ -1772,6 +1784,7 @@ void PlugInManager::SendMessageToAllPlugins(const wxString &message_id, const wx
                 case 111:
                 case 112:
                 case 113:
+                case 114:
                 {
                     opencpn_plugin_18 *ppi = dynamic_cast<opencpn_plugin_18 *>(pic->m_pplugin);
                     if(ppi)
@@ -1850,6 +1863,7 @@ void PlugInManager::SendPositionFixToAllPlugIns(GenericPosDatEx *ppos)
                 case 111:
                 case 112:
                 case 113:
+                case 114:
                 {
                     opencpn_plugin_18 *ppi = dynamic_cast<opencpn_plugin_18 *>(pic->m_pplugin);
                     if(ppi)
@@ -3713,6 +3727,18 @@ bool opencpn_plugin_113::KeyboardEventHook( wxKeyEvent &event )
 
 void opencpn_plugin_113::OnToolbarToolDownCallback(int id) {}
 void opencpn_plugin_113::OnToolbarToolUpCallback(int id) {}
+
+
+//    Opencpn_Plugin_114 Implementation
+opencpn_plugin_114::opencpn_plugin_114(void *pmgr)
+: opencpn_plugin_113(pmgr)
+{
+}
+
+opencpn_plugin_114::~opencpn_plugin_114(void)
+{
+}
+
 
 //          Helper and interface classes
 
@@ -6310,3 +6336,25 @@ bool PlugInManager::HandleCurlThreadError(wxCurlThreadError err, wxCurlBaseThrea
 }
 #endif
 #endif
+
+/* API 1.14 */
+
+void PlugInAISDrawGL( wxGLCanvas* glcanvas, const PlugIn_ViewPort &vp )
+{
+  ViewPort ocpn_vp = CreateCompatibleViewport(vp);
+
+  ocpnDC dc(*glcanvas);
+
+  AISDraw(dc, ocpn_vp, NULL);
+}
+
+wxColour PlugInGetFontColor(const wxString TextElement)
+{
+  return FontMgr::Get().GetFontColor(TextElement);
+}
+
+bool PlugInSetFontColor(const wxString TextElement, const wxColour color)
+{
+  return FontMgr::Get().SetFontColor(TextElement, color);
+}
+
