@@ -1017,6 +1017,8 @@ void options::Init(void) {
   
   lastPage = 0;
 
+  m_cs = (ColorScheme) 0;
+  
   // for deferred loading
   m_pPlugInCtrl = NULL;
   m_pNMEAForm = NULL;
@@ -4165,14 +4167,16 @@ void options::CreatePanel_AIS(size_t parent, int border_size,
   pLostGrid->Add(m_pText_Mark_Lost, 1, wxALL | wxALIGN_RIGHT,
                  group_item_spacing);
 
-  m_pCheck_Remove_Lost =
-      new wxCheckBox(panelAIS, -1, _("Remove lost targets after (min)"));
+  m_pCheck_Remove_Lost = new wxCheckBox(panelAIS, -1, _("Remove lost targets after (min)"));
   pLostGrid->Add(m_pCheck_Remove_Lost, 1, wxALL, group_item_spacing);
 
   m_pText_Remove_Lost = new wxTextCtrl(panelAIS, -1);
   pLostGrid->Add(m_pText_Remove_Lost, 1, wxALL | wxALIGN_RIGHT,
                  group_item_spacing);
 
+  if(g_bInlandEcdis)
+      lostSizer->Hide(pLostGrid, true);
+  
   //      Display
   wxStaticBox* displBox = new wxStaticBox(panelAIS, wxID_ANY, _("Display"));
   wxStaticBoxSizer* displSizer = new wxStaticBoxSizer(displBox, wxHORIZONTAL);
@@ -4462,7 +4466,7 @@ void options::CreatePanel_UI(size_t parent, int border_size,
   miscOptions->Add(pResponsive, 0, wxALL, border_size);
 
   pInlandEcdis = new wxCheckBox(itemPanelFont, ID_INLANDECDISBOX,
-                                _("Use Settings for Inland ECDIS"));
+                                _("Use Settings for Inland ECDIS Version 2.3"));
   miscOptions->Add(pInlandEcdis, 0, wxALL, border_size);
   
   miscOptions->AddSpacer(10);
@@ -4499,6 +4503,116 @@ void options::CreatePanel_UI(size_t parent, int border_size,
   
   miscOptions->AddSpacer(20);
 }
+
+void options::CreateListbookIcons()
+{
+    ocpnStyle::Style* style = g_StyleManager->GetCurrentStyle();
+    
+    if(!g_bresponsive){
+        m_topImgList = new wxImageList(40, 40, TRUE, 1);
+        
+        #if wxCHECK_VERSION(2, 8, 12)
+        m_topImgList->Add(style->GetIcon(_T("Display")));
+        m_topImgList->Add(style->GetIcon(_T("Charts")));
+        m_topImgList->Add(style->GetIcon(_T("Connections")));
+        m_topImgList->Add(style->GetIcon(_T("Ship")));
+        m_topImgList->Add(style->GetIcon(_T("UI")));
+        m_topImgList->Add(style->GetIcon(_T("Plugins")));
+        #else
+        wxBitmap bmp;
+        wxImage img;
+        bmp = style->GetIcon(_T("Display"));
+        img = bmp.ConvertToImage();
+        img.ConvertAlphaToMask(128);
+        bmp = wxBitmap(img);
+        m_topImgList->Add(bmp);
+        bmp = style->GetIcon(_T("Charts"));
+        img = bmp.ConvertToImage();
+        img.ConvertAlphaToMask(128);
+        bmp = wxBitmap(img);
+        m_topImgList->Add(bmp);
+        bmp = style->GetIcon(_T("Connections"));
+        img = bmp.ConvertToImage();
+        img.ConvertAlphaToMask(128);
+        bmp = wxBitmap(img);
+        m_topImgList->Add(bmp);
+        bmp = style->GetIcon(_T("Ship"));
+        img = bmp.ConvertToImage();
+        img.ConvertAlphaToMask(128);
+        bmp = wxBitmap(img);
+        m_topImgList->Add(bmp);
+        bmp = style->GetIcon(_T("UI"));
+        img = bmp.ConvertToImage();
+        img.ConvertAlphaToMask(128);
+        bmp = wxBitmap(img);
+        m_topImgList->Add(bmp);
+        bmp = style->GetIcon(_T("Plugins"));
+        img = bmp.ConvertToImage();
+        img.ConvertAlphaToMask(128);
+        bmp = wxBitmap(img);
+        m_topImgList->Add(bmp);
+        #endif
+    }
+    else{
+        wxBitmap bmps;
+        bmps = style->GetIcon(_T("Display"));
+        int base_size = bmps.GetWidth();
+        double tool_size = base_size;
+        
+        double premult = 1.0;
+        
+        // unless overridden by user, we declare the "best" size
+        // to be roughly 6 mm square.
+        double target_size = 6.0;                // mm
+        
+        double basic_tool_size_mm = tool_size / g_Platform->GetDisplayDPmm();
+        premult = target_size / basic_tool_size_mm;
+        
+        //Adjust the scale factor using the global GUI scale parameter
+        double postmult =  exp( g_GUIScaleFactor * (0.693 / 5.0) );       //  exp(2)
+        postmult = wxMin(postmult, 3.0);
+        postmult = wxMax(postmult, 1.0);
+        
+        int sizeTab = base_size * postmult * premult;
+        
+        m_topImgList = new wxImageList(sizeTab, sizeTab, TRUE, 1);
+        
+        wxBitmap bmp;
+        wxImage img, simg;
+        bmp = style->GetIcon(_T("Display"));
+        img = bmp.ConvertToImage();
+        simg = img.Scale(sizeTab, sizeTab);
+        bmp = wxBitmap(simg);
+        m_topImgList->Add(bmp);
+        bmp = style->GetIcon(_T("Charts"));
+        img = bmp.ConvertToImage();
+        simg = img.Scale(sizeTab, sizeTab);
+        bmp = wxBitmap(simg);
+        m_topImgList->Add(bmp);
+        bmp = style->GetIcon(_T("Connections"));
+        img = bmp.ConvertToImage();
+        simg = img.Scale(sizeTab, sizeTab);
+        bmp = wxBitmap(simg);
+        m_topImgList->Add(bmp);
+        bmp = style->GetIcon(_T("Ship"));
+        img = bmp.ConvertToImage();
+        simg = img.Scale(sizeTab, sizeTab);
+        bmp = wxBitmap(simg);
+        m_topImgList->Add(bmp);
+        bmp = style->GetIcon(_T("UI"));
+        img = bmp.ConvertToImage();
+        simg = img.Scale(sizeTab, sizeTab);
+        bmp = wxBitmap(simg);
+        m_topImgList->Add(bmp);
+        bmp = style->GetIcon(_T("Plugins"));
+        img = bmp.ConvertToImage();
+        simg = img.Scale(sizeTab, sizeTab);
+        bmp = wxBitmap(simg);
+        m_topImgList->Add(bmp);
+    }
+    
+}
+
 
 void options::CreateControls(void) {
   int border_size = 4;
@@ -4629,117 +4743,10 @@ void options::CreateControls(void) {
   }
 #endif
 
-//  m_topImgList = new wxImageList(40, 40, TRUE, 1);
-  ocpnStyle::Style* style = g_StyleManager->GetCurrentStyle();
-
-  if(!g_bresponsive){
-    m_topImgList = new wxImageList(40, 40, TRUE, 1);
-
-#if wxCHECK_VERSION(2, 8, 12)
-    m_topImgList->Add(style->GetIcon(_T("Display")));
-    m_topImgList->Add(style->GetIcon(_T("Charts")));
-    m_topImgList->Add(style->GetIcon(_T("Connections")));
-    m_topImgList->Add(style->GetIcon(_T("Ship")));
-    m_topImgList->Add(style->GetIcon(_T("UI")));
-    m_topImgList->Add(style->GetIcon(_T("Plugins")));
-#else
-    wxBitmap bmp;
-    wxImage img;
-    bmp = style->GetIcon(_T("Display"));
-    img = bmp.ConvertToImage();
-    img.ConvertAlphaToMask(128);
-    bmp = wxBitmap(img);
-    m_topImgList->Add(bmp);
-    bmp = style->GetIcon(_T("Charts"));
-    img = bmp.ConvertToImage();
-    img.ConvertAlphaToMask(128);
-    bmp = wxBitmap(img);
-    m_topImgList->Add(bmp);
-    bmp = style->GetIcon(_T("Connections"));
-    img = bmp.ConvertToImage();
-    img.ConvertAlphaToMask(128);
-    bmp = wxBitmap(img);
-    m_topImgList->Add(bmp);
-    bmp = style->GetIcon(_T("Ship"));
-    img = bmp.ConvertToImage();
-    img.ConvertAlphaToMask(128);
-    bmp = wxBitmap(img);
-    m_topImgList->Add(bmp);
-    bmp = style->GetIcon(_T("UI"));
-    img = bmp.ConvertToImage();
-    img.ConvertAlphaToMask(128);
-    bmp = wxBitmap(img);
-    m_topImgList->Add(bmp);
-    bmp = style->GetIcon(_T("Plugins"));
-    img = bmp.ConvertToImage();
-    img.ConvertAlphaToMask(128);
-    bmp = wxBitmap(img);
-    m_topImgList->Add(bmp);
-#endif
-  }
-  else{
-    wxBitmap bmps;
-    bmps = style->GetIcon(_T("Display"));
-    int base_size = bmps.GetWidth();
-    double tool_size = base_size;
-    
-    double premult = 1.0;
-    
-    // unless overridden by user, we declare the "best" size
-    // to be roughly 6 mm square.
-    double target_size = 6.0;                // mm
-    
-    double basic_tool_size_mm = tool_size / g_Platform->GetDisplayDPmm();
-    premult = target_size / basic_tool_size_mm;
-    
-    //Adjust the scale factor using the global GUI scale parameter
-    double postmult =  exp( g_GUIScaleFactor * (0.693 / 5.0) );       //  exp(2)
-    postmult = wxMin(postmult, 3.0);
-    postmult = wxMax(postmult, 1.0);
-    
-    int sizeTab = base_size * postmult * premult;
-    
-    m_topImgList = new wxImageList(sizeTab, sizeTab, TRUE, 1);
-
-    wxBitmap bmp;
-    wxImage img, simg;
-    bmp = style->GetIcon(_T("Display"));
-    img = bmp.ConvertToImage();
-    simg = img.Scale(sizeTab, sizeTab);
-    bmp = wxBitmap(simg);
-    m_topImgList->Add(bmp);
-    bmp = style->GetIcon(_T("Charts"));
-    img = bmp.ConvertToImage();
-    simg = img.Scale(sizeTab, sizeTab);
-    bmp = wxBitmap(simg);
-    m_topImgList->Add(bmp);
-    bmp = style->GetIcon(_T("Connections"));
-    img = bmp.ConvertToImage();
-    simg = img.Scale(sizeTab, sizeTab);
-    bmp = wxBitmap(simg);
-    m_topImgList->Add(bmp);
-    bmp = style->GetIcon(_T("Ship"));
-    img = bmp.ConvertToImage();
-    simg = img.Scale(sizeTab, sizeTab);
-    bmp = wxBitmap(simg);
-    m_topImgList->Add(bmp);
-    bmp = style->GetIcon(_T("UI"));
-    img = bmp.ConvertToImage();
-    simg = img.Scale(sizeTab, sizeTab);
-    bmp = wxBitmap(simg);
-    m_topImgList->Add(bmp);
-    bmp = style->GetIcon(_T("Plugins"));
-    img = bmp.ConvertToImage();
-    simg = img.Scale(sizeTab, sizeTab);
-    bmp = wxBitmap(simg);
-    m_topImgList->Add(bmp);
-  }
+  CreateListbookIcons();
 
   m_pListbook->SetImageList(m_topImgList);
-  itemBoxSizer2->Add(
-      m_pListbook, 1,
-      wxALL | wxEXPAND,
-      border_size);
+  itemBoxSizer2->Add( m_pListbook, 1, wxALL | wxEXPAND, border_size);
 
   wxBoxSizer* buttons = new wxBoxSizer(wxHORIZONTAL);
   itemBoxSizer2->Add(buttons, 0, wxALIGN_RIGHT | wxALL, border_size);
@@ -4837,6 +4844,15 @@ void options::SetColorScheme(ColorScheme cs) {
 #ifdef __OCPN__OPTIONS_USE_LISTBOOK__
   wxListView* lv = m_pListbook->GetListView();
   lv->SetBackgroundColour(GetBackgroundColour());
+  
+  if(m_cs != cs){
+      delete m_topImgList;
+      CreateListbookIcons();
+      m_pListbook->SetImageList(m_topImgList);
+      
+      m_cs = cs;
+  }
+      
 #endif
 }
 

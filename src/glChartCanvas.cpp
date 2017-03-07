@@ -658,9 +658,6 @@ void glChartCanvas::BuildFBO( )
     // Disable Render to FBO
     ( s_glBindFramebuffer )( GL_FRAMEBUFFER_EXT, 0 );
 
-    // Disable Render to FBO
-    ( s_glBindFramebuffer )( GL_FRAMEBUFFER_EXT, 0 );
-
     /* invalidate cache */
     Invalidate();
 
@@ -1239,7 +1236,8 @@ void glChartCanvas::DrawStaticRoutesTracksAndWaypoints( ViewPort &vp )
         for(wxRoutePointListNode *pnode = pWayPointMan->GetWaypointList()->GetFirst(); pnode; pnode = pnode->GetNext() ) {
             RoutePoint *pWP = pnode->GetData();
             if( pWP && (!pWP->m_bIsBeingEdited) &&(!pWP->m_bIsInRoute ) )
-                pWP->DrawGL( vp );
+                if(vp.GetBBox().ContainsMarge(pWP->m_lat, pWP->m_lon, .5))
+                    pWP->DrawGL( vp );
         }
     }
 }
@@ -3458,6 +3456,15 @@ void glChartCanvas::Render()
         }
 
         if( b_newview ) {
+
+            bool busy = false;
+            if(VPoint.b_quilt && cc1->m_pQuilt->IsQuiltVector() &&
+                ( m_cache_vp.view_scale_ppm != VPoint.view_scale_ppm || m_cache_vp.rotation != VPoint.rotation))
+            {
+                    OCPNPlatform::ShowBusySpinner();
+                    busy = true;
+            }
+            
             // enable rendering to texture in framebuffer object
             ( s_glBindFramebuffer )( GL_FRAMEBUFFER_EXT, m_fb0 );
 
@@ -3626,7 +3633,10 @@ void glChartCanvas::Render()
                 } 
             // Disable Render to FBO
             ( s_glBindFramebuffer )( GL_FRAMEBUFFER_EXT, 0 );
-            
+
+            if(busy)
+                OCPNPlatform::HideBusySpinner();
+        
         } // newview
 
         useFBO = true;

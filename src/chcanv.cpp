@@ -220,6 +220,7 @@ extern int              g_pNavAidRadarRingsStepUnits;
 extern bool             g_bWayPointPreventDragging;
 extern bool             g_bEnableZoomToCursor;
 extern bool             g_bShowChartBar;
+extern bool             g_bInlandEcdis;
 
 extern AISTargetAlertDialog    *g_pais_alert_dialog_active;
 extern AISTargetQueryDialog    *g_pais_query_dialog_active;
@@ -329,81 +330,6 @@ wxDialog                *g_pcurtain;
 
 #define MIN_BRIGHT 10
 #define MAX_BRIGHT 100
-
-//    Constants for right click menus
-enum
-{
-    ID_DEF_MENU_MAX_DETAIL = 1,
-    ID_DEF_MENU_SCALE_IN,
-    ID_DEF_MENU_SCALE_OUT,
-    ID_DEF_MENU_DROP_WP,
-    ID_DEF_MENU_QUERY,
-    ID_DEF_MENU_MOVE_BOAT_HERE,
-    ID_DEF_MENU_GOTO_HERE,
-    ID_DEF_MENU_GOTOPOSITION,
-
-    ID_WP_MENU_GOTO,
-    ID_WP_MENU_DELPOINT,
-    ID_WP_MENU_PROPERTIES,
-    ID_RT_MENU_ACTIVATE,
-    ID_RT_MENU_DEACTIVATE,
-    ID_RT_MENU_INSERT,
-    ID_RT_MENU_APPEND,
-    ID_RT_MENU_COPY,
-    ID_TK_MENU_COPY,
-    ID_WPT_MENU_COPY,
-    ID_WPT_MENU_SENDTOGPS,
-    ID_WPT_MENU_SENDTONEWGPS,
-    ID_PASTE_WAYPOINT,
-    ID_PASTE_ROUTE,
-    ID_PASTE_TRACK,
-    ID_RT_MENU_DELETE,
-    ID_RT_MENU_REVERSE,
-    ID_RT_MENU_DELPOINT,
-    ID_RT_MENU_ACTPOINT,
-    ID_RT_MENU_DEACTPOINT,
-    ID_RT_MENU_ACTNXTPOINT,
-    ID_RT_MENU_REMPOINT,
-    ID_RT_MENU_PROPERTIES,
-    ID_RT_MENU_SENDTOGPS,
-    ID_RT_MENU_SENDTONEWGPS,
-    ID_WP_MENU_SET_ANCHORWATCH,
-    ID_WP_MENU_CLEAR_ANCHORWATCH,
-    ID_DEF_MENU_AISTARGETLIST,
-
-    ID_RC_MENU_SCALE_IN,
-    ID_RC_MENU_SCALE_OUT,
-    ID_RC_MENU_ZOOM_IN,
-    ID_RC_MENU_ZOOM_OUT,
-    ID_RC_MENU_FINISH,
-    ID_DEF_MENU_AIS_QUERY,
-    ID_DEF_MENU_AIS_CPA,
-    ID_DEF_MENU_AISSHOWTRACK,
-    ID_DEF_MENU_ACTIVATE_MEASURE,
-    ID_DEF_MENU_DEACTIVATE_MEASURE,
-
-    ID_UNDO,
-    ID_REDO,
-
-    ID_DEF_MENU_CM93OFFSET_DIALOG,
-
-    ID_TK_MENU_PROPERTIES,
-    ID_TK_MENU_DELETE,
-    ID_WP_MENU_ADDITIONAL_INFO,
-
-    ID_DEF_MENU_QUILTREMOVE,
-    ID_DEF_MENU_COGUP,
-    ID_DEF_MENU_NORTHUP,
-    ID_DEF_MENU_TOGGLE_FULL,
-    ID_DEF_MENU_TIDEINFO,
-    ID_DEF_MENU_CURRENTINFO,
-    ID_DEF_ZERO_XTE,
-    
-    ID_DEF_MENU_GROUPBASE,  // Must be last entry, as chart group identifiers are created dynamically
-
-    
-    ID_DEF_MENU_LAST
-};
 
 //------------------------------------------------------------------------------
 //    ChartCanvas Implementation
@@ -1441,6 +1367,13 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
 
     // HOTKEYS
     switch( event.GetKeyCode() ) {
+    case WXK_MENU:
+        int x, y, mx, my;
+        event.GetPosition( &x, &y );
+
+        CallPopupMenu(x, y);
+        break;
+
     case WXK_ALT:
         m_modkeys |= wxMOD_ALT;
         break;
@@ -1708,6 +1641,12 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
                 m_bMeasure_DistCircle = false;
 
             StartMeasureRoute();
+            break;
+            
+        case 'N':
+            if( g_bInlandEcdis && ps52plib){
+                gFrame->SetENCDisplayCategory( (_DisCat)STANDARD );
+            }
             break;
 
         case 'O':
@@ -3468,6 +3407,11 @@ bool ChartCanvas::SetViewPoint( double lat, double lon, double scale_ppm, double
                 double sfr = wxRound(m_displayed_scale_factor * 10.) / 10.;
                 text.Printf( _T("%s %4.0f (%1.2fx)"), _("Scale"), true_scale_display, sfr );
             }
+            else if( m_displayed_scale_factor > 0.01 ){
+                double sfr = wxRound(m_displayed_scale_factor * 100.) / 100.;
+                text.Printf( _T("%s %4.0f (%1.2fx)"), _("Scale"), true_scale_display, sfr );
+            }
+            
             else  {
                 text.Printf( _T("%s %4.0f (---)"), _("Scale"), true_scale_display );      // Generally, no chart, so no chart scale factor
             }
@@ -5063,6 +5007,329 @@ bool ChartCanvas::MouseEventSetup( wxMouseEvent& event,  bool b_handle_dclick )
         
 }
 
+void ChartCanvas::CallPopupMenu(int x, int y)
+{
+    int mx, my;
+    mx = x;
+    my = y;
+
+    last_drag.x = mx;
+    last_drag.y = my;
+    if( parent_frame->nRoute_State ) {                    // creating route?
+        InvokeCanvasMenu(x, y, SELTYPE_ROUTECREATE);
+        return;
+    }
+    // General Right Click
+    // Look for selectable objects
+    double slat, slon;
+    slat = m_cursor_lat;
+    slon = m_cursor_lon;
+    
+    #if defined(__WXMAC__) || defined(__OCPN__ANDROID__)
+    wxScreenDC sdc;
+    ocpnDC dc( sdc );
+    #else
+    wxClientDC cdc( GetParent() );
+    ocpnDC dc( cdc );
+    #endif
+    
+    SelectItem *pFindAIS;
+    SelectItem *pFindRP;
+    SelectItem *pFindRouteSeg;
+    SelectItem *pFindTrackSeg;
+    SelectItem *pFindCurrent = NULL;
+    SelectItem *pFindTide = NULL;
+    
+    //    Deselect any current objects
+    if( m_pSelectedRoute ) {
+        m_pSelectedRoute->m_bRtIsSelected = false;        // Only one selection at a time
+        m_pSelectedRoute->DeSelectRoute();
+        #ifdef ocpnUSE_GL
+        if(g_bopengl){
+            InvalidateGL();
+            Update();
+        }
+        else
+            #endif
+            m_pSelectedRoute->Draw( dc, VPoint, GetVP().GetBBox() );
+    }
+    
+    if( m_pFoundRoutePoint ) {
+        m_pFoundRoutePoint->m_bPtIsSelected = false;
+        m_pFoundRoutePoint->Draw( dc );
+        RefreshRect( m_pFoundRoutePoint->CurrentRect_in_DC );
+    }
+    
+    //      Get all the selectable things at the cursor
+    pFindAIS = pSelectAIS->FindSelection( slat, slon, SELTYPE_AISTARGET );
+    pFindRP = pSelect->FindSelection( slat, slon, SELTYPE_ROUTEPOINT );
+    pFindRouteSeg = pSelect->FindSelection( slat, slon, SELTYPE_ROUTESEGMENT );
+    pFindTrackSeg = pSelect->FindSelection( slat, slon, SELTYPE_TRACKSEGMENT );
+    
+    if( m_bShowCurrent ) pFindCurrent = pSelectTC->FindSelection( slat, slon,
+        SELTYPE_CURRENTPOINT );
+    
+    if( m_bShowTide )                                // look for tide stations
+        pFindTide = pSelectTC->FindSelection( slat, slon, SELTYPE_TIDEPOINT );
+    
+    int seltype = 0;
+    
+    //    Try for AIS targets first
+    if( pFindAIS ) {
+        m_FoundAIS_MMSI = pFindAIS->GetUserData();
+        
+        //      Make sure the target data is available
+        if( g_pAIS->Get_Target_Data_From_MMSI( m_FoundAIS_MMSI ) ) seltype |=
+            SELTYPE_AISTARGET;
+    }
+    
+    //    Now the various Route Parts
+    
+    m_pFoundRoutePoint = NULL;
+    if( pFindRP ) {
+        RoutePoint *pFirstVizPoint = NULL;
+        RoutePoint *pFoundActiveRoutePoint = NULL;
+        RoutePoint *pFoundVizRoutePoint = NULL;
+        Route *pSelectedActiveRoute = NULL;
+        Route *pSelectedVizRoute = NULL;
+        
+        //There is at least one routepoint, so get the whole list
+        SelectableItemList SelList = pSelect->FindSelectionList( slat, slon,
+                                                                 SELTYPE_ROUTEPOINT );
+        wxSelectableItemListNode *node = SelList.GetFirst();
+        while( node ) {
+            SelectItem *pFindSel = node->GetData();
+            
+            RoutePoint *prp = (RoutePoint *) pFindSel->m_pData1;        //candidate
+            
+            //    Get an array of all routes using this point
+            wxArrayPtrVoid *proute_array = g_pRouteMan->GetRouteArrayContaining( prp );
+            
+            // Use route array (if any) to determine actual visibility for this point
+            bool brp_viz = false;
+            if( proute_array ) {
+                for( unsigned int ir = 0; ir < proute_array->GetCount(); ir++ ) {
+                    Route *pr = (Route *) proute_array->Item( ir );
+                    if( pr->IsVisible() ) {
+                        brp_viz = true;
+                        break;
+                    }
+                }
+                if( !brp_viz  && prp->m_bKeepXRoute)    // is not visible as part of route, but still exists as a waypoint
+                    brp_viz = prp->IsVisible();         //  so treat as isolated point
+                    
+            } else
+                brp_viz = prp->IsVisible();               // isolated point
+                
+            if( ( NULL == pFirstVizPoint ) && brp_viz ) pFirstVizPoint = prp;
+                
+            // Use route array to choose the appropriate route
+            // Give preference to any active route, otherwise select the first visible route in the array for this point
+            m_pSelectedRoute = NULL;
+            if( proute_array ) {
+                for( unsigned int ir = 0; ir < proute_array->GetCount(); ir++ ) {
+                    Route *pr = (Route *) proute_array->Item( ir );
+                    if( pr->m_bRtIsActive ) {
+                        pSelectedActiveRoute = pr;
+                        pFoundActiveRoutePoint = prp;
+                        break;
+                    }
+                }
+                
+                if( NULL == pSelectedVizRoute ) {
+                    for( unsigned int ir = 0; ir < proute_array->GetCount(); ir++ ) {
+                        Route *pr = (Route *) proute_array->Item( ir );
+                        if( pr->IsVisible() ) {
+                            pSelectedVizRoute = pr;
+                            pFoundVizRoutePoint = prp;
+                            break;
+                        }
+                    }
+                }
+                
+                delete proute_array;
+            }
+            
+            node = node->GetNext();
+        }
+        
+        //      Now choose the "best" selections
+        if( pFoundActiveRoutePoint ) {
+            m_pFoundRoutePoint = pFoundActiveRoutePoint;
+            m_pSelectedRoute = pSelectedActiveRoute;
+        } else if( pFoundVizRoutePoint ) {
+            m_pFoundRoutePoint = pFoundVizRoutePoint;
+            m_pSelectedRoute = pSelectedVizRoute;
+        } else
+            // default is first visible point in list
+            m_pFoundRoutePoint = pFirstVizPoint;
+        
+        if( m_pSelectedRoute ) {
+            if( m_pSelectedRoute->IsVisible() ) seltype |= SELTYPE_ROUTEPOINT;
+        } else if( m_pFoundRoutePoint ) seltype |= SELTYPE_MARKPOINT;
+        
+        //      Highlite the selected point, to verify the proper right click selection
+        if( m_pFoundRoutePoint) {
+            m_pFoundRoutePoint->m_bPtIsSelected = true;
+            wxRect wp_rect;
+            m_pFoundRoutePoint->CalculateDCRect( m_dc_route, &wp_rect );
+            RefreshRect( wp_rect, true );
+        }
+        
+    }
+    
+    // Note here that we use SELTYPE_ROUTESEGMENT to select tracks as well as routes
+    // But call the popup handler with identifier appropriate to the type
+    if( pFindRouteSeg )                  // there is at least one select item
+    {
+        SelectableItemList SelList = pSelect->FindSelectionList( slat, slon,
+                                                                 SELTYPE_ROUTESEGMENT );
+        
+        if( NULL == m_pSelectedRoute )  // the case where a segment only is selected
+        {
+            //  Choose the first visible route containing segment in the list
+            wxSelectableItemListNode *node = SelList.GetFirst();
+            while( node ) {
+                SelectItem *pFindSel = node->GetData();
+                
+                Route *pr = (Route *) pFindSel->m_pData3;
+                if( pr->IsVisible() ) {
+                    m_pSelectedRoute = pr;
+                    break;
+                }
+                node = node->GetNext();
+            }
+        }
+        
+        if( m_pSelectedRoute ) {
+            if( NULL == m_pFoundRoutePoint )
+                m_pFoundRoutePoint =   (RoutePoint *) pFindRouteSeg->m_pData1;
+            
+            m_pSelectedRoute->m_bRtIsSelected = !(seltype & SELTYPE_ROUTEPOINT);
+            if( m_pSelectedRoute->m_bRtIsSelected ){
+                #ifdef ocpnUSE_GL
+                if(g_bopengl){
+                    InvalidateGL();
+                    Update();
+                }
+                else
+                    #endif
+                    m_pSelectedRoute->Draw( dc, GetVP(), GetVP().GetBBox() );
+            }
+            
+            seltype |= SELTYPE_ROUTESEGMENT;
+        }
+        
+    }
+    
+    if( pFindTrackSeg ) {
+        m_pSelectedTrack = NULL;
+        SelectableItemList SelList = pSelect->FindSelectionList( slat, slon,
+                                                                 SELTYPE_TRACKSEGMENT );
+        
+        //  Choose the first visible track containing segment in the list
+        wxSelectableItemListNode *node = SelList.GetFirst();
+        while( node ) {
+            SelectItem *pFindSel = node->GetData();
+            
+            Track *pt = (Track *) pFindSel->m_pData3;
+            if( pt->IsVisible() ) {
+                m_pSelectedTrack = pt;
+                break;
+            }
+            node = node->GetNext();
+        }
+        
+        if( m_pSelectedTrack ) seltype |= SELTYPE_TRACKSEGMENT;
+    }
+    
+    bool bseltc = false;
+    //                      if(0 == seltype)
+    {
+        if( pFindCurrent ) {
+            // There may be multiple current entries at the same point.
+            // For example, there often is a current substation (with directions specified)
+            // co-located with its master.  We want to select the substation, so that
+            // the direction will be properly indicated on the graphic.
+            // So, we search the select list looking for IDX_type == 'c' (i.e substation)
+            IDX_entry *pIDX_best_candidate;
+            
+            SelectItem *pFind = NULL;
+            SelectableItemList SelList = pSelectTC->FindSelectionList( m_cursor_lat,
+                                                                       m_cursor_lon, SELTYPE_CURRENTPOINT );
+            
+            //      Default is first entry
+            wxSelectableItemListNode *node = SelList.GetFirst();
+            pFind = node->GetData();
+            pIDX_best_candidate = (IDX_entry *) ( pFind->m_pData1 );
+            
+            if( SelList.GetCount() > 1 ) {
+                node = node->GetNext();
+                while( node ) {
+                    pFind = node->GetData();
+                    IDX_entry *pIDX_candidate = (IDX_entry *) ( pFind->m_pData1 );
+                    if( pIDX_candidate->IDX_type == 'c' ) {
+                        pIDX_best_candidate = pIDX_candidate;
+                        break;
+                    }
+                    
+                    node = node->GetNext();
+                }       // while (node)
+            } else {
+                wxSelectableItemListNode *node = SelList.GetFirst();
+                pFind = node->GetData();
+                pIDX_best_candidate = (IDX_entry *) ( pFind->m_pData1 );
+            }
+            
+            m_pIDXCandidate = pIDX_best_candidate;
+            
+            if( 0 == seltype ) {
+                DrawTCWindow( x, y, (void *) pIDX_best_candidate );
+                Refresh( false );
+                bseltc = true;
+            } else
+                seltype |= SELTYPE_CURRENTPOINT;
+        }
+        
+        else if( pFindTide ) {
+            m_pIDXCandidate = (IDX_entry *) pFindTide->m_pData1;
+            
+            if( 0 == seltype ) {
+                DrawTCWindow( x, y, (void *) pFindTide->m_pData1 );
+                Refresh( false );
+                bseltc = true;
+            } else
+                seltype |= SELTYPE_TIDEPOINT;
+        }
+    }
+    
+    if( 0 == seltype )
+        seltype |= SELTYPE_UNKNOWN;
+    
+    if( !bseltc ){
+        InvokeCanvasMenu(x, y, seltype);
+        
+        // Clean up if not deleted in InvokeCanvasMenu
+        if( m_pSelectedRoute && g_pRouteMan->IsRouteValid(m_pSelectedRoute) ) {
+            m_pSelectedRoute->m_bRtIsSelected = false;
+        }
+        
+        m_pSelectedRoute = NULL;
+        
+        if( m_pFoundRoutePoint ) {
+            if (pSelect->IsSelectableRoutePointValid(m_pFoundRoutePoint))
+                m_pFoundRoutePoint->m_bPtIsSelected = false;
+        }
+        m_pFoundRoutePoint = NULL;
+        
+        Refresh( true );
+        
+    }                
+    
+    // Seth: Is this refresh needed?
+    Refresh( false );            // needed for MSW, not GTK  Why??
+}
+
 bool ChartCanvas::MouseEventProcessObjects( wxMouseEvent& event )
 {
     // For now just bail out completely if the point clicked is not on the chart
@@ -6111,321 +6378,7 @@ bool ChartCanvas::MouseEventProcessObjects( wxMouseEvent& event )
         }
         
         ret = true;
-        
-        if( parent_frame->nRoute_State ) {                    // creating route?
-            InvokeCanvasMenu(x, y, SELTYPE_ROUTECREATE);
-        }
-        else                                                  // General Right Click
-        {
-            // Look for selectable objects
-            double slat, slon;
-            slat = m_cursor_lat;
-            slon = m_cursor_lon;
-            
-            #if defined(__WXMAC__) || defined(__OCPN__ANDROID__)
-            wxScreenDC sdc;
-            ocpnDC dc( sdc );
-            #else
-            wxClientDC cdc( GetParent() );
-            ocpnDC dc( cdc );
-            #endif
-            
-            SelectItem *pFindAIS;
-            SelectItem *pFindRP;
-            SelectItem *pFindRouteSeg;
-            SelectItem *pFindTrackSeg;
-            SelectItem *pFindCurrent = NULL;
-            SelectItem *pFindTide = NULL;
-            
-            //    Deselect any current objects
-            if( m_pSelectedRoute ) {
-                m_pSelectedRoute->m_bRtIsSelected = false;        // Only one selection at a time
-                m_pSelectedRoute->DeSelectRoute();
-                #ifdef ocpnUSE_GL
-                if(g_bopengl){
-                    InvalidateGL();
-                    Update();
-                }
-                else
-                    #endif
-                    m_pSelectedRoute->Draw( dc, VPoint, GetVP().GetBBox() );
-            }
-            
-            if( m_pFoundRoutePoint ) {
-                m_pFoundRoutePoint->m_bPtIsSelected = false;
-                m_pFoundRoutePoint->Draw( dc );
-                RefreshRect( m_pFoundRoutePoint->CurrentRect_in_DC );
-            }
-            
-            //      Get all the selectable things at the cursor
-            pFindAIS = pSelectAIS->FindSelection( slat, slon, SELTYPE_AISTARGET );
-            pFindRP = pSelect->FindSelection( slat, slon, SELTYPE_ROUTEPOINT );
-            pFindRouteSeg = pSelect->FindSelection( slat, slon, SELTYPE_ROUTESEGMENT );
-            pFindTrackSeg = pSelect->FindSelection( slat, slon, SELTYPE_TRACKSEGMENT );
-            
-            if( m_bShowCurrent ) pFindCurrent = pSelectTC->FindSelection( slat, slon,
-                SELTYPE_CURRENTPOINT );
-            
-            if( m_bShowTide )                                // look for tide stations
-                pFindTide = pSelectTC->FindSelection( slat, slon, SELTYPE_TIDEPOINT );
-            
-            int seltype = 0;
-            
-            //    Try for AIS targets first
-            if( pFindAIS ) {
-                m_FoundAIS_MMSI = pFindAIS->GetUserData();
-                
-                //      Make sure the target data is available
-                if( g_pAIS->Get_Target_Data_From_MMSI( m_FoundAIS_MMSI ) ) seltype |=
-                    SELTYPE_AISTARGET;
-            }
-            
-            //    Now the various Route Parts
-            
-            m_pFoundRoutePoint = NULL;
-            if( pFindRP ) {
-                RoutePoint *pFirstVizPoint = NULL;
-                RoutePoint *pFoundActiveRoutePoint = NULL;
-                RoutePoint *pFoundVizRoutePoint = NULL;
-                Route *pSelectedActiveRoute = NULL;
-                Route *pSelectedVizRoute = NULL;
-                
-                //There is at least one routepoint, so get the whole list
-                SelectableItemList SelList = pSelect->FindSelectionList( slat, slon,
-                                                                         SELTYPE_ROUTEPOINT );
-                wxSelectableItemListNode *node = SelList.GetFirst();
-                while( node ) {
-                    SelectItem *pFindSel = node->GetData();
-                    
-                    RoutePoint *prp = (RoutePoint *) pFindSel->m_pData1;        //candidate
-                    
-                    //    Get an array of all routes using this point
-                    wxArrayPtrVoid *proute_array = g_pRouteMan->GetRouteArrayContaining( prp );
-                    
-                    // Use route array (if any) to determine actual visibility for this point
-                    bool brp_viz = false;
-                    if( proute_array ) {
-                        for( unsigned int ir = 0; ir < proute_array->GetCount(); ir++ ) {
-                            Route *pr = (Route *) proute_array->Item( ir );
-                            if( pr->IsVisible() ) {
-                                brp_viz = true;
-                                break;
-                            }
-                        }
-                        if( !brp_viz  && prp->m_bKeepXRoute)    // is not visible as part of route, but still exists as a waypoint
-                            brp_viz = prp->IsVisible();         //  so treat as isolated point
-                            
-                    } else
-                        brp_viz = prp->IsVisible();               // isolated point
-                        
-                    if( ( NULL == pFirstVizPoint ) && brp_viz ) pFirstVizPoint = prp;
-                        
-                    // Use route array to choose the appropriate route
-                    // Give preference to any active route, otherwise select the first visible route in the array for this point
-                    m_pSelectedRoute = NULL;
-                    if( proute_array ) {
-                        for( unsigned int ir = 0; ir < proute_array->GetCount(); ir++ ) {
-                            Route *pr = (Route *) proute_array->Item( ir );
-                            if( pr->m_bRtIsActive ) {
-                                pSelectedActiveRoute = pr;
-                                pFoundActiveRoutePoint = prp;
-                                break;
-                            }
-                        }
-                        
-                        if( NULL == pSelectedVizRoute ) {
-                            for( unsigned int ir = 0; ir < proute_array->GetCount(); ir++ ) {
-                                Route *pr = (Route *) proute_array->Item( ir );
-                                if( pr->IsVisible() ) {
-                                    pSelectedVizRoute = pr;
-                                    pFoundVizRoutePoint = prp;
-                                    break;
-                                }
-                            }
-                        }
-                        
-                        delete proute_array;
-                    }
-                    
-                    node = node->GetNext();
-                }
-                
-                //      Now choose the "best" selections
-                if( pFoundActiveRoutePoint ) {
-                    m_pFoundRoutePoint = pFoundActiveRoutePoint;
-                    m_pSelectedRoute = pSelectedActiveRoute;
-                } else if( pFoundVizRoutePoint ) {
-                    m_pFoundRoutePoint = pFoundVizRoutePoint;
-                    m_pSelectedRoute = pSelectedVizRoute;
-                } else
-                    // default is first visible point in list
-                    m_pFoundRoutePoint = pFirstVizPoint;
-                
-                if( m_pSelectedRoute ) {
-                    if( m_pSelectedRoute->IsVisible() ) seltype |= SELTYPE_ROUTEPOINT;
-                } else if( m_pFoundRoutePoint ) seltype |= SELTYPE_MARKPOINT;
-                
-                //      Highlite the selected point, to verify the proper right click selection
-                if( m_pFoundRoutePoint) {
-                    m_pFoundRoutePoint->m_bPtIsSelected = true;
-                    wxRect wp_rect;
-                    m_pFoundRoutePoint->CalculateDCRect( m_dc_route, &wp_rect );
-                    RefreshRect( wp_rect, true );
-                }
-                
-            }
-            
-            // Note here that we use SELTYPE_ROUTESEGMENT to select tracks as well as routes
-            // But call the popup handler with identifier appropriate to the type
-            if( pFindRouteSeg )                  // there is at least one select item
-            {
-                SelectableItemList SelList = pSelect->FindSelectionList( slat, slon,
-                                                                         SELTYPE_ROUTESEGMENT );
-                
-                if( NULL == m_pSelectedRoute )  // the case where a segment only is selected
-                {
-                    //  Choose the first visible route containing segment in the list
-                    wxSelectableItemListNode *node = SelList.GetFirst();
-                    while( node ) {
-                        SelectItem *pFindSel = node->GetData();
-                        
-                        Route *pr = (Route *) pFindSel->m_pData3;
-                        if( pr->IsVisible() ) {
-                            m_pSelectedRoute = pr;
-                            break;
-                        }
-                        node = node->GetNext();
-                    }
-                }
-                
-                if( m_pSelectedRoute ) {
-                    if( NULL == m_pFoundRoutePoint )
-                        m_pFoundRoutePoint =   (RoutePoint *) pFindRouteSeg->m_pData1;
-                    
-                    m_pSelectedRoute->m_bRtIsSelected = !(seltype & SELTYPE_ROUTEPOINT);
-                    if( m_pSelectedRoute->m_bRtIsSelected ){
-                        #ifdef ocpnUSE_GL
-                        if(g_bopengl){
-                            InvalidateGL();
-                            Update();
-                        }
-                        else
-                            #endif
-                            m_pSelectedRoute->Draw( dc, GetVP(), GetVP().GetBBox() );
-                    }
-                    
-                    seltype |= SELTYPE_ROUTESEGMENT;
-                }
-                
-            }
-            
-            if( pFindTrackSeg ) {
-                m_pSelectedTrack = NULL;
-                SelectableItemList SelList = pSelect->FindSelectionList( slat, slon,
-                                                                         SELTYPE_TRACKSEGMENT );
-                
-                //  Choose the first visible track containing segment in the list
-                wxSelectableItemListNode *node = SelList.GetFirst();
-                while( node ) {
-                    SelectItem *pFindSel = node->GetData();
-                    
-                    Track *pt = (Track *) pFindSel->m_pData3;
-                    if( pt->IsVisible() ) {
-                        m_pSelectedTrack = pt;
-                        break;
-                    }
-                    node = node->GetNext();
-                }
-                
-                if( m_pSelectedTrack ) seltype |= SELTYPE_TRACKSEGMENT;
-            }
-            
-            bool bseltc = false;
-            //                      if(0 == seltype)
-            {
-                if( pFindCurrent ) {
-                    // There may be multiple current entries at the same point.
-                    // For example, there often is a current substation (with directions specified)
-                    // co-located with its master.  We want to select the substation, so that
-                    // the direction will be properly indicated on the graphic.
-                    // So, we search the select list looking for IDX_type == 'c' (i.e substation)
-                    IDX_entry *pIDX_best_candidate;
-                    
-                    SelectItem *pFind = NULL;
-                    SelectableItemList SelList = pSelectTC->FindSelectionList( m_cursor_lat,
-                                                                               m_cursor_lon, SELTYPE_CURRENTPOINT );
-                    
-                    //      Default is first entry
-                    wxSelectableItemListNode *node = SelList.GetFirst();
-                    pFind = node->GetData();
-                    pIDX_best_candidate = (IDX_entry *) ( pFind->m_pData1 );
-                    
-                    if( SelList.GetCount() > 1 ) {
-                        node = node->GetNext();
-                        while( node ) {
-                            pFind = node->GetData();
-                            IDX_entry *pIDX_candidate = (IDX_entry *) ( pFind->m_pData1 );
-                            if( pIDX_candidate->IDX_type == 'c' ) {
-                                pIDX_best_candidate = pIDX_candidate;
-                                break;
-                            }
-                            
-                            node = node->GetNext();
-                        }       // while (node)
-                    } else {
-                        wxSelectableItemListNode *node = SelList.GetFirst();
-                        pFind = node->GetData();
-                        pIDX_best_candidate = (IDX_entry *) ( pFind->m_pData1 );
-                    }
-                    
-                    m_pIDXCandidate = pIDX_best_candidate;
-                    
-                    if( 0 == seltype ) {
-                        DrawTCWindow( x, y, (void *) pIDX_best_candidate );
-                        Refresh( false );
-                        bseltc = true;
-                    } else
-                        seltype |= SELTYPE_CURRENTPOINT;
-                }
-                
-                else if( pFindTide ) {
-                    m_pIDXCandidate = (IDX_entry *) pFindTide->m_pData1;
-                    
-                    if( 0 == seltype ) {
-                        DrawTCWindow( x, y, (void *) pFindTide->m_pData1 );
-                        Refresh( false );
-                        bseltc = true;
-                    } else
-                        seltype |= SELTYPE_TIDEPOINT;
-                }
-            }
-            
-            if( 0 == seltype )
-                seltype |= SELTYPE_UNKNOWN;
-            
-            if( !bseltc ){
-                InvokeCanvasMenu(x, y, seltype);
-                
-                // Clean up if not deleted in InvokeCanvasMenu
-                if( m_pSelectedRoute && g_pRouteMan->IsRouteValid(m_pSelectedRoute) ) {
-                    m_pSelectedRoute->m_bRtIsSelected = false;
-                }
-                
-                m_pSelectedRoute = NULL;
-                
-                if( m_pFoundRoutePoint ) {
-                    if (pSelect->IsSelectableRoutePointValid(m_pFoundRoutePoint))
-                        m_pFoundRoutePoint->m_bPtIsSelected = false;
-                }
-                m_pFoundRoutePoint = NULL;
-                
-                Refresh( true );
-                
-            }                
-            
-            // Seth: Is this refresh needed?
-            Refresh( false );            // needed for MSW, not GTK  Why??
-        }
+        CallPopupMenu(mx , my);
     }   //Right down
 
     return ret;
@@ -7728,6 +7681,15 @@ void ChartCanvas::OnPaint( wxPaintEvent& event )
     {
         if( m_pQuilt && !m_pQuilt->IsComposed() ) return;
 
+        bool busy = false;
+        if( cc1->m_pQuilt->IsQuiltVector() &&
+            ( m_cache_vp.view_scale_ppm != VPoint.view_scale_ppm || m_cache_vp.rotation != VPoint.rotation))
+        {
+            OCPNPlatform::ShowBusySpinner();
+            busy = true;
+        }
+            
+            
         if( ( m_working_bm.GetWidth() != svp.pix_width )
                 || ( m_working_bm.GetHeight() != svp.pix_height ) ) m_working_bm.Create(
                         svp.pix_width, svp.pix_height, -1 ); // make sure the target is big enoug
@@ -7846,6 +7808,10 @@ void ChartCanvas::OnPaint( wxPaintEvent& event )
             OCPNRegion chart_get_all_region( wxRect( 0, 0, svp.pix_width, svp.pix_height ) );
             m_pQuilt->RenderQuiltRegionViewOnDCNoText( temp_dc, svp, chart_get_all_region );
         }
+        
+        if(busy)
+            OCPNPlatform::HideBusySpinner();
+        
     }
 
     else                  // not quilted
@@ -8058,12 +8024,25 @@ void ChartCanvas::OnPaint( wxPaintEvent& event )
         q_dc.SelectObject( wxNullBitmap );
 
     }
+#if 0
+    //  It is possible that this two-step method may be reuired for some platforms.
+    //  So, retain in the code base to aid recovery if necessary
     
     // Create and Render the Vector quilt decluttered text overlay, omitting CM93 composite
     if( VPoint.b_quilt ) {
         if(m_pQuilt->IsQuiltVector() && ps52plib && ps52plib->GetShowS57Text()){
             ChartBase *chart = m_pQuilt->GetRefChart();
-            if(chart->GetChartType() != CHART_TYPE_CM93COMP){
+            if( chart && chart->GetChartType() != CHART_TYPE_CM93COMP){
+                
+                //        Clear the text Global declutter list
+                ChartPlugInWrapper *ChPI = dynamic_cast<ChartPlugInWrapper*>( chart );
+                if(ChPI)
+                    ChPI->ClearPLIBTextList();
+                else{
+                    if(ps52plib)
+                        ps52plib->ClearTextList();
+                }
+                
                 wxMemoryDC t_dc;
                 wxBitmap qbm(  GetVP().pix_width, GetVP().pix_height );
                 
@@ -8071,31 +8050,15 @@ void ChartCanvas::OnPaint( wxPaintEvent& event )
                 t_dc.SelectObject( qbm );
                 t_dc.SetBackground(wxBrush(maskBackground));
                 t_dc.Clear();
-                
-                //        Clear the text Global declutter list
-                if(chart){
-                    ChartPlugInWrapper *ChPI = dynamic_cast<ChartPlugInWrapper*>( chart );
-                    if(ChPI){
-                        ChPI->ClearPLIBTextList();
-                    }
-                    else{
-                        if(ps52plib)
-                            ps52plib->ClearTextList();
-                    }
-                }
-                
+
+                //  Copy the scratch DC into the new bitmap
+                t_dc.Blit( 0, 0, GetVP().pix_width, GetVP().pix_height, scratch_dc.GetDC(), 0, 0, wxCOPY );
+
+                //  Render the text to the new bitmap
                 OCPNRegion chart_all_text_region( wxRect( 0, 0, GetVP().pix_width, GetVP().pix_height ) );
                 m_pQuilt->RenderQuiltRegionViewOnDCTextOnly( t_dc, svp, chart_all_text_region );
                 
-                t_dc.SelectObject( wxNullBitmap );
-                
-                wxMask *pMask = new wxMask(qbm, maskBackground);
-                qbm.SetMask(pMask);
-                
-                //  Pick up the new Mask
-                t_dc.SelectObject( qbm );
-                
-
+                //  Copy the new bitmap back to the scratch dc
                 wxRegionIterator upd_final( ru );
                 while( upd_final ) {
                     wxRect rect = upd_final.GetRect();
@@ -8107,9 +8070,31 @@ void ChartCanvas::OnPaint( wxPaintEvent& event )
             }
         }
     }
+#endif
+    // Direct rendering model...
+    if( VPoint.b_quilt ) {
+        if(m_pQuilt->IsQuiltVector() && ps52plib && ps52plib->GetShowS57Text()){
+            ChartBase *chart = m_pQuilt->GetRefChart();
+            if( chart && chart->GetChartType() != CHART_TYPE_CM93COMP){
+                
+                //        Clear the text Global declutter list
+                ChartPlugInWrapper *ChPI = dynamic_cast<ChartPlugInWrapper*>( chart );
+                if(ChPI)
+                    ChPI->ClearPLIBTextList();
+                else{
+                    if(ps52plib)
+                        ps52plib->ClearTextList();
+                }
+                
+                //  Render the text directly to the scratch bitmap
+                OCPNRegion chart_all_text_region( wxRect( 0, 0, GetVP().pix_width, GetVP().pix_height ) );
+                m_pQuilt->RenderQuiltRegionViewOnDCTextOnly( mscratch_dc, svp, chart_all_text_region );
+                
+            }
+        }
+    }
     
     
-
 //    And finally, blit the scratch dc onto the physical dc
     wxRegionIterator upd_final( rgn_blit );
     while( upd_final ) {
@@ -8141,7 +8126,6 @@ void ChartCanvas::OnPaint( wxPaintEvent& event )
 
     
     PaintCleanup();
-    OCPNPlatform::HideBusySpinner();
 
 }
 
@@ -8296,7 +8280,7 @@ void ChartCanvas::CancelMouseRoute()
 
 int ChartCanvas::GetNextContextMenuId()
 {
-    return ID_DEF_MENU_LAST + 100;  //Allowing for 100 dynamic menu item identifiers
+    return CanvasMenuHandler::GetNextContextMenuId();
 }
 
 bool ChartCanvas::SetCursor( const wxCursor &c )
@@ -9030,20 +9014,21 @@ void ChartCanvas::DrawAllTidesInBBox( ocpnDC& dc, LLBBox& BBox )
 				    // scale default size by tide_draw_scaler factor
 				    int width = (int) (12 * tide_draw_scaler + 0.5);
 				    int height = (int) (45 * tide_draw_scaler + 0.5);
-				    int linew = wxMax(1, (int) (tide_draw_scaler + 0.5));
+				    int linew = wxMax(1, (int) (tide_draw_scaler));
 
 				    //std::cerr << "tide icon w=" << width << ", h=" << height;
 				    //std::cerr << ", linew=" << linew << ", scale=" << tide_draw_scaler << std::endl;
 
                                     //process tide state  ( %height and flow sens )
                                     float ts = 1 - ( ( nowlev - ltleve ) / ( htleve - ltleve ) );
-                                    int hs = ( httime > lttime ) ? -5 : 5;
+                                    int hs = ( httime > lttime ) ? -4 : 4;
+				    hs *= (int) (tide_draw_scaler + 0.5); 
                                     if( ts > 0.995 || ts < 0.005 ) hs = 0;
                                     int ht_y = (int) ( height * ts );
 
 				    //draw yellow tide rectangle outlined in black
-                                    dc.SetPen( *pblack_pen );
 				    pblack_pen->SetWidth(linew);
+                                    dc.SetPen( *pblack_pen );
                                     dc.SetBrush( *pyelo_brush );
                                     dc.DrawRectangle( w, h, width, height );
 
@@ -9208,7 +9193,7 @@ void ChartCanvas::DrawAllCurrentsInBBox( ocpnDC& dc, LLBBox& BBox )
                     GetCanvasPointPix( lat, lon, &r );
 
                     wxPoint d[4]; // points of a diamond at the current station location
-                    int dd = (int) (6.0 * current_draw_scaler);  
+                    int dd = (int) (5.0 * current_draw_scaler + 0.5);  
                     d[0].x = r.x;
                     d[0].y = r.y + dd;
                     d[1].x = r.x + dd;
@@ -9219,7 +9204,7 @@ void ChartCanvas::DrawAllCurrentsInBBox( ocpnDC& dc, LLBBox& BBox )
                     d[3].y = r.y;
 
                     if( ptcmgr->GetTideOrCurrent15( now, i, tcvalue, dir, bnew_val ) ) {
-                        pblack_pen->SetWidth( 1 );
+		      pblack_pen->SetWidth( wxMax(1, (int) (current_draw_scaler + 0.5)) );
                         dc.SetPen( *pblack_pen );
                         dc.SetBrush( *porange_brush );
                         dc.DrawPolygon( 4, d );
@@ -9247,10 +9232,10 @@ void ChartCanvas::DrawAllCurrentsInBBox( ocpnDC& dc, LLBBox& BBox )
                                 double a2 = log10( a1 );
 
 				// scale to pass to DrawArrow. 0.4 is a reasonable factor here.
-				// adjust value of CurrentArrowScale in config file as needed
+				// users can adjust value of CurrentArrowScale in config file as needed
                                 float cscale = current_draw_scaler * a2 * 0.4;
 
-                                porange_pen->SetWidth( 2 );
+                                porange_pen->SetWidth( wxMax(1, (int) (current_draw_scaler + 0.5)) );
                                 dc.SetPen( *porange_pen );
                                 DrawArrow( dc, pixxc, pixyc,
                                            dir - 90 + ( skew_angle * 180. / PI ), cscale );

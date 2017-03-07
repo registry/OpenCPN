@@ -2579,9 +2579,10 @@ bool s57chart::DoRenderOnGL( const wxGLContext &glc, const ViewPort& VPoint )
 
     //      Render the areas quickly
     for( i = 0; i < PRIO_NUM; ++i ) {
-        if( ps52plib->m_nBoundaryStyle == SYMBOLIZED_BOUNDARIES ) top = razRules[i][4]; // Area Symbolized Boundaries
+        if( ps52plib->m_nBoundaryStyle == SYMBOLIZED_BOUNDARIES ) 
+            top = razRules[i][4]; // Area Symbolized Boundaries
         else
-            top = razRules[i][3];           // Area Plain Boundaries
+            top = razRules[i][3]; // Area Plain Boundaries
 
         while( top != NULL ) {
             crnt = top;
@@ -2593,9 +2594,10 @@ bool s57chart::DoRenderOnGL( const wxGLContext &glc, const ViewPort& VPoint )
 
     //    Render the lines and points
     for( i = 0; i < PRIO_NUM; ++i ) {
-        if( ps52plib->m_nBoundaryStyle == SYMBOLIZED_BOUNDARIES ) top = razRules[i][4]; // Area Symbolized Boundaries
+        if( ps52plib->m_nBoundaryStyle == SYMBOLIZED_BOUNDARIES ) 
+            top = razRules[i][4]; // Area Symbolized Boundaries
         else
-            top = razRules[i][3];           // Area Plain Boundaries
+            top = razRules[i][3]; // Area Plain Boundaries
         while( top != NULL ) {
             crnt = top;
             top = top->next;               // next object
@@ -2605,13 +2607,14 @@ bool s57chart::DoRenderOnGL( const wxGLContext &glc, const ViewPort& VPoint )
 
         top = razRules[i][2];           //LINES
         while( top != NULL ) {
-            ObjRazRules *crnt = top;
+            crnt = top;
             top = top->next;
             crnt->sm_transform_parms = &vp_transform;
             ps52plib->RenderObjectToGL( glc, crnt, &tvp );
         }
 
-        if( ps52plib->m_nSymbolStyle == SIMPLIFIED ) top = razRules[i][0];       //SIMPLIFIED Points
+        if( ps52plib->m_nSymbolStyle == SIMPLIFIED ) 
+            top = razRules[i][0];       //SIMPLIFIED Points
         else
             top = razRules[i][1];           //Paper Chart Points Points
 
@@ -2637,7 +2640,8 @@ bool s57chart::DoRenderOnGLText( const wxGLContext &glc, const ViewPort& VPoint 
     ObjRazRules *top;
     ObjRazRules *crnt;
     ViewPort tvp = VPoint;                    // undo const  TODO fix this in PLIB
-    
+
+#if 0    
     //      Render the areas quickly
     for( i = 0; i < PRIO_NUM; ++i ) {
         if( ps52plib->m_nBoundaryStyle == SYMBOLIZED_BOUNDARIES )
@@ -2652,37 +2656,41 @@ bool s57chart::DoRenderOnGLText( const wxGLContext &glc, const ViewPort& VPoint 
 ///                ps52plib->RenderAreaToGL( glc, crnt, &tvp );
             }
     }
+#endif
     
     //    Render the lines and points
     for( i = 0; i < PRIO_NUM; ++i ) {
-        if( ps52plib->m_nBoundaryStyle == SYMBOLIZED_BOUNDARIES ) top = razRules[i][4]; // Area Symbolized Boundaries
+        if( ps52plib->m_nBoundaryStyle == SYMBOLIZED_BOUNDARIES ) 
+            top = razRules[i][4]; // Area Symbolized Boundaries
         else
-            top = razRules[i][3];           // Area Plain Boundaries
-            while( top != NULL ) {
+            top = razRules[i][3]; // Area Plain Boundaries
+
+        while( top != NULL ) {
                 crnt = top;
                 top = top->next;               // next object
                 crnt->sm_transform_parms = &vp_transform;
                 ps52plib->RenderObjectToGLText( glc, crnt, &tvp );
-            }
+        }
             
-            top = razRules[i][2];           //LINES
-            while( top != NULL ) {
-                ObjRazRules *crnt = top;
-                top = top->next;
-                crnt->sm_transform_parms = &vp_transform;
-                ps52plib->RenderObjectToGLText( glc, crnt, &tvp );
-            }
-            
-            if( ps52plib->m_nSymbolStyle == SIMPLIFIED ) top = razRules[i][0];       //SIMPLIFIED Points
-        else
-            top = razRules[i][1];           //Paper Chart Points Points
-            
-            while( top != NULL ) {
+        top = razRules[i][2];           //LINES
+        while( top != NULL ) {
                 crnt = top;
                 top = top->next;
                 crnt->sm_transform_parms = &vp_transform;
                 ps52plib->RenderObjectToGLText( glc, crnt, &tvp );
-            }
+        }
+            
+        if( ps52plib->m_nSymbolStyle == SIMPLIFIED ) 
+            top = razRules[i][0];       //SIMPLIFIED Points
+        else
+            top = razRules[i][1];           //Paper Chart Points Points
+            
+        while( top != NULL ) {
+                crnt = top;
+                top = top->next;
+                crnt->sm_transform_parms = &vp_transform;
+                ps52plib->RenderObjectToGLText( glc, crnt, &tvp );
+        }
             
     }
     
@@ -3116,9 +3124,10 @@ int s57chart::DCRenderRect( wxMemoryDC& dcinput, const ViewPort& vp, wxRect* rec
 
 //      Render the areas quickly
     for( i = 0; i < PRIO_NUM; ++i ) {
-        if( ps52plib->m_nBoundaryStyle == SYMBOLIZED_BOUNDARIES ) top = razRules[i][4]; // Area Symbolized Boundaries
+        if( ps52plib->m_nBoundaryStyle == SYMBOLIZED_BOUNDARIES ) 
+            top = razRules[i][4]; // Area Symbolized Boundaries
         else
-            top = razRules[i][3];           // Area Plain Boundaries
+            top = razRules[i][3]; // Area Plain Boundaries
 
         while( top != NULL ) {
             crnt = top;
@@ -3179,7 +3188,8 @@ bool s57chart::DCRenderLPB( wxMemoryDC& dcinput, const ViewPort& vp, wxRect* rec
 //         pdcc = new wxDCClipper(dcinput, nr);
         }
 
-        if( ps52plib->m_nBoundaryStyle == SYMBOLIZED_BOUNDARIES ) top = razRules[i][4]; // Area Symbolized Boundaries
+        if( ps52plib->m_nBoundaryStyle == SYMBOLIZED_BOUNDARIES ) 
+            top = razRules[i][4]; // Area Symbolized Boundaries
         else
             top = razRules[i][3];           // Area Plain Boundaries
         while( top != NULL ) {
@@ -3191,13 +3201,14 @@ bool s57chart::DCRenderLPB( wxMemoryDC& dcinput, const ViewPort& vp, wxRect* rec
 
         top = razRules[i][2];           //LINES
         while( top != NULL ) {
-            ObjRazRules *crnt = top;
+            crnt = top;
             top = top->next;
             crnt->sm_transform_parms = &vp_transform;
             ps52plib->RenderObjectToDC( &dcinput, crnt, &tvp );
         }
 
-        if( ps52plib->m_nSymbolStyle == SIMPLIFIED ) top = razRules[i][0];       //SIMPLIFIED Points
+        if( ps52plib->m_nSymbolStyle == SIMPLIFIED ) 
+            top = razRules[i][0];       //SIMPLIFIED Points
         else
             top = razRules[i][1];           //Paper Chart Points Points
 
@@ -3231,34 +3242,37 @@ bool s57chart::DCRenderText( wxMemoryDC& dcinput, const ViewPort& vp )
     
     for( i = 0; i < PRIO_NUM; ++i ) {
         
-        if( ps52plib->m_nBoundaryStyle == SYMBOLIZED_BOUNDARIES ) top = razRules[i][4]; // Area Symbolized Boundaries
+        if( ps52plib->m_nBoundaryStyle == SYMBOLIZED_BOUNDARIES ) 
+            top = razRules[i][4]; // Area Symbolized Boundaries
         else
-            top = razRules[i][3];           // Area Plain Boundaries
-            while( top != NULL ) {
+            top = razRules[i][3]; // Area Plain Boundaries
+
+        while( top != NULL ) {
                 crnt = top;
                 top = top->next;               // next object
                 crnt->sm_transform_parms = &vp_transform;
                 ps52plib->RenderObjectToDCText( &dcinput, crnt, &tvp );
-            }
+        }
             
-            top = razRules[i][2];           //LINES
-            while( top != NULL ) {
-                ObjRazRules *crnt = top;
-                top = top->next;
-                crnt->sm_transform_parms = &vp_transform;
-                ps52plib->RenderObjectToDCText( &dcinput, crnt, &tvp );
-            }
-            
-            if( ps52plib->m_nSymbolStyle == SIMPLIFIED ) top = razRules[i][0];       //SIMPLIFIED Points
-        else
-            top = razRules[i][1];           //Paper Chart Points Points
-            
-            while( top != NULL ) {
+        top = razRules[i][2];           //LINES
+        while( top != NULL ) {
                 crnt = top;
                 top = top->next;
                 crnt->sm_transform_parms = &vp_transform;
                 ps52plib->RenderObjectToDCText( &dcinput, crnt, &tvp );
-            }
+        }
+            
+        if( ps52plib->m_nSymbolStyle == SIMPLIFIED ) 
+            top = razRules[i][0];       //SIMPLIFIED Points
+        else
+            top = razRules[i][1];           //Paper Chart Points Points
+            
+        while( top != NULL ) {
+                crnt = top;
+                top = top->next;
+                crnt->sm_transform_parms = &vp_transform;
+                ps52plib->RenderObjectToDCText( &dcinput, crnt, &tvp );
+        }
     }
             
     return true;
@@ -3272,7 +3286,10 @@ bool s57chart::IsCellOverlayType( char *pFullPath )
     wxFileName fn( wxString( pFullPath, wxConvUTF8 ) );
     //      Get the "Usage" character
     wxString cname = fn.GetName();
-    return ( (cname[2] == 'L') || (cname[2] == 'A'));
+    if(cname.Length() >= 3)
+        return ( (cname[2] == 'L') || (cname[2] == 'A'));
+    else
+        return false;
 }
 
 InitReturn s57chart::Init( const wxString& name, ChartInitFlag flags )
@@ -3381,7 +3398,6 @@ InitReturn s57chart::Init( const wxString& name, ChartInitFlag flags )
 
     if( ext == _T("000") ) {
         if( m_bbase_file_attr_known ) {
-            OCPNPlatform::ShowBusySpinner();
 
             int sret = FindOrCreateSenc( m_FullPath );
             if( sret != BUILD_SENC_OK ) {
@@ -3396,14 +3412,12 @@ InitReturn s57chart::Init( const wxString& name, ChartInitFlag flags )
     }
 
     else if( ext == _T("S57") ) {
-        OCPNPlatform::ShowBusySpinner();
 
         m_SENCFileName = m_TempFilePath;
         ret_value = PostInit( flags, m_global_color_scheme );
 
     }
 
-    OCPNPlatform::HideBusySpinner();
     
     s_bInS57--;
     return ret_value;
@@ -3630,7 +3644,7 @@ InitReturn s57chart::PostInit( ChartInitFlag flags, ColorScheme cs )
         SENCdir.Append( wxFileName::GetPathSeparator() );
     
     wxFileName s57File(m_SENCFileName);
-    wxFileName ThumbFileName( SENCdir, s57File.GetName(), _T("BMP") );
+    wxFileName ThumbFileName( SENCdir, s57File.GetName().Mid( 13 ), _T("BMP") );
 
     if( !ThumbFileName.FileExists() || m_bneed_new_thumbnail )
         BuildThumbnail( ThumbFileName.GetFullPath() );
@@ -3744,6 +3758,12 @@ void s57chart::SetSafetyContour(void)
      } else {
          m_next_safe_cnt = (double) 1e6;
      }
+     
+     // A safety contour greater than "Deep Depth" makes no sense...
+     // So, declare "no suitable safety depth contour"
+     if(m_next_safe_cnt > S52_getMarinerParam(S52_MAR_DEEP_CONTOUR))
+         m_next_safe_cnt = (double) 1e6;
+     
 }
 
 void s57chart::InvalidateCache()
@@ -4756,6 +4776,8 @@ bool s57chart::GetBaseFileAttr( const wxString& file000 )
 
 int s57chart::BuildSENCFile( const wxString& FullPath000, const wxString& SENCFileName, bool b_progress )
 {
+    OCPNPlatform::ShowBusySpinner();
+    
     //  LOD calculation
     double display_ppm = 1 / .00025;     // nominal for most LCD displays
     double meters_per_pixel_max_scale = GetNormalScaleMin(0,g_b_overzoom_x)/display_ppm;
@@ -4773,6 +4795,8 @@ int s57chart::BuildSENCFile( const wxString& FullPath000, const wxString& SENCFi
 
     int ret = senc.createSenc200( FullPath000, SENCFileName, b_progress );
 
+    OCPNPlatform::HideBusySpinner();
+    
     if(ret == ERROR_INGESTING000)
         return BUILD_SENC_NOK_PERMANENT;
     else
@@ -5444,27 +5468,19 @@ bool s57chart::DoesLatLonSelectObject( float lat, float lon, float select_radius
         }
 
         case GEO_LINE: {
+            //  Coarse test first
+            if( !obj->BBObj.ContainsMarge( lat, lon, select_radius ) )
+                return false;
+            
+            float sel_rad_meters = select_radius * 1852 * 60;       // approximately
+            double easting, northing;
+            toSM( lat, lon, ref_lat, ref_lon, &easting, &northing );
+            
             if( obj->geoPt ) {
-                //  Coarse test first
-                if( !obj->BBObj.ContainsMarge( lat, lon, select_radius ) ) return false;
 
                 //  Line geometry is carried in SM or CM93 coordinates, so...
                 //  make the hit test using SM coordinates, converting from object points to SM using per-object conversion factors.
 
-                float sel_rad_meters = select_radius * 1852 * 60;       // approximately
-
-                double easting, northing;
-                toSM( lat, lon, ref_lat, ref_lon, &easting, &northing );
-                
-#if 0
-                float *ptest;
-                int ntp = GetLineFeaturePointArray(obj, (void **) &ptest);
-
-                if(!ntp)
-                    return false;
-
-                float *pfree = ptest;
-#endif
                 pt *ppt = obj->geoPt;
                 int npt = obj->npt;
 
@@ -5475,20 +5491,9 @@ bool s57chart::DoesLatLonSelectObject( float lat, float lon, float select_radius
 
                 double north0 = ( ppt->y * yr ) + yo;
                 double east0 = ( ppt->x * xr ) + xo;
-#if 0
-                float a0 = *ptest++;
-                float b0 = *ptest++;
-#endif
                 ppt++;
 
                 for( int ip = 1; ip < npt; ip++ ) {
-#if 0
-                    float a = *ptest++;
-                    float b = *ptest++;
-                    float c = ppt->y;
-                    float d = ppt->x;
-                    printf("%g %g %g %g\n", a,b,c,d);
-#endif
 
                     double north = ( ppt->y * yr ) + yo;
                     double east = ( ppt->x * xr ) + xo;
@@ -5498,8 +5503,6 @@ bool s57chart::DoesLatLonSelectObject( float lat, float lon, float select_radius
                         <= ( fmax(north, north0) + sel_rad_meters ) ) if( easting
                         >= ( fmin(east, east0) - sel_rad_meters ) ) if( easting
                         <= ( fmax(east, east0) + sel_rad_meters ) ) {
-                        //                                                    index = ip;
-                        //free (pfree);
                         return true;
                     }
 
@@ -5507,9 +5510,53 @@ bool s57chart::DoesLatLonSelectObject( float lat, float lon, float select_radius
                     east0 = east;
                     ppt++;
                 }
-                //free (pfree);
             }
-
+            else{                       // in oSENC V2, Array of points is stored in prearranged VBO array.
+                if( obj->m_ls_list ){
+                
+                    float *ppt;
+                    unsigned char *vbo_point = (unsigned char *)obj->m_chart_context->chart->GetLineVertexBuffer();
+                    line_segment_element *ls = obj->m_ls_list;
+        
+                    while(ls && vbo_point){
+                        int nPoints;
+                        if( (ls->ls_type == TYPE_EE) || (ls->ls_type == TYPE_EE_REV) ){
+                            ppt = (float *)(vbo_point + ls->pedge->vbo_offset);
+                            nPoints = ls->pedge->nCount;
+                        }
+                        else{
+                            ppt = (float *)(vbo_point + ls->pcs->vbo_offset);
+                            nPoints = 2;
+                        }
+                    
+                        float north0 = ppt[1];
+                        float east0 = ppt[0];
+                        
+                        ppt += 2;
+                    
+                        for(int ip=0 ; ip < nPoints - 1 ; ip++){
+                            
+                            float north = ppt[1];
+                            float east = ppt[0];
+                            
+                            if( northing >= ( fmin(north, north0) - sel_rad_meters ) )
+                                if( northing <= ( fmax(north, north0) + sel_rad_meters ) )
+                                    if( easting >= ( fmin(east, east0) - sel_rad_meters ) )
+                                        if( easting <= ( fmax(east, east0) + sel_rad_meters ) ) {
+                                 return true;
+                             }
+                                    
+                             north0 = north;
+                             east0 = east;
+                                    
+                             ppt += 2;
+                        }            
+                
+                        ls = ls->next;
+                    }
+                }
+            }
+            
             break;
         }
 
@@ -6227,7 +6274,11 @@ wxString s57chart::CreateObjDescriptions( ListOfObjRazRules* rule_list )
                             attribStr << _T("</font></td></tr>\n");
                             inDepthRange = false;
                         }
-                        attribStr << _T("<tr><td valign=top><font size=-2>") << curAttrName;
+                        attribStr << _T("<tr><td valign=top><font size=-2>");
+                        if(curAttrName == _T("catgeo"))
+                            attribStr << _T("CATGEO");
+                        else
+                            attribStr << curAttrName;
                         attribStr << _T("</font></td><td>&nbsp;&nbsp;</td><td valign=top><font size=-1>");
                     }
                 }
@@ -6243,9 +6294,13 @@ wxString s57chart::CreateObjDescriptions( ListOfObjRazRules* rule_list )
                 if( isLight ) {
                     curLight->attributeValues.Add( value );
                 } else {
-                    if( curAttrName == _T("INFORM") || curAttrName == _T("NINFOM") ) value.Replace(
-                            _T("|"), _T("<br>") );
-                    attribStr << value;
+                    if( curAttrName == _T("INFORM") || curAttrName == _T("NINFOM") )
+                        value.Replace(_T("|"), _T("<br>") );
+                    
+                    if(curAttrName == _T("catgeo"))
+                        attribStr << type2str(current->obj->Primitive_type);
+                    else
+                        attribStr << value;
 
                     if( !( curAttrName == _T("DRVAL1") ) ) {
                         attribStr << _T("</font></td></tr>\n");
