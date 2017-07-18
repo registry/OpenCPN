@@ -189,6 +189,7 @@ private:
 
       float             m_IconScaleFactor;
       wxBitmap          m_ScaledBMP;
+      bool              m_bPreScaled;
 };
 
 WX_DECLARE_LIST(RoutePoint, RoutePointList);// establish class as list member

@@ -1597,6 +1597,10 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
         if ( event.ControlDown() )
             key_char -= 64;
 
+        if (key_char >= '0' && key_char <= '9')
+            gFrame->SetGroupIndex( key_char - '0' );
+        else
+
         switch( key_char ) {
         case 'A':
             parent_frame->ToggleAnchor();
@@ -2257,7 +2261,7 @@ void ChartCanvas::OnRolloverPopupTimerEvent( wxTimerEvent& event )
                 showAISRollover = true;
 
                 if( NULL == m_pAISRolloverWin ) {
-                    m_pAISRolloverWin = new RolloverWin( this, 10 );
+                    m_pAISRolloverWin = new RolloverWin( this );
                     m_pAISRolloverWin->IsActive( false );
                     b_need_refresh = true;
                 }
@@ -2326,7 +2330,7 @@ void ChartCanvas::OnRolloverPopupTimerEvent( wxTimerEvent& event )
                 showRollover = true;
 
                 if( NULL == m_pRouteRolloverWin ) {
-                    m_pRouteRolloverWin = new RolloverWin( this );
+                    m_pRouteRolloverWin = new RolloverWin( this, 10 );
                     m_pRouteRolloverWin->IsActive( false );
                 }
 
@@ -2399,9 +2403,11 @@ void ChartCanvas::OnRolloverPopupTimerEvent( wxTimerEvent& event )
                 node = node->GetNext();
         }
     } else {
-        //    Is the cursor still in select radius?
-        if( !pSelect->IsSelectableSegmentSelected( m_cursor_lat, m_cursor_lon,
-                m_pRolloverRouteSeg ) ) showRollover = false;
+        //    Is the cursor still in select radius, and not timed out?
+        if( !pSelect->IsSelectableSegmentSelected( m_cursor_lat, m_cursor_lon, m_pRolloverRouteSeg ) )
+            showRollover = false;
+        else if(m_pRouteRolloverWin && !m_pRouteRolloverWin->IsActive())
+            showRollover = false;
         else
             showRollover = true;
     }
@@ -2414,7 +2420,7 @@ void ChartCanvas::OnRolloverPopupTimerEvent( wxTimerEvent& event )
     if( m_pAISRolloverWin && m_pAISRolloverWin->IsActive() )
         showRollover = false;
 
-    if( m_pRouteRolloverWin && m_pRouteRolloverWin->IsActive() && !showRollover ) {
+    if( m_pRouteRolloverWin /*&& m_pRouteRolloverWin->IsActive()*/ && !showRollover ) {
         m_pRouteRolloverWin->IsActive( false );
         m_pRolloverRouteSeg = NULL;
         m_pRouteRolloverWin->Destroy();
