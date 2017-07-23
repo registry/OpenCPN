@@ -83,6 +83,10 @@
 #include "macutils.h"
 #endif
 
+#ifdef __WXGTK__
+#include <gdk/gdk.h>
+#endif
+
 DECLARE_APP(MyApp)
 
 void appendOSDirSlash( wxString* pString );
@@ -308,6 +312,7 @@ catch_signals(int signo)
             break;
             
         case SIGTERM:
+        case SIGHUP:
             gFrame->FastClose();
             break;
             
@@ -529,11 +534,14 @@ void OCPNPlatform::Initialize_1( void )
             
             //      Register my request for some signals
             sigaction(SIGUSR1, &sa_all, NULL);
-            
             sigaction(SIGUSR1, NULL, &sa_all_old);// inspect existing action for this signal
             
             sigaction(SIGTERM, &sa_all, NULL);
             sigaction(SIGTERM, NULL, &sa_all_old);
+            
+            sigaction(SIGHUP, &sa_all, NULL);
+            sigaction(SIGHUP, NULL, &sa_all_old);
+            
 #endif
 
 #ifdef __OCPN__ANDROID__
@@ -1565,6 +1573,12 @@ double  OCPNPlatform::GetDisplaySizeMM()
         m_displaySizeMM = wxGetDisplaySizeMM();
 
     double ret = m_displaySizeMM.GetWidth();
+    
+#ifdef __WXGTK__
+    GdkScreen *screen = gdk_screen_get_default();
+    ret = (double)gdk_screen_get_monitor_width_mm(screen, 0);
+#endif    
+    
     
 #ifdef __WXMSW__    
     int w,h;
