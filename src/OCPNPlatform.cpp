@@ -298,6 +298,8 @@ int MyNewHandler( size_t size )
 //      SIGSEGV
 //      Some undefined segfault......
 
+int s_inhup;
+
 void
 catch_signals(int signo)
 {
@@ -311,9 +313,19 @@ catch_signals(int signo)
             siglongjmp(env, 1);// jump back to the setjmp() point
             break;
             
-        case SIGTERM:
         case SIGHUP:
-            gFrame->FastClose();
+            if(!s_inhup){
+                s_inhup++;                  // incase SIGHUP is closely followed by SIGTERM
+                gFrame->FastClose();
+            }
+            break;             
+            
+        case SIGTERM:
+            if(!s_inhup){
+                s_inhup++;                  // incase SIGHUP is closely followed by SIGTERM
+                gFrame->FastClose();
+            }
+                
             break;
             
         default:
@@ -578,7 +590,7 @@ void OCPNPlatform::OnExit_2( void ){
 #ifdef OCPN_USE_CRASHRPT
 #ifndef _DEBUG
         // Uninstall Windows crash reporting
-    crUninstall();
+//    crUninstall();
 #endif
 #endif
     
