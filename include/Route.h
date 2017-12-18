@@ -134,7 +134,6 @@ public:
       wxString    m_Colour;
       bool        m_btemp;
       int         m_hiliteWidth;
-      bool        m_bisTrack;
       
 private:
       LLBBox     RBBox;
