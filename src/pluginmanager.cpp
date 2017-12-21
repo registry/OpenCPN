@@ -128,6 +128,7 @@ extern ocpnFloatingToolbarDialog *g_MainToolbar;
 extern int              g_chart_zoom_modifier;
 extern int              g_chart_zoom_modifier_vector;
 extern double           g_display_size_mm;
+extern bool             g_bopengl;
 
 unsigned int      gs_plib_flags;
 
@@ -486,6 +487,12 @@ bool PlugInManager::LoadAllPlugIns(const wxString &plugin_dir, bool load_enabled
 
     // Tell all the PlugIns about the current OCPN configuration
     SendConfigToAllPlugIns();
+    
+    // Inform Plugins of OpenGL configuration, if enabled
+    if(g_bopengl){
+        if(cc1->GetglCanvas())
+            cc1->GetglCanvas()->SendJSONConfigMessage();
+    }
     
     //  And then reload all catalogs.
     ReloadLocale();
@@ -3235,6 +3242,16 @@ wxArrayString GetWaypointGUIDArray( void )
     return result;
 }
 
+wxArrayString GetIconNameArray(void)
+{
+	wxArrayString result;
+
+	for (int i = 0; i < pWayPointMan->GetNumIcons(); i++) {
+		wxString *ps = pWayPointMan->GetIconKey(i);
+		result.Add(*ps);
+	}
+	return result;
+}
 
 bool AddPlugInRoute( PlugIn_Route *proute, bool b_permanent )
 {

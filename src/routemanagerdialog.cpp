@@ -1611,10 +1611,8 @@ void RouteManagerDialog::OnTrkMenuSelected( wxCommandEvent &event )
 
                 for(int i=0; i<mergeTrack->GetnPoints(); i++) {
                     tPoint = mergeTrack->GetPoint(i);
-                    newPoint = new TrackPoint( tPoint->m_lat, tPoint->m_lon );
+                    newPoint = new TrackPoint( tPoint->m_lat, tPoint->m_lon, tPoint->GetCreateTime() );
                     newPoint->m_GPXTrkSegNo = 1;
-
-                    newPoint->SetCreateTime(tPoint->GetCreateTime());
 
                     targetTrack->AddPoint( newPoint );
 
@@ -1717,7 +1715,6 @@ void RouteManagerDialog::UpdateTrkListCtrl()
 
     m_pTrkListCtrl->SortItems( SortRoutesOnName, (wxIntPtr) m_pTrkListCtrl );
 
-    m_pTrkListCtrl->SortItems( SortRoutesOnName, (wxIntPtr) m_pTrkListCtrl );
     m_pTrkListCtrl->SetColumnWidth(0, 4 * m_charWidth);
     
     // restore selection if possible

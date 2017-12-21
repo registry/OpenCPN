@@ -340,6 +340,7 @@ extern int              g_ais_cog_predictor_width;
 
 extern int              g_route_line_width;
 extern int              g_track_line_width;
+extern wxColour         g_colourTrackLineColour;
 extern wxString         g_default_wp_icon;
 
 extern ChartGroupArray  *g_pGroupArray;
@@ -397,6 +398,10 @@ extern int              g_iENCToolbarPosX;
 extern int              g_iENCToolbarPosY;
 
 extern bool             g_bSpaceDropMark;
+
+extern bool             g_bShowTide;
+extern bool             g_bShowCurrent;
+
 
 extern wxString         g_uiStyle;
 
@@ -567,6 +572,8 @@ int MyConfig::LoadMyConfig()
     Read( _T ( "AutoHideToolbarSecs" ), &g_nAutoHideToolbar, 0 );
     
     Read( _T ( "UseSimplifiedScalebar" ), &g_bsimplifiedScalebar, 0 );
+    Read( _T ( "ShowTide" ), &g_bShowTide, 0 );
+    Read( _T ( "ShowCurrent" ), &g_bShowCurrent, 0 );
     
     int size_mm;
     Read( _T ( "DisplaySizeMM" ), &size_mm, -1 );
@@ -1341,6 +1348,11 @@ int MyConfig::LoadMyConfig()
 
     Read( _T ( "RouteLineWidth" ), &g_route_line_width, 2 );
     Read( _T ( "TrackLineWidth" ), &g_track_line_width, 2 );
+    g_colourTrackLineColour = wxColour( 243, 229, 47 );
+    wxString l_wxsTrackLineColour;
+    Read( _T( "TrackLineColour" ), &l_wxsTrackLineColour );
+    g_colourTrackLineColour.Set( l_wxsTrackLineColour );
+
     Read( _T ( "CurrentArrowScale" ), &g_current_arrow_scale, 100 );
     Read( _T ( "TideRectangleScale" ), &g_tide_rectangle_scale, 100 );
     Read( _T ( "TideCurrentWindowScale" ), &g_tcwin_scale, 100 );
@@ -1965,6 +1977,9 @@ void MyConfig::UpdateSettings()
 
     if( cc1 ) Write( _T ( "ChartQuiltingInitial" ), cc1->GetQuiltMode() );
 
+    if( cc1 ) Write( _T ( "ShowTide" ), cc1->GetbShowTide() );
+    if( cc1 ) Write( _T ( "ShowCurrent" ), cc1->GetbShowCurrent() );
+
     Write( _T ( "NMEALogWindowSizeX" ), NMEALogWindow::Get().GetSizeW());
     Write( _T ( "NMEALogWindowSizeY" ), NMEALogWindow::Get().GetSizeH());
     Write( _T ( "NMEALogWindowPosX" ), NMEALogWindow::Get().GetPosX());
@@ -2288,6 +2303,7 @@ void MyConfig::UpdateSettings()
 
     Write( _T ( "RouteLineWidth" ), g_route_line_width );
     Write( _T ( "TrackLineWidth" ), g_track_line_width );
+    Write( _T ( "TrackLineColour" ), g_colourTrackLineColour.GetAsString( wxC2S_HTML_SYNTAX ) );
     Write( _T ( "CurrentArrowScale" ), g_current_arrow_scale );
     Write( _T ( "TideRectangleScale" ), g_tide_rectangle_scale );
     Write( _T ( "TideCurrentWindowScale" ), g_tcwin_scale );

@@ -146,6 +146,15 @@ bool ChartTableHeader::CheckValid()
 // ChartTableEntry
 ///////////////////////////////////////////////////////////////////////
 
+void ChartTableEntry::SetScale( int scale )
+{
+    Scale = scale;
+    rounding = 0;
+    // XXX find the right rounding
+    if (Scale >= 1000)
+       rounding = 5 *pow(10, log10(Scale) -2);
+}
+
 ChartTableEntry::ChartTableEntry(ChartBase &theChart)
 {
     Clear();
@@ -155,10 +164,10 @@ ChartTableEntry::ChartTableEntry(ChartBase &theChart)
     pFullPath = pt;
 
 
+    SetScale(theChart.GetNativeScale());
 
     ChartType = theChart.GetChartType();
     ChartFamily = theChart.GetChartFamily();
-    Scale = theChart.GetNativeScale();
 
     Skew = theChart.GetChartSkew();
     ProjectionType = theChart.GetChartProjectionType();
@@ -502,7 +511,7 @@ bool ChartTableEntry::Read(const ChartDatabase *pDb, wxInputStream &is)
         Skew = cte.skew;
         ProjectionType = cte.ProjectionType;
         
-        Scale = cte.Scale;
+        SetScale(cte.Scale);
         edition_date = cte.edition_date;
         file_date = cte.file_date;
         
@@ -579,7 +588,7 @@ bool ChartTableEntry::Read(const ChartDatabase *pDb, wxInputStream &is)
         Skew = cte.skew;
         ProjectionType = cte.ProjectionType;
         
-        Scale = cte.Scale;
+        SetScale(cte.Scale);
         edition_date = cte.edition_date;
         file_date = cte.file_date;
         
@@ -657,7 +666,7 @@ bool ChartTableEntry::Read(const ChartDatabase *pDb, wxInputStream &is)
           Skew = cte.skew;
           ProjectionType = cte.ProjectionType;
 
-          Scale = cte.Scale;
+          SetScale(cte.Scale);
           edition_date = cte.edition_date;
           file_date = cte.file_date;
 
@@ -709,7 +718,7 @@ bool ChartTableEntry::Read(const ChartDatabase *pDb, wxInputStream &is)
 
       m_bbox.Set(LatMin, LatMax, LonMin, LonMax);
       
-      Scale = cte.Scale;
+      SetScale(cte.Scale);
       edition_date = cte.edition_date;
       file_date = cte.file_date;
 
@@ -759,7 +768,7 @@ bool ChartTableEntry::Read(const ChartDatabase *pDb, wxInputStream &is)
 
           m_bbox.Set(LatMin, LatMax, LonMin, LonMax);
           
-          Scale = cte.Scale;
+          SetScale(cte.Scale);
           edition_date = cte.edition_date;
           file_date = 0;                        //  file_date does not exist in V14;
           nPlyEntries = cte.nPlyEntries;
@@ -896,6 +905,165 @@ void ChartTableEntry::ReEnable()
     }
 }
 
+std::vector<float> ChartTableEntry::GetReducedPlyPoints()
+{
+    if(m_reducedPlyPoints.size())
+        return m_reducedPlyPoints;
+    
+    //  Reduce the LOD of the chart outline PlyPoints
+    float LOD_meters = 1; 
+    
+    float plylat, plylon;
+    const int nPoints = GetnPlyEntries();
+
+    float *fpo = GetpPlyTable();
+
+    double *ppd = new double[nPoints * 2];
+    double *ppsm = new double[nPoints * 2];
+    double *npr = ppd;
+    double *npsm= ppsm;
+    for( int i = 0; i < nPoints; i++ ) {
+        plylat = fpo[i*2];
+        plylon = fpo[i*2+1];
+
+        double x, y;
+        toSM(plylat, plylon, fpo[0], fpo[1], &x, &y);
+
+        *npr++ = plylon;
+        *npr++ = plylat;
+        *npsm++ = x;
+        *npsm++ = y;
+    }
+
+    wxArrayInt index_keep;
+    if(nPoints > 10){
+        index_keep.Clear();
+        index_keep.Add(0);
+        index_keep.Add(nPoints-1);
+        index_keep.Add(1);
+        index_keep.Add(nPoints-2);
+
+                
+        DouglasPeuckerM(ppsm, 1, nPoints-2, LOD_meters , &index_keep);
+                
+    }
+    else {
+        index_keep.Clear();
+        for(int i = 0 ; i < nPoints ; i++)
+            index_keep.Add(i);
+    }
+            
+    double *ppr = ppd;  
+    for(int ip = 0 ; ip < nPoints ; ip++){
+        double x = *ppr++;
+        double y = *ppr++;
+                
+        for(unsigned int j=0 ; j < index_keep.GetCount() ; j++){
+            if(index_keep.Item(j) == ip){
+                m_reducedPlyPoints.push_back(x);
+                m_reducedPlyPoints.push_back(y);
+                break;
+            }
+        }
+    }
+    
+    delete[] ppd;
+    delete[] ppsm;
+    
+    int nprr = m_reducedPlyPoints.size() / 2;
+   
+    return m_reducedPlyPoints;
+
+}
+
+std::vector<float> ChartTableEntry::GetReducedAuxPlyPoints( int iTable)
+{
+    //  Maybe need to initialize the vector
+    if( !m_reducedAuxPlyPointsVector.size()){
+        std::vector<float> vec;
+        for(int i=0 ; i < GetnAuxPlyEntries() ; i++){
+            m_reducedAuxPlyPointsVector.push_back(vec);
+        }
+    }
+    
+    std::vector<float> vec;
+
+    //  Invalid parameter
+    if((unsigned int)iTable >= m_reducedAuxPlyPointsVector.size())
+        return vec;
+    
+    if( m_reducedAuxPlyPointsVector.at(iTable).size())
+        return m_reducedAuxPlyPointsVector.at(iTable);
+    
+    //  Reduce the LOD of the chart outline PlyPoints
+    float LOD_meters = 1.0;
+    
+    const int nPoints = GetAuxCntTableEntry(iTable);
+    float *fpo = GetpAuxPlyTableEntry(iTable);
+
+    double *ppd = new double[nPoints * 2];
+    double *ppsm = new double[nPoints * 2];
+    double *npr = ppd;
+    double *npsm= ppsm;
+    float plylat, plylon;
+    
+    for( int i = 0; i < nPoints; i++ ) {
+        plylat = fpo[i*2];
+        plylon = fpo[i*2+1];
+
+        double x, y;
+        toSM(plylat, plylon, fpo[0], fpo[1], &x, &y);
+
+        *npr++ = plylon;
+        *npr++ = plylat;
+        *npsm++ = x;
+        *npsm++ = y;
+    }
+
+
+    wxArrayInt index_keep;
+    if(nPoints > 10 ){
+        index_keep.Clear();
+        index_keep.Add(0);
+        index_keep.Add(nPoints-1);
+        index_keep.Add(1);
+        index_keep.Add(nPoints-2);
+                
+        DouglasPeuckerM(ppsm, 1, nPoints - 2, LOD_meters, &index_keep);
+                
+    }
+    else {
+        index_keep.Clear();
+        for(int i = 0 ; i < nPoints ; i++)
+            index_keep.Add(i);
+    }
+   
+   int nnn = index_keep.GetCount();
+   
+    double *ppr = ppd;  
+    for(int ip = 0 ; ip < nPoints ; ip++){
+        double x = *ppr++;
+        double y = *ppr++;
+                
+        for(unsigned int j=0 ; j < index_keep.GetCount() ; j++){
+            if(index_keep.Item(j) == ip){
+                vec.push_back(x);
+                vec.push_back(y);
+                break;
+            }
+        }
+    }
+    
+    delete[] ppd;
+    delete[] ppsm;
+
+    m_reducedAuxPlyPointsVector[iTable] = vec;
+    
+    int nprr = vec.size() / 2;
+    
+    return vec;
+
+}
 
 ///////////////////////////////////////////////////////////////////////
 // ChartDatabase
@@ -2612,6 +2780,37 @@ int  ChartDatabase::GetnAuxPlyEntries(int dbIndex)
       else
             return 0;
 }
+
+//-------------------------------------------------------------------
+//      Get vector of reduced Plypoints
+//-------------------------------------------------------------------
+std::vector<float> ChartDatabase::GetReducedPlyPoints(int dbIndex)
+{
+    if((bValid) && (dbIndex >= 0) && (dbIndex < (int)active_chartTable.size())){
+        ChartTableEntry *pentry = GetpChartTableEntry(dbIndex);
+        if(pentry)
+            return pentry->GetReducedPlyPoints();
+    }
+    
+    std::vector<float> dummy;
+    return dummy;
+}
+
+//-------------------------------------------------------------------
+//      Get vector of reduced AuxPlypoints
+//-------------------------------------------------------------------
+std::vector<float> ChartDatabase::GetReducedAuxPlyPoints(int dbIndex, int iTable)
+{
+    if((bValid) && (dbIndex >= 0) && (dbIndex < (int)active_chartTable.size())){
+        ChartTableEntry *pentry = GetpChartTableEntry(dbIndex);
+        if(pentry)
+            return pentry->GetReducedAuxPlyPoints( iTable );
+    }
+    
+    std::vector<float> dummy;
+    return dummy;
+}
+
 
 bool  ChartDatabase::IsChartAvailable(int dbIndex)
 {
