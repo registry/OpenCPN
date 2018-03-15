@@ -120,6 +120,7 @@ extern sigjmp_buf           env;                    // the context saved by sigs
 #endif
 
 extern float  g_ChartScaleFactorExp;
+extern float  g_ShipScaleFactorExp;
 
 #include <vector>
 
@@ -324,7 +325,12 @@ extern double           g_display_size_mm;
 
 extern bool             g_bshowToolbar;
 extern ocpnFloatingToolbarDialog *g_MainToolbar;
+extern wxColour         g_colourOwnshipRangeRingsColour;
 
+// LIVE ETA OPTION
+bool                    g_bShowLiveETA;
+double                  g_defaultBoatSpeed;
+double                  g_defaultBoatSpeedUserUnit;
 
 
 // "Curtain" mode parameters
@@ -390,6 +396,7 @@ ChartCanvas::ChartCanvas ( wxFrame *frame ) :
     m_bMeasure_Active = false;
     m_bMeasure_DistCircle = false;
     m_pMeasureRoute = NULL;
+    m_pTrackRolloverWin = NULL;
     m_pRouteRolloverWin = NULL;
     m_pAISRolloverWin = NULL;
     m_bedge_pan = false;
@@ -408,6 +415,7 @@ ChartCanvas::ChartCanvas ( wxFrame *frame ) :
     m_pFoundRoutePoint            = NULL;
 
     m_pRolloverRouteSeg           = NULL;
+    m_pRolloverTrackSeg           = NULL;
     m_bsectors_shown              = false;
     
     m_bbrightdir = false;
@@ -803,6 +811,7 @@ ChartCanvas::~ChartCanvas()
     delete pRotDefTimer;
     delete m_DoubleClickTimer;
 
+    delete m_pTrackRolloverWin;
     delete m_pRouteRolloverWin;
     delete m_pAISRolloverWin;
     delete m_pBrightPopup;
@@ -1646,8 +1655,13 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
                     {
                         pPopupDetailSlider = new PopUpDSlide( this, -1, ChartType, ChartFam,
                             wxPoint( g_detailslider_dialog_x, g_detailslider_dialog_y ),
-                            wxDefaultSize, wxSIMPLE_BORDER, _("") );
-                        if (pPopupDetailSlider) pPopupDetailSlider->ShowModal();
+                            wxDefaultSize, wxSIMPLE_BORDER, _T("") );
+                        if (pPopupDetailSlider)
+#ifdef __WXOSX__
+                            pPopupDetailSlider->Show();
+#else
+                            pPopupDetailSlider->ShowModal();
+#endif
                     }
                 }
             else //( !pPopupDetailSlider ) close popupslider
@@ -1696,6 +1710,10 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
 
         case 'T':
             parent_frame->ToggleENCText();
+            break;
+
+        case 'U':
+            parent_frame->ToggleDataQuality();
             break;
 
         case 1:                      // Ctrl A
@@ -2158,10 +2176,10 @@ void ChartCanvas::SetColorScheme( ColorScheme cs )
     if( cs == GLOBAL_COLOR_SCHEME_DUSK || cs == GLOBAL_COLOR_SCHEME_NIGHT ) {
         SetBackgroundColour( wxColour(0,0,0) );
         
-        SetWindowStyleFlag( (GetWindowStyleFlag() && !wxSIMPLE_BORDER) || wxNO_BORDER);
+        SetWindowStyleFlag( (GetWindowStyleFlag() & !wxSIMPLE_BORDER) | wxNO_BORDER);
     }
     else{
-        SetWindowStyleFlag( (GetWindowStyleFlag() && !wxNO_BORDER) || wxSIMPLE_BORDER);
+        SetWindowStyleFlag( (GetWindowStyleFlag() & !wxNO_BORDER) | wxSIMPLE_BORDER);
         SetBackgroundColour( wxNullColour );
     }
         
@@ -2287,13 +2305,11 @@ void ChartCanvas::OnRolloverPopupTimerEvent( wxTimerEvent& event )
                     m_pAISRolloverWin->IsActive( false );
                     b_need_refresh = true;
                 }
-
-                //      Sometimes the mouse moves fast enough to get over a new AIS target before
-                //      the one-shot has fired to remove the old target.
-                //      Result:  wrong target data is shown.
-                //      Detect this case,close the existing rollover ASAP, and restart the timer.
-                if( m_pAISRolloverWin && m_pAISRolloverWin->IsActive() &&
-                    m_AISRollover_MMSI && (m_AISRollover_MMSI != FoundAIS_MMSI) ){
+                else if( m_pAISRolloverWin->IsActive() && m_AISRollover_MMSI && m_AISRollover_MMSI != FoundAIS_MMSI ){
+                    //      Sometimes the mouse moves fast enough to get over a new AIS target before
+                    //      the one-shot has fired to remove the old target.
+                    //      Result:  wrong target data is shown.
+                    //      Detect this case,close the existing rollover ASAP, and restart the timer.
                     m_RolloverPopupTimer.Start( 50, wxTIMER_ONE_SHOT );
                     m_pAISRolloverWin->IsActive( false );
                     m_AISRollover_MMSI = 0;
@@ -2334,7 +2350,7 @@ void ChartCanvas::OnRolloverPopupTimerEvent( wxTimerEvent& event )
 
     // Now the Route info rollover
     // Show the route segment info
-    bool showRollover = false;
+    bool showRouteRollover = false;
 
     if( NULL == m_pRolloverRouteSeg ) {
         //    Get a list of all selectable sgements, and search for the first visible segment as the rollover target.
@@ -2349,7 +2365,7 @@ void ChartCanvas::OnRolloverPopupTimerEvent( wxTimerEvent& event )
 
             if( pr && pr->IsVisible() ) {
                 m_pRolloverRouteSeg = pFindSel;
-                showRollover = true;
+                showRouteRollover = true;
 
                 if( NULL == m_pRouteRolloverWin ) {
                     m_pRouteRolloverWin = new RolloverWin( this, 10 );
@@ -2418,7 +2434,7 @@ void ChartCanvas::OnRolloverPopupTimerEvent( wxTimerEvent& event )
                     m_pRouteRolloverWin->SetBitmap( LEG_ROLLOVER );
                     m_pRouteRolloverWin->IsActive( true );
                     b_need_refresh = true;
-                    showRollover = true;
+                    showRouteRollover = true;
                     break;
                 }
             } else
@@ -2427,29 +2443,135 @@ void ChartCanvas::OnRolloverPopupTimerEvent( wxTimerEvent& event )
     } else {
         //    Is the cursor still in select radius, and not timed out?
         if( !pSelect->IsSelectableSegmentSelected( m_cursor_lat, m_cursor_lon, m_pRolloverRouteSeg ) )
-            showRollover = false;
+            showRouteRollover = false;
         else if(m_pRouteRolloverWin && !m_pRouteRolloverWin->IsActive())
-            showRollover = false;
+            showRouteRollover = false;
         else
-            showRollover = true;
+            showRouteRollover = true;
     }
 
     //    If currently creating a route, do not show this rollover window
     if( parent_frame->nRoute_State )
-        showRollover = false;
+        showRouteRollover = false;
 
     //    Similar for AIS target rollover window
     if( m_pAISRolloverWin && m_pAISRolloverWin->IsActive() )
-        showRollover = false;
+        showRouteRollover = false;
 
-    if( m_pRouteRolloverWin /*&& m_pRouteRolloverWin->IsActive()*/ && !showRollover ) {
+    if( m_pRouteRolloverWin /*&& m_pRouteRolloverWin->IsActive()*/ && !showRouteRollover ) {
         m_pRouteRolloverWin->IsActive( false );
         m_pRolloverRouteSeg = NULL;
         m_pRouteRolloverWin->Destroy();
         m_pRouteRolloverWin = NULL;
         b_need_refresh = true;
-    } else if( m_pRouteRolloverWin && showRollover ) {
+    } else if( m_pRouteRolloverWin && showRouteRollover ) {
         m_pRouteRolloverWin->IsActive( true );
+        b_need_refresh = true;
+    }
+
+    // Now the Track info rollover
+    // Show the track segment info
+    bool showTrackRollover = false;
+
+    if( NULL == m_pRolloverTrackSeg ) {
+        //    Get a list of all selectable sgements, and search for the first visible segment as the rollover target.
+
+        SelectableItemList SelList = pSelect->FindSelectionList( m_cursor_lat, m_cursor_lon,
+                                     SELTYPE_TRACKSEGMENT );
+        wxSelectableItemListNode *node = SelList.GetFirst();
+        while( node ) {
+            SelectItem *pFindSel = node->GetData();
+
+            Track *pt = (Track *) pFindSel->m_pData3;        //candidate
+
+            if( pt && pt->IsVisible() ) {
+                m_pRolloverTrackSeg = pFindSel;
+                showTrackRollover = true;
+
+                if( NULL == m_pTrackRolloverWin ) {
+		   m_pTrackRolloverWin = new RolloverWin( this, 10 );
+                    m_pTrackRolloverWin->IsActive( false );
+                }
+
+                if( !m_pTrackRolloverWin->IsActive() ) {
+                    wxString s;
+                    TrackPoint *segShow_point_a = (TrackPoint *) m_pRolloverTrackSeg->m_pData1;
+                    TrackPoint *segShow_point_b = (TrackPoint *) m_pRolloverTrackSeg->m_pData2;
+
+                    double brg, dist;
+                    DistanceBearingMercator( segShow_point_b->m_lat, segShow_point_b->m_lon,
+                                             segShow_point_a->m_lat, segShow_point_a->m_lon, &brg, &dist );
+
+                    if( !pt->m_bIsInLayer )
+                        s.Append( _("Track") + _T(": ") );
+                    else
+                        s.Append( _("Layer Track: ") );
+
+                    if( pt->m_TrackNameString.IsEmpty() ) s.Append( _("(unnamed)") );
+                    else
+                        s.Append( pt->m_TrackNameString );
+
+                    s << _T("\n") << _("Total Length: ") << FormatDistanceAdaptive( pt->Length())
+                    << _T("\n");
+
+                    if( g_bShowTrue )
+                        s << wxString::Format( wxString("%03d°  ", wxConvUTF8 ), (int)brg );
+                    if( g_bShowMag ){
+                        double latAverage = (segShow_point_b->m_lat + segShow_point_a->m_lat)/2;
+                        double lonAverage = (segShow_point_b->m_lon + segShow_point_a->m_lon)/2;
+                        double varBrg = gFrame->GetMag( brg, latAverage, lonAverage);
+
+                        s << wxString::Format( wxString("%03d°(M)  ", wxConvUTF8 ), (int)varBrg );
+                    }
+
+                    s << FormatDistanceAdaptive( dist );
+
+                    if(segShow_point_a->GetTimeString() && segShow_point_b->GetTimeString()){
+                        double segmentSpeed = toUsrSpeed( dist / ( (segShow_point_b->GetCreateTime() - segShow_point_a->GetCreateTime()).GetSeconds().ToDouble() / 3600.) );
+                        s << wxString::Format( _T("  %.1f "), (float)segmentSpeed ) << getUsrSpeedUnit();
+                    }
+
+                    m_pTrackRolloverWin->SetString( s );
+
+                    wxSize win_size = GetSize();
+                    if( console && console->IsShown() ) win_size.x -= console->GetSize().x;
+                    m_pTrackRolloverWin->SetBestPosition( mouse_x, mouse_y, 16, 16, LEG_ROLLOVER,
+                                                     win_size );
+                    m_pTrackRolloverWin->SetBitmap( LEG_ROLLOVER );
+                    m_pTrackRolloverWin->IsActive( true );
+                    b_need_refresh = true;
+                    showTrackRollover = true;
+                    break;
+                }
+            } else
+                node = node->GetNext();
+        }
+    } else {
+        //    Is the cursor still in select radius, and not timed out?
+        if( !pSelect->IsSelectableSegmentSelected( m_cursor_lat, m_cursor_lon, m_pRolloverTrackSeg ) )
+            showTrackRollover = false;
+        else if(m_pTrackRolloverWin && !m_pTrackRolloverWin->IsActive())
+            showTrackRollover = false;
+        else
+            showTrackRollover = true;
+    }
+
+    //    Similar for AIS target rollover window
+    if( m_pAISRolloverWin && m_pAISRolloverWin->IsActive() )
+        showTrackRollover = false;
+
+    //    Similar for route rollover window
+    if( m_pRouteRolloverWin && m_pRouteRolloverWin->IsActive() )
+        showTrackRollover = false;
+
+    if( m_pTrackRolloverWin /*&& m_pTrackRolloverWin->IsActive()*/ && !showTrackRollover ) {
+        m_pTrackRolloverWin->IsActive( false );
+        m_pRolloverTrackSeg = NULL;
+        m_pTrackRolloverWin->Destroy();
+        m_pTrackRolloverWin = NULL;
+        b_need_refresh = true;
+    } else if( m_pTrackRolloverWin && showTrackRollover ) {
+        m_pTrackRolloverWin->IsActive( true );
         b_need_refresh = true;
     }
 
@@ -2511,7 +2633,10 @@ void ChartCanvas::SetCursorStatus( double cursor_lat, double cursor_lon )
     
     if(STAT_FIELD_CURSOR_LL >= 0)
         parent_frame->SetStatusText ( s1, STAT_FIELD_CURSOR_LL );
-    
+
+    if( STAT_FIELD_CURSOR_BRGRNG < 0 )
+        return;
+
     double brg, dist;
     wxString s;
     DistanceBearingMercator(cursor_lat, cursor_lon, gLat, gLon, &brg, &dist);
@@ -2522,9 +2647,137 @@ void ChartCanvas::SetCursorStatus( double cursor_lat, double cursor_lon )
     
     s << FormatDistanceAdaptive( dist );
     
-    if(STAT_FIELD_CURSOR_BRGRNG >= 0)
-        parent_frame->SetStatusText ( s, STAT_FIELD_CURSOR_BRGRNG );
+    // CUSTOMIZATION - LIVE ETA OPTION
+    // -------------------------------------------------------
+    // Calculate an "live" ETA based on route starting from the current
+    // position of the boat and goes to the cursor of the mouse.
+    // In any case, an standard ETA will be calculated with a default speed
+    // of the boat to give an estimation of the route (in particular if GPS
+    // is off).
+    
+    // Display only if option "live ETA" is selected in Settings > Display > General.
+    if (g_bShowLiveETA)
+    {
+    
+        float realTimeETA;
+        float boatSpeed;
+        float boatSpeedDefault = g_defaultBoatSpeed;
+        
+        // Calculate Estimate Time to Arrival (ETA) in minutes
+        // Check before is value not closed to zero (it will make an very big number...)
+        if (!wxIsNaN(gSog))
+        {
+            boatSpeed = gSog;
+            if (boatSpeed < 0.5)
+            {
+                realTimeETA = 0;
+            }
+            else
+            {
+                realTimeETA = dist / boatSpeed * 60;
+            }
+        }
+        else
+        {
+            realTimeETA = 0;
+        }
+        
+        // Add space after distance display
+        s << " ";
+        // Display ETA
+        s << minutesToHoursDays(realTimeETA);
+        
+        // In any case, display also an ETA with default speed at 6knts
+        
+        s << " [@";
+        s << wxString::Format(_T("%d"), (int)toUsrSpeed(boatSpeedDefault, -1));
+        s << wxString::Format(_T("%s"), getUsrSpeedUnit(-1));
+        s << " ";
+        s << minutesToHoursDays(dist/boatSpeedDefault*60);
+        s << "]";
+    
+    }
+    // END OF - LIVE ETA OPTION
+    
+    parent_frame->SetStatusText ( s, STAT_FIELD_CURSOR_BRGRNG );
 }
+
+// CUSTOMIZATION - FORMAT MINUTES
+// -------------------------------------------------------
+// New function to format minutes into a more readable format:
+//  * Hours + minutes, or
+//  * Days + hours.
+wxString minutesToHoursDays(float timeInMinutes)
+{
+    wxString s;
+    
+    if (timeInMinutes == 0)
+    {
+        s << "--min";
+    }
+    
+    // Less than 60min, keep time in minutes
+    else if (timeInMinutes < 60 && timeInMinutes != 0)
+    {
+        s << wxString::Format(_T("%d"), (int)timeInMinutes);
+        s << "min";
+    }
+    
+    // Between 1h and less than 24h, display time in hours, minutes
+    else if (timeInMinutes >= 60 && timeInMinutes < 24 * 60)
+    {
+        
+        int hours;
+        int min;
+        hours = (int)timeInMinutes / 60;
+        min = (int)timeInMinutes % 60;
+        
+        if (min == 0)
+        {
+            s << wxString::Format(_T("%d"), hours );
+            s << "h";
+        }
+        else
+        {
+            s << wxString::Format(_T("%d"), hours );
+            s << "h";
+            s << wxString::Format(_T("%d"), min );
+            s << "min";
+        }
+        
+    }
+    
+    // More than 24h, display time in days, hours
+    else if (timeInMinutes > 24 * 60)
+    {
+        
+        int days;
+        int hours;
+        days = (int)(timeInMinutes / 60) / 24;
+        hours = (int)(timeInMinutes / 60) % 24;
+        
+        if (hours == 0)
+        {
+            s << wxString::Format(_T("%d"), days );
+            s << "d";
+        }
+        else
+        {
+            s << wxString::Format(_T("%d"), days );
+            s << "d";
+            s << wxString::Format(_T("%d"), hours );
+            s << "h";
+        }
+        
+    }
+    
+    return s;
+}
+
+// END OF CUSTOMIZATION - FORMAT MINUTES
+// Thanks open source code ;-)
+// -------------------------------------------------------
+
 
 void ChartCanvas::GetCursorLatLon( double *lat, double *lon )
 {
@@ -3115,7 +3368,7 @@ bool ChartCanvas::SetViewPoint( double lat, double lon, double scale_ppm, double
 
     //  Any sensible change?
     if (VPoint.IsValid()) {
-        if( ( fabs( VPoint.view_scale_ppm - scale_ppm ) < 1e-5 )
+        if( ( fabs( VPoint.view_scale_ppm - scale_ppm )/ scale_ppm < 1e-5 )
             && ( fabs( VPoint.skew - skew ) < 1e-9 )
             && ( fabs( VPoint.rotation - rotation ) < 1e-9 )
             && ( fabs( VPoint.clat - lat ) < 1e-9 )
@@ -3199,7 +3452,16 @@ bool ChartCanvas::SetViewPoint( double lat, double lon, double scale_ppm, double
                 b_ret = true;
             }
         }
-        
+        //  Create the stack
+        if( pCurrentStack ) {
+            assert(ChartData != 0);
+            int current_db_index;
+            current_db_index = pCurrentStack->GetCurrentEntrydbIndex();       // capture the current
+
+            ChartData->BuildChartStack( pCurrentStack, lat, lon, current_db_index);
+            pCurrentStack->SetCurrentEntryFromdbIndex( current_db_index );
+        }
+
         if(!g_bopengl)
             VPoint.b_MercatorProjectionOverride = false;
     }
@@ -3213,7 +3475,7 @@ bool ChartCanvas::SetViewPoint( double lat, double lon, double scale_ppm, double
         if( ChartData /*&& ChartData->IsValid()*/ ) {
             if( !pCurrentStack ) return false;
 
-            int current_db_index = -1;
+            int current_db_index;
             current_db_index = pCurrentStack->GetCurrentEntrydbIndex();       // capture the current
 
             ChartData->BuildChartStack( pCurrentStack, lat, lon );
@@ -3291,14 +3553,15 @@ bool ChartCanvas::SetViewPoint( double lat, double lon, double scale_ppm, double
                 if( candidate_stack_index >= pCurrentStack->nEntry ) {
                     candidate_stack_index = pCurrentStack->nEntry - 1;
                     while( candidate_stack_index >= 0 ) {
-                        const ChartTableEntry &cte_candidate = ChartData->GetChartTableEntry(
-                                pCurrentStack->GetDBIndex( candidate_stack_index ) );
-                        int candidate_scale = cte_candidate.GetScale();
-                        int candidate_type = cte_candidate.GetChartType();
+                        int idx = pCurrentStack->GetDBIndex( candidate_stack_index );
+                        if ( idx >= 0) {
+                            const ChartTableEntry &cte_candidate = ChartData->GetChartTableEntry(idx);
+                            int candidate_scale = cte_candidate.GetScale();
+                            int candidate_type = cte_candidate.GetChartType();
 
-                        if( ( candidate_scale <= target_scale )
-                                && ( candidate_type == target_type ) ) break;
-
+                            if( ( candidate_scale <= target_scale ) && ( candidate_type == target_type ) ) 
+                                break;
+                        }
                         candidate_stack_index--;
                     }
                 }
@@ -3678,8 +3941,8 @@ void ChartCanvas::ShipIndicatorsDraw( ocpnDC& dc, int img_height,
                 
                 // Prepare COG predictor endpoint icon
             double png_pred_icon_scale_factor = .4;
-            if(g_ChartScaleFactorExp > 1.0)
-                png_pred_icon_scale_factor *= (log(g_ChartScaleFactorExp) + 1.0) * 1.1;   
+            if(g_ShipScaleFactorExp > 1.0)
+                png_pred_icon_scale_factor *= (log(g_ShipScaleFactorExp) + 1.0) * 1.1;   
                 
             wxPoint icon[4];
                 
@@ -3734,8 +3997,8 @@ void ChartCanvas::ShipIndicatorsDraw( ocpnDC& dc, int img_height,
             double nominal_circle_size_pixels = wxMax(4.0, floor(m_pix_per_mm * (ref_dim / 5.0)));    // not less than 4 pixel
             
             // Scale the circle to ChartScaleFactor, slightly softened....
-            if(g_ChartScaleFactorExp > 1.0)
-                nominal_circle_size_pixels *= (log(g_ChartScaleFactorExp) + 1.0) * 1.1;   
+            if(g_ShipScaleFactorExp > 1.0)
+                nominal_circle_size_pixels *= (log(g_ShipScaleFactorExp) + 1.0) * 1.1;   
             
             dc.StrokeCircle( lHeadPoint.x + GPSOffsetPixels.x, lHeadPoint.y + GPSOffsetPixels.y, nominal_circle_size_pixels/2 );
         }
@@ -3757,9 +4020,13 @@ void ChartCanvas::ShipIndicatorsDraw( ocpnDC& dc, int img_height,
             pow( (double) (lGPSPoint.y - r.y), 2 ) );
             int pix_radius = (int) lpp;
             
-            wxPen ppPen1( GetGlobalColor( _T ( "URED" ) ), g_cog_predictor_width );
+            extern wxColor GetDimColor(wxColor c);
+            wxColor rangeringcolour = GetDimColor(g_colourOwnshipRangeRingsColour);
+            
+            wxPen ppPen1( rangeringcolour, g_cog_predictor_width );
+            
             dc.SetPen( ppPen1 );
-            dc.SetBrush( wxBrush( GetGlobalColor( _T ( "URED" ) ), wxBRUSHSTYLE_TRANSPARENT ) );
+            dc.SetBrush( wxBrush( rangeringcolour, wxBRUSHSTYLE_TRANSPARENT ) );
             
             for( int i = 1; i <= g_iNavAidRadarRingsNumberVisible; i++ )
                 dc.StrokeCircle( lGPSPoint.x, lGPSPoint.y, i * pix_radius );
@@ -3995,9 +4262,9 @@ void ChartCanvas::ShipDraw( ocpnDC& dc )
                 
                 wxBitmap os_bm( rot_image );
                 
-                if(g_ChartScaleFactorExp > 1){
+                if(g_ShipScaleFactorExp > 1){
                     wxImage scaled_image = os_bm.ConvertToImage();
-                    double factor = (log(g_ChartScaleFactorExp) + 1.0) * 1.0;   // soften the scale factor a bit
+                    double factor = (log(g_ShipScaleFactorExp) + 1.0) * 1.0;   // soften the scale factor a bit
                     os_bm = wxBitmap(scaled_image.Scale(scaled_image.GetWidth() * factor,
                                                         scaled_image.GetHeight() * factor,
                                                         wxIMAGE_QUALITY_HIGH));
@@ -4061,7 +4328,7 @@ void CalcGridSpacing( float view_scale_ppm, float& MajorSpacing, float&MinorSpac
     };
 
     unsigned int tabi;
-    for( tabi = 0; tabi < (sizeof lltab) / (sizeof *lltab); tabi++ )
+    for( tabi = 0; tabi < ((sizeof lltab) / (sizeof *lltab)) -1; tabi++ )
         if( view_scale_ppm < lltab[tabi][0] )
             break;
     MajorSpacing = lltab[tabi][1]; // major latitude distance
@@ -4243,7 +4510,7 @@ void ChartCanvas::ScaleBarDraw( ocpnDC& dc )
             dist = 1.0;
             count = 10;
             pen1 = wxPen( GetGlobalColor( _T ( "SCLBR" ) ), 3, wxPENSTYLE_SOLID );
-            pen2 = wxPen( GetGlobalColor( _T ( "CHDRD" ) ), 3, wxPENSTYLE_SOLID );
+            pen2 = wxPen( GetGlobalColor( _T ( "CHGRD" ) ), 3, wxPENSTYLE_SOLID );
         }
 
         GetCanvasPixPoint( x_origin, y_origin, blat, blon );
@@ -5004,7 +5271,9 @@ bool ChartCanvas::MouseEventSetup( wxMouseEvent& event,  bool b_handle_dclick )
 //      Retrigger the route leg / AIS target popup timer
     if( !g_btouch )
     {
-        if( m_pRouteRolloverWin && m_pRouteRolloverWin->IsActive() )
+       if( (m_pRouteRolloverWin && m_pRouteRolloverWin->IsActive()) ||
+	   (m_pTrackRolloverWin && m_pTrackRolloverWin->IsActive()) ||
+	   (m_pAISRolloverWin && m_pAISRolloverWin->IsActive()) )
             m_RolloverPopupTimer.Start( 10, wxTIMER_ONE_SHOT );               // faster response while the rollover is turned on
         else
             m_RolloverPopupTimer.Start( m_rollover_popup_timer_msec, wxTIMER_ONE_SHOT );
@@ -6225,7 +6494,10 @@ bool ChartCanvas::MouseEventProcessObjects( wxMouseEvent& event )
                         b_startedit_route = true;
                         
                         
-                        //  Hide the route rollover during route point edit, not needed, and may be confusing
+                        //  Hide the track and route rollover during route point edit, not needed, and may be confusing
+                        if( m_pTrackRolloverWin && m_pTrackRolloverWin->IsActive()  ) {
+                            m_pTrackRolloverWin->IsActive( false );
+                        }
                         if( m_pRouteRolloverWin && m_pRouteRolloverWin->IsActive()  ) {
                             m_pRouteRolloverWin->IsActive( false );
                         }
@@ -6342,6 +6614,23 @@ bool ChartCanvas::MouseEventProcessObjects( wxMouseEvent& event )
                 }       // while
             }
             
+            if(!b_start_rollover && !b_startedit_route){
+                SelectableItemList SelList = pSelect->FindSelectionList( m_cursor_lat, m_cursor_lon,
+                                                                         SELTYPE_TRACKSEGMENT );
+                wxSelectableItemListNode *node = SelList.GetFirst();
+                while( node ) {
+                    SelectItem *pFindSel = node->GetData();
+
+                    Track *tr = (Track *) pFindSel->m_pData3;        //candidate
+
+                    if( tr && tr->IsVisible() ){
+                        b_start_rollover = true;
+                        break;
+                    }
+                    node = node->GetNext();
+                }       // while
+            }
+
             if( b_start_rollover )
                 m_RolloverPopupTimer.Start( m_rollover_popup_timer_msec, wxTIMER_ONE_SHOT );
             
@@ -6598,6 +6887,26 @@ bool ChartCanvas::MouseEventProcessCanvas( wxMouseEvent& event )
     }
     
     if( event.Dragging() && event.LeftIsDown()){
+            /*
+             * fixed dragging.
+             * On my Surface Pro 3 running Arch Linux there is no mouse down event before the drag event.
+             * Hence, as there is no mouse down event, last_drag is not reset before the drag.
+             * And that results in one single drag session, meaning you cannot drag the map a few miles
+             * north, lift your finger, and the go even further north. Instead, the map resets itself
+             * always to the very first drag start (since there is not reset of last_drag).
+             *
+             * Besides, should not left down and dragging be enough of a situation to start a drag procedure?
+             *
+             * Anyways, guarded it to be active in touch situations only.
+             */
+            if( g_btouch ) {
+                if(false == m_bChartDragging) {
+                    last_drag.x = x, last_drag.y = y;
+                    m_bChartDragging = true;
+                }
+            }
+
+
             if( ( last_drag.x != x ) || ( last_drag.y != y ) ) {
                 m_bChartDragging = true;
                 StartTimedMovement();
@@ -6982,6 +7291,7 @@ void pupHandler_PasteWaypoint() {
 
     int pasteBuffer = kml.ParsePasteBuffer();
     RoutePoint* pasted = kml.GetParsedRoutePoint();
+    if( ! pasted ) return;
 
     int nearby_sel_rad_pix = 8;
     double nearby_radius_meters = nearby_sel_rad_pix / cc1->GetCanvasTrueScale();
@@ -7793,7 +8103,8 @@ void ChartCanvas::OnPaint( wxPaintEvent& event )
     //  Blit pan acceleration
     if( VPoint.b_quilt )          // quilted
     {
-        if( m_pQuilt && !m_pQuilt->IsComposed() ) return;
+        if( !m_pQuilt || !m_pQuilt->IsComposed() ) 
+            return;  // not ready
 
         bool busy = false;
         if( cc1->m_pQuilt->IsQuiltVector() &&
@@ -8438,7 +8749,9 @@ void ChartCanvas::Refresh( bool eraseBackground, const wxRect *rect )
     //      n.b.  We use slightly longer oneshot value to allow this method's Refresh() to complete before
     //      potentially getting another Refresh() in the popup timer handler.
     if( !m_RolloverPopupTimer.IsRunning() &&
-        ((m_pRouteRolloverWin && m_pRouteRolloverWin->IsActive()) || (m_pAISRolloverWin && m_pAISRolloverWin->IsActive())))
+        ((m_pRouteRolloverWin && m_pRouteRolloverWin->IsActive()) ||
+	(m_pTrackRolloverWin && m_pTrackRolloverWin->IsActive()) ||
+	(m_pAISRolloverWin && m_pAISRolloverWin->IsActive())) )
         m_RolloverPopupTimer.Start( 500, wxTIMER_ONE_SHOT );
 
 #ifdef ocpnUSE_GL
@@ -8602,6 +8915,11 @@ void ChartCanvas::DrawOverlayObjects( ocpnDC &dc, const wxRegion& ru )
 #ifdef USE_S57
     s57_DrawExtendedLightSectors( dc, VPoint, extendedSectorLegs );
 #endif
+
+    if( m_pTrackRolloverWin ) {
+        m_pTrackRolloverWin->Draw(dc);
+        m_brepaint_piano = true;
+    }
 
     if( m_pRouteRolloverWin ) {
         m_pRouteRolloverWin->Draw(dc);
@@ -8787,16 +9105,18 @@ emboss_data *ChartCanvas::CreateEmbossMapData( wxFont &font, int width, int heig
 
     int val;
     int index;
-    pmap = (int *) calloc( imgs.GetWidth() * imgs.GetHeight() * sizeof(int), 1 );
+    const int w = imgs.GetWidth();
+    const int h = imgs.GetHeight();
+    pmap = (int *) calloc( w *  h * sizeof(int), 1 );
     //  Create emboss map by differentiating the emboss image
     //  and storing integer results in pmap
     //  n.b. since the image is B/W, it is sufficient to check
     //  one channel (i.e. red) only
-    for( int y = 1; y < imgs.GetHeight() - 1; y++ ) {
-        for( int x = 1; x < imgs.GetWidth() - 1; x++ ) {
+    for( int y = 1; y < h - 1; y++ ) {
+        for( int x = 1; x < w - 1; x++ ) {
             val = img.GetRed( x + 1, y + 1 ) - img.GetRed( x - 1, y - 1 );  // range +/- 256
             val = (int) ( val * val_factor );
-            index = ( y * imgs.GetWidth() ) + x;
+            index = ( y * w ) + x;
             pmap[index] = val;
 
         }
@@ -8804,8 +9124,8 @@ emboss_data *ChartCanvas::CreateEmbossMapData( wxFont &font, int width, int heig
 
     emboss_data *pret = new emboss_data;
     pret->pmap = pmap;
-    pret->width = imgs.GetWidth();
-    pret->height = imgs.GetHeight();
+    pret->width = w;
+    pret->height = h;
 
     return pret;
 }

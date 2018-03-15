@@ -52,13 +52,17 @@
 #include <wx/tokenzr.h>
 #include <wx/fileconf.h>
 
-
 extern float g_GLMinCartographicLineWidth;
 extern float g_GLMinSymbolLineWidth;
 extern double  g_overzoom_emphasis_base;
 extern bool    g_oz_vector_scale;
 extern float g_ChartScaleFactorExp;
 extern int g_chart_zoom_modifier_vector;
+
+#ifdef ocpnUSE_GL
+#include "glChartCanvas.h"
+extern ocpnGLOptions g_GLOptions;
+#endif
 
 float g_scaminScale;
 
@@ -393,9 +397,12 @@ s52plib::s52plib( const wxString& PLib, bool b_forceLegacy )
     m_bShowLdisText = true;
     m_bExtendLightSectors = true;
 
+    // Set a few initial states
+    AddObjNoshow( "M_QUAL" );
     m_lightsOff = false;
-    m_anchorOn = false;
-    
+    m_anchorOn = true;
+    m_qualityOfDataOn = false;
+
     GenerateStateHash();
 
     HPGL = new RenderFromHPGL( this );
@@ -590,25 +597,40 @@ bool s52plib::GetAnchorOn()
     OBJLElement *pOLE = NULL;
         
     if(  MARINERS_STANDARD == GetDisplayCategory()){
-            // Need to loop once for SBDARE, which is our "master", then for
-            // other categories, since order is unknown?
+        old_vis = m_anchorOn;
+    }
+    else if(OTHER == GetDisplayCategory())
+        old_vis = true;
+
+    //other cat  
+    //const char * categories[] = { "ACHBRT", "ACHARE", "CBLSUB", "PIPARE", "PIPSOL", "TUNNEL", "SBDARE" };
+
+    old_vis &= !IsObjNoshow("SBDARE");
+
+    return (old_vis != 0);
+}
+
+bool s52plib::GetQualityOfDataOn()
+{
+    //  Investigate and report the logical condition that "Quality of Data Condition" is shown
+    
+    int old_vis =  0;
+    OBJLElement *pOLE = NULL;
+        
+    if(  MARINERS_STANDARD == GetDisplayCategory()){
             for( unsigned int iPtr = 0; iPtr < pOBJLArray->GetCount(); iPtr++ ) {
                 OBJLElement *pOLE = (OBJLElement *) ( pOBJLArray->Item( iPtr ) );
-                if( !strncmp( pOLE->OBJLName, "SBDARE", 6 ) ) {
+                if( !strncmp( pOLE->OBJLName, "M_QUAL", 6 ) ) {
                     old_vis = pOLE->nViz;
                     break;
                 }
-                pOLE = NULL;
             }
     }
     else if(OTHER == GetDisplayCategory())
         old_vis = true;
-        
-    const char * categories[] = { "ACHBRT", "ACHARE", "CBLSUB", "PIPARE", "PIPSOL", "TUNNEL", "SBDARE" };
-    unsigned int num = sizeof(categories) / sizeof(categories[0]);
-        
-    old_vis &= !IsObjNoshow("SBDARE");
-    
+
+    old_vis &= !IsObjNoshow("M_QUAL");
+
     return (old_vis != 0);
 }
         
@@ -1888,7 +1910,7 @@ bool s52plib::RenderText( wxDC *pdc, S52_TextC *ptext, int x, int y, wxRect *pRe
             
             int old_size = ptext->pFont->GetPointSize();
             int new_size = old_size * scale_factor;
-            scaled_font = wxTheFontList->FindOrCreateFont( new_size, ptext->pFont->GetFamily(),
+            scaled_font = FindOrCreateFont_PlugIn( new_size, ptext->pFont->GetFamily(),
                                                            ptext->pFont->GetStyle(), ptext->pFont->GetWeight(), false,
                                                            ptext->pFont->GetFaceName() );
             wxScreenDC sdc;
@@ -1901,7 +1923,9 @@ bool s52plib::RenderText( wxDC *pdc, S52_TextC *ptext, int x, int y, wxRect *pRe
                 ptext->texobj = 0;
             }
             
-            ptext->rendered_char_height = h_scaled - descent;
+            // We cannot get the font ascent value to remove the interline spacing from the font "height".
+            // So we have to estimate based on conventional Arial metrics
+            ptext->rendered_char_height = (h_scaled - descent) * 8 / 10;
             
         }
         // We render string with "special" characters the old, hard way, since we don't necessarily have the glyphs in our font, 
@@ -1914,7 +1938,10 @@ bool s52plib::RenderText( wxDC *pdc, S52_TextC *ptext, int x, int y, wxRect *pRe
                 
                 if(scale_factor <= 1.){
                     sdc.GetTextExtent( ptext->frmtd, &w_scaled, &h_scaled, &descent, &exlead, scaled_font ); // measure the text
-                    ptext->rendered_char_height = h_scaled - descent;
+
+                    // We cannot get the font ascent value to remove the interline spacing from the font "height".
+                    // So we have to estimate based on conventional Arial metrics
+                    ptext->rendered_char_height = (h_scaled - descent) * 8 / 10;
                 }
                 
                 ptext->text_width = w_scaled;
@@ -2150,7 +2177,9 @@ bool s52plib::RenderText( wxDC *pdc, S52_TextC *ptext, int x, int y, wxRect *pRe
             int w, h;
             f_cache->GetTextExtent(ptext->frmtd, &w, &h);
             
-            ptext->rendered_char_height = h;
+            // We don't store descent/ascent info for font texture cache
+            // So we have to estimate based on conventional Arial metrics
+            ptext->rendered_char_height = h * 65 / 100;
             
             //  Adjust the y position to account for the convention that S52 text is drawn
             //  with the lower left corner at the specified point, instead of the wx convention
@@ -2181,10 +2210,10 @@ bool s52plib::RenderText( wxDC *pdc, S52_TextC *ptext, int x, int y, wxRect *pRe
             
             switch ( ptext->vjust){
                 case '3':               // top
-                    yadjust += h;
+                    yadjust += ptext->rendered_char_height;
                     break;
                 case '2':               // centered
-                     yadjust += h/2;
+                     yadjust += ptext->rendered_char_height/2;
                      break;
                 case '1':               // bottom (default)
                 default:
@@ -2255,7 +2284,7 @@ bool s52plib::RenderText( wxDC *pdc, S52_TextC *ptext, int x, int y, wxRect *pRe
                 wxFont *pf = ptext->pFont;
                 int old_size = pf->GetPointSize();
                 int new_size = old_size * scale_factor;
-                wxFont *scaled_font = wxTheFontList->FindOrCreateFont( new_size, pf->GetFamily(),
+                wxFont *scaled_font = FindOrCreateFont_PlugIn( new_size, pf->GetFamily(),
                                                                        pf->GetStyle(), pf->GetWeight(), false,
                                                                        pf->GetFaceName() );
                 pdc->SetFont( *scaled_font);
@@ -2267,16 +2296,20 @@ bool s52plib::RenderText( wxDC *pdc, S52_TextC *ptext, int x, int y, wxRect *pRe
             wxCoord w, h, descent, exlead;
             pdc->GetTextExtent( ptext->frmtd, &w, &h, &descent, &exlead ); // measure the text
             
+            // We cannot get the font ascent value to remove the interline spacing.
+            // So we have to estimate based on conventional Arial metrics
+            int rendered_text_height = (h - descent) * 8 / 10;
+            
             //  Adjust the y position to account for the convention that S52 text is drawn
             //  with the lower left corner at the specified point, instead of the wx convention
             //  using upper right corner
             int yadjust = 0;
             int xadjust = 0;
             
-            yadjust =  - ( h - descent );
+            yadjust =  - ( rendered_text_height );
             
             //  Add in the offsets, specified in units of nominal font height
-            yadjust += ptext->yoffs * ( h - descent );
+            yadjust += ptext->yoffs * ( rendered_text_height );
             
             //  X offset specified in units of average char width
             xadjust += ptext->xoffs * ptext->avgCharWidth;
@@ -2296,10 +2329,10 @@ bool s52plib::RenderText( wxDC *pdc, S52_TextC *ptext, int x, int y, wxRect *pRe
             
             switch ( ptext->vjust){
                 case '3':               // top
-                    yadjust += h;
+                    yadjust += rendered_text_height;
                     break;
                 case '2':               // centered
-                     yadjust += h/2;
+                     yadjust += rendered_text_height/2;
                      break;
                 case '1':               // bottom (default)
                 default:
@@ -2478,7 +2511,7 @@ int s52plib::RenderT_All( ObjRazRules *rzRules, Rules *rules, ViewPort *vp, bool
                     fontweight = wxFONTWEIGHT_BOLD;
             }
              
-            wxFont *specFont = wxTheFontList->FindOrCreateFont( text->bsize, wxFONTFAMILY_SWISS,
+            wxFont *specFont = FindOrCreateFont_PlugIn( text->bsize, wxFONTFAMILY_SWISS,
                                                                wxFONTSTYLE_NORMAL, fontweight );
             
             //Get the width of a single average character in the spec font
@@ -2527,7 +2560,7 @@ int s52plib::RenderT_All( ObjRazRules *rzRules, Rules *rules, ViewPort *vp, bool
                 // In no case should font size be less than 10, since it becomes unreadable
                 fontSize = wxMax(10, fontSize);
 
-                text->pFont = wxTheFontList->FindOrCreateFont( fontSize, wxFONTFAMILY_SWISS,
+                text->pFont = FindOrCreateFont_PlugIn( fontSize, wxFONTFAMILY_SWISS,
                         templateFont->GetStyle(), fontweight, false, templateFont->GetFaceName() );
             }
         }
@@ -2962,15 +2995,16 @@ bool s52plib::RenderRasterSymbol( ObjRazRules *rzRules, Rule *prule, wxPoint &r,
                 Image.SetMaskColour( m_unused_wxColor.Red(), m_unused_wxColor.Green(),
                                      m_unused_wxColor.Blue() );
                 unsigned char mr, mg, mb;
-                if( !Image.GetOrFindMaskColour( &mr, &mg, &mb ) && !a )
+                if( !a && !Image.GetOrFindMaskColour( &mr, &mg, &mb ) )
                     printf( "trying to use mask to draw a bitmap without alpha or mask\n" );
                 
                 unsigned char *e = (unsigned char *) malloc( w * h * 4 );
+                // XXX FIXME a or e ?
                 if( d && a){
                     for( int y = 0; y < h; y++ ) {
                         for( int x = 0; x < w; x++ ) {
                             unsigned char r, g, b;
-                            int off = ( y * Image.GetWidth() + x );
+                            int off = ( y * w + x );
                             r = d[off * 3 + 0];
                             g = d[off * 3 + 1];
                             b = d[off * 3 + 2];
@@ -3419,7 +3453,7 @@ int s52plib::RenderGLLS( ObjRazRules *rzRules, Rules *rules, ViewPort *vp )
     
 #else    
     glLineWidth(lineWidth);
-    if(lineWidth > 4.0){
+    if(lineWidth > 4.0 && g_GLOptions.m_GLLineSmoothing){
         glEnable( GL_LINE_SMOOTH );
         glEnable( GL_BLEND );
     }
@@ -3632,7 +3666,7 @@ int s52plib::RenderLS( ObjRazRules *rzRules, Rules *rules, ViewPort *vp )
             else
                 glDisable( GL_LINE_STIPPLE );
 #endif
-            if(w >= 2){    
+            if(w >= 2 && g_GLOptions.m_GLLineSmoothing){    
                 glEnable( GL_LINE_SMOOTH );
                 glEnable( GL_BLEND );
             }
@@ -3837,7 +3871,7 @@ int s52plib::RenderLSLegacy( ObjRazRules *rzRules, Rules *rules, ViewPort *vp )
         else
             glDisable( GL_LINE_STIPPLE );
 #endif
-        if(w >= 2){    
+        if(w >= 2 && g_GLOptions.m_GLLineSmoothing){
             glEnable( GL_LINE_SMOOTH );
             glEnable( GL_BLEND );
         }
@@ -4574,8 +4608,7 @@ int s52plib::RenderLCLegacy( ObjRazRules *rzRules, Rules *rules, ViewPort *vp )
     else
         if( rzRules->obj->pPolyTessGeo ) {
             if( !rzRules->obj->pPolyTessGeo->IsOk() ){ // perform deferred tesselation
-                if(rzRules->obj->pPolyTessGeo->m_pxgeom)
-                    rzRules->obj->pPolyTessGeo->BuildDeferredTess();
+                rzRules->obj->pPolyTessGeo->BuildDeferredTess();
             }
 
             PolyTriGroup *pptg = rzRules->obj->pPolyTessGeo->Get_PolyTriGroup_head();
@@ -4659,24 +4692,14 @@ int s52plib::RenderLCPlugIn( ObjRazRules *rzRules, Rules *rules, ViewPort *vp )
                 
             ls = ls->next;
         }
-    }
+
+        //  Allocate some storage for converted points
+        wxPoint *ptp = (wxPoint *) malloc( ( nls_max + 2 ) * sizeof(wxPoint) ); // + 2 allows for end nodes
     
-    
-    //  Allocate some storage for converted points
-    wxPoint *ptp = (wxPoint *) malloc( ( nls_max + 2 ) * sizeof(wxPoint) ); // + 2 allows for end nodes
-    
-    
-    if( rzRules->obj->m_ls_list_legacy )
-    {
-        float *ppt;
-        
-        VE_Element *pedge;
-        
-        
         PI_connector_segment *pcs;
         
         unsigned char *vbo_point = (unsigned char *)rzRules->obj->m_chart_context->vertex_buffer;
-        PI_line_segment_element *ls = rzRules->obj->m_ls_list_legacy;
+        ls = rzRules->obj->m_ls_list_legacy;
         
         while(ls){
                 if( ls->priority == priority_current  ) {  
@@ -4892,8 +4915,11 @@ next_seg_dc:
                     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
                     glEnable (GL_BLEND);
                     
-                    glEnable (GL_LINE_SMOOTH);
-                    glHint (GL_LINE_SMOOTH_HINT, GL_NICEST);
+                    if( g_GLOptions.m_GLLineSmoothing )
+                    {
+                        glEnable (GL_LINE_SMOOTH);
+                        glHint (GL_LINE_SMOOTH_HINT, GL_NICEST);
+                    }
 #endif
                     {
                         glBegin( GL_LINES );
@@ -4929,8 +4955,10 @@ next_seg_dc:
                     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
                     glEnable (GL_BLEND);
 
-                    glEnable (GL_LINE_SMOOTH);
-                    glHint (GL_LINE_SMOOTH_HINT, GL_NICEST);
+                    if( g_GLOptions.m_GLLineSmoothing ) {
+                        glEnable (GL_LINE_SMOOTH);
+                        glHint (GL_LINE_SMOOTH_HINT, GL_NICEST);
+                    }
 
 #endif
                     {
@@ -5481,7 +5509,8 @@ int s52plib::RenderCARC_VBO( ObjRazRules *rzRules, Rules *rules, ViewPort *vp )
 
 #ifndef __OCPN__ANDROID__
         glEnable( GL_BLEND );
-        glEnable( GL_LINE_SMOOTH );
+        if( g_GLOptions.m_GLLineSmoothing )
+            glEnable( GL_LINE_SMOOTH );
 #endif        
         glEnableClientState(GL_VERTEX_ARRAY);             // activate vertex coords array
 
@@ -5936,6 +5965,9 @@ int s52plib::SetLineFeaturePriority( ObjRazRules *rzRules, int npriority )
         }
     }
 
+    if( IsObjNoshow( rzRules->LUP->OBCL) )
+        b_catfilter = false;
+    
     if(!b_catfilter)            // No chance this object is visible
         return 0;
 
@@ -7112,8 +7144,7 @@ void s52plib::RenderToBufferFilledPolygon( ObjRazRules *rzRules, S57Obj *obj, S5
 
     if( obj->pPolyTessGeo ) {
         if( !rzRules->obj->pPolyTessGeo->IsOk() ){ // perform deferred tesselation
-            if(rzRules->obj->pPolyTessGeo->m_pxgeom)
-                rzRules->obj->pPolyTessGeo->BuildDeferredTess();
+            rzRules->obj->pPolyTessGeo->BuildDeferredTess();
         }
 
         wxPoint *pp3 = (wxPoint *) malloc( 3 * sizeof(wxPoint) );
@@ -7298,8 +7329,7 @@ int s52plib::RenderToGLAC( ObjRazRules *rzRules, Rules *rules, ViewPort *vp )
         
         // perform deferred tesselation
         if( !rzRules->obj->pPolyTessGeo->IsOk() ){
-            if(rzRules->obj->pPolyTessGeo->m_pxgeom)
-                rzRules->obj->pPolyTessGeo->BuildDeferredTess();
+            rzRules->obj->pPolyTessGeo->BuildDeferredTess();
         }
 
         //  Get the vertex data
@@ -7345,7 +7375,7 @@ int s52plib::RenderToGLAC( ObjRazRules *rzRules, Rules *rules, ViewPort *vp )
                                 free(p_tp->p_vertex);
                                 p_tp->p_vertex = (double *)p_run;
                                 
-                                p_run += p_tp->nVert * 2 * sizeof(float);
+                                p_run += p_tp->nVert * 2;
                                 
                                 p_tp = p_tp->p_next; // pick up the next in chain
                             }
@@ -7642,8 +7672,7 @@ int s52plib::RenderToGLAP( ObjRazRules *rzRules, Rules *rules, ViewPort *vp )
     wxPoint *ptp;
     if( rzRules->obj->pPolyTessGeo ) {
         if( !rzRules->obj->pPolyTessGeo->IsOk() ){ // perform deferred tesselation
-            if(rzRules->obj->pPolyTessGeo->m_pxgeom)
-                rzRules->obj->pPolyTessGeo->BuildDeferredTess();
+            rzRules->obj->pPolyTessGeo->BuildDeferredTess();
         }
 
         ptp = (wxPoint *) malloc(
@@ -8014,7 +8043,7 @@ void s52plib::RenderPolytessGL(ObjRazRules *rzRules, ViewPort *vp, double z_clip
 
 int s52plib::RenderAreaToGL( const wxGLContext &glcc, ObjRazRules *rzRules, ViewPort *vp )
 {
-    if( !ObjectRenderCheckRules( rzRules, vp ) )
+    if( !ObjectRenderCheckRules( rzRules, vp, true ) )
         return 0;
 
     Rules *rules = rzRules->LUP->ruleList;
@@ -8408,7 +8437,7 @@ int s52plib::RenderAreaToDC( wxDC *pdcin, ObjRazRules *rzRules, ViewPort *vp,
         render_canvas_parms *pb_spec )
 {
 
-    if( !ObjectRenderCheckRules( rzRules, vp ) )
+    if( !ObjectRenderCheckRules( rzRules, vp, true ) )
         return 0;
 
     m_pdc = pdcin; // use this DC
@@ -8605,7 +8634,8 @@ bool s52plib::ObjectRenderCheckCat( ObjRazRules *rzRules, ViewPort *vp )
     if( m_nDisplayCategory == OTHER ){
         if(OTHER == obj_cat){
             if( !strncmp( rzRules->LUP->OBCL, "M_", 2 ) )
-                if( !m_bShowMeta ) return false;
+                if( !m_bShowMeta &&  strncmp( rzRules->LUP->OBCL, "M_QUAL", 6 ))
+                    return false;
         }
     }
 
@@ -8956,38 +8986,48 @@ void s52plib::PrepareForRender()
             if(!bshow_lights)                     // On, going off
                 AddObjNoshow("LIGHTS");
             else{                                   // Off, going on
-                if(pOLE)
-                    pOLE->nViz = 1;
                 RemoveObjNoshow("LIGHTS");
             }
-            
-            // Handle Anchor area toggle
-            bool bAnchor = m_anchorOn;
+
             
             const char * categories[] = { "ACHBRT", "ACHARE", "CBLSUB", "PIPARE", "PIPSOL", "TUNNEL", "SBDARE" };
             unsigned int num = sizeof(categories) / sizeof(categories[0]);
             
-            if(!bAnchor){
-                for( unsigned int c = 0; c < num; c++ ) {
-                    AddObjNoshow(categories[c]);
+            // Handle Anchor area toggle
+            if( (m_nDisplayCategory == OTHER) || (m_nDisplayCategory == MARINERS_STANDARD) ){
+                bool bAnchor = m_anchorOn;
+                
+                
+                if(!bAnchor){
+                    for( unsigned int c = 0; c < num; c++ ) {
+                        AddObjNoshow(categories[c]);
+                    }
+                }
+                else{
+                    for( unsigned int c = 0; c < num; c++ ) {
+                        RemoveObjNoshow(categories[c]);
+                    }
                 }
             }
-            else{
+            else{                               // if not category OTHER, then anchor-related features are always shown.
                 for( unsigned int c = 0; c < num; c++ ) {
                     RemoveObjNoshow(categories[c]);
                 }
+            }
                 
-                unsigned int cnt = 0;
+            // Handle Quality of data toggle
+            bool bQuality = m_qualityOfDataOn;
+            if(!bQuality){
+                AddObjNoshow("M_QUAL");
+            }
+            else{
+                RemoveObjNoshow("M_QUAL");
                 for( unsigned int iPtr = 0; iPtr < pOBJLArray->GetCount(); iPtr++ ) {
                     OBJLElement *pOLE = (OBJLElement *) ( pOBJLArray->Item( iPtr ) );
-                    for( unsigned int c = 0; c < num; c++ ) {
-                        if( !strncmp( pOLE->OBJLName, categories[c], 6 ) ) {
-                            pOLE->nViz = 1;         // force on
-                            cnt++;
-                            break;
-                        }
+                    if( !strncmp( pOLE->OBJLName, "M_QUAL", 6 ) ) {
+                        pOLE->nViz = 1;         // force on
+                        break;
                     }
-                    if( cnt == num ) break;
                 }
             }
         }
@@ -9219,8 +9259,8 @@ void RenderFromHPGL::SetPen()
     }
 #ifdef ocpnUSE_GL
     if( renderToOpenGl ) {
-    //    glEnable( GL_LINE_SMOOTH );
-        glEnable( GL_POLYGON_SMOOTH );
+        if( g_GLOptions.m_GLPolygonSmoothing )
+            glEnable( GL_POLYGON_SMOOTH );
         
         glColor4ub( penColor.Red(), penColor.Green(), penColor.Blue(), transparency );
         int line_width = wxMax(g_GLMinSymbolLineWidth, (float) penWidth * 0.7);
@@ -9235,7 +9275,7 @@ void RenderFromHPGL::SetPen()
 #endif
         
 #ifndef __OCPN__ANDROID__
-        if(line_width >= 2)
+        if( line_width >= 2 && g_GLOptions.m_GLLineSmoothing )
             glEnable( GL_LINE_SMOOTH );
         else
             glDisable( GL_LINE_SMOOTH );

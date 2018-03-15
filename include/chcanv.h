@@ -47,6 +47,7 @@
 #include "timers.h"
 #include "emboss_data.h"
 #include "S57Sector.h"
+#include "gshhs.h"
 
 class wxGLContext;
 class GSHHSChart;
@@ -235,6 +236,7 @@ public:
       bool isMarkEditing( void ){ return m_bMarkEditing && m_pRoutePointEditTarget; }
       
       GSHHSChart* GetWorldBackgroundChart() { return pWorldBackgroundChart; }
+      void ResetWorldBackgroundChart() { pWorldBackgroundChart->Reset(); }
 
       void  SetbTCUpdate(bool f){ m_bTCupdate = f;}
       bool  GetbTCUpdate(){ return m_bTCupdate;}
@@ -341,7 +343,9 @@ public:
       MyFrame     *parent_frame;
       wxString    FindValidUploadPort();
       CanvasMenuHandler  *m_canvasMenu;
-      
+      int GetMinAvailableGshhgQuality() { return pWorldBackgroundChart->GetMinAvailableQuality(); }
+      int GetMaxAvailableGshhgQuality() { return pWorldBackgroundChart->GetMaxAvailableQuality(); }
+
 private:
       void CallPopupMenu( int x, int y );
       
@@ -562,6 +566,7 @@ private:
       wxBitmap    m_cCurrentBitmap;
       
       RolloverWin *m_pRouteRolloverWin;
+      RolloverWin *m_pTrackRolloverWin;
       RolloverWin *m_pAISRolloverWin;
       
       TimedPopupWin *m_pBrightPopup;
@@ -607,6 +612,7 @@ private:
       bool        m_b_rot_hidef;
 
       SelectItem  *m_pRolloverRouteSeg;
+      SelectItem  *m_pRolloverTrackSeg;
 
       double      m_wheel_lat, m_wheel_lon;
       int         m_wheel_x,m_wheel_y;
@@ -652,6 +658,12 @@ private:
 
 DECLARE_EVENT_TABLE()
 };
+
+// CUSTOMIZATION - FORMAT MINUTES
+
+wxString minutesToHoursDays(float timeInMinutes);
+
+// END OF CUSTOMIZATION - FORMAT MINUTES
 
 /*!
  * Compatibility

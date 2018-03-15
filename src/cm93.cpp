@@ -56,6 +56,7 @@
 
 #ifdef ocpnUSE_GL
 #include "glChartCanvas.h"
+extern ocpnGLOptions g_GLOptions;
 #endif
 
 
@@ -1080,7 +1081,7 @@ static int   read_and_decode_bytes ( FILE *stream, void *p, int nbytes )
             return 1;
 
       //    read into callers buffer
-      if ( !fread ( p, nbytes, 1, stream ) )
+      if ( fread ( p, nbytes, 1, stream ) != 1)
             return 0;
 
       //    decode inplace
@@ -1103,7 +1104,7 @@ static int read_and_decode_double ( FILE *stream, double *p )
 {
       double t;
       //    read into temp buffer
-      if ( !fread ( &t, sizeof ( double ), 1, stream ) )
+      if ( fread ( &t, sizeof ( double ), 1, stream ) != 1)
             return 0;
 
       //    decode inplace
@@ -1129,7 +1130,7 @@ static int read_and_decode_int ( FILE *stream, int *p )
 {
       int t;
       //    read into temp buffer
-      if ( !fread ( &t, sizeof ( int ), 1, stream ) )
+      if ( fread ( &t, sizeof ( int ), 1, stream ) != 1)
             return 0;
 
       //    decode inplace
@@ -1155,7 +1156,7 @@ static int read_and_decode_ushort ( FILE *stream, unsigned short *p )
 {
       unsigned short t;
       //    read into temp buffer
-      if ( !fread ( &t, sizeof ( unsigned short ), 1, stream ) )
+      if ( fread ( &t, sizeof ( unsigned short ), 1, stream ) != 1)
             return 0;
 
       //    decode inplace
@@ -3565,7 +3566,7 @@ S57Obj *cm93chart::CreateS57Obj ( int cell_index, int iobject, int subcell, Obje
                   else if ( sattr.IsSameAs ( _T ( "_wgsoy" ) ) )
                   {
                         tmp_transform_y = * ( double * ) pattValTmp->value;
-                        if ( fabs ( tmp_transform_x ) > 1.0 )
+                        if ( fabs ( tmp_transform_y ) > 1.0 )
                               m_CIB.b_have_offsets = true;
                   }
             }
@@ -4470,18 +4471,27 @@ int cm93chart::loadsubcell ( int cellindex, wxChar sub_char )
       wxString file;
       file.Printf ( _T ( "%04d%04d." ), jlat, jlon );
       file += m_scalechar;
+      file[0] = sub_char;
+      
 
-
+      // We prefer to make use of the NoFind array to avoid file system access to cells known not to exist.
+      // However, when the arra becomes "large", then searching the array becomes slower than actually accessing the file system.
+      // So, detect this case, and skip the NoFind array if the array size is larger than nnn items.
+      // "nnn" determined by experimentation/intuition.
+      // Could also be platform dependent.
+      bool b_useNoFind = true;
+      if(m_noFindArray.GetCount() > 500)
+          b_useNoFind = false;
+      
       
       wxString fileroot;
       fileroot.Printf ( _T ( "%04d%04d/" ), ilatroot, ilonroot );
       fileroot += m_scalechar;
       fileroot += _T ( "/" );
       wxString key = fileroot;
-      key += sub_char;
+      key += file;
       fileroot.Prepend ( m_prefix );
 
-      file[0] = sub_char;
       file.Prepend ( fileroot );
 
       if ( g_bDebugCM93 )
@@ -4494,24 +4504,34 @@ int cm93chart::loadsubcell ( int cellindex, wxChar sub_char )
 
       bool bfound = false;
       wxString compfile;
-      if(m_noFindArray.Index(key) == wxNOT_FOUND){
-        if ( ::wxFileExists ( file ) ) {
-            bfound = true;;
-        }
-        else{
-            m_noFindArray.Add(key);
+      if(b_useNoFind){
+        if(m_noFindArray.Index(key) == wxNOT_FOUND){
+            if ( ::wxFileExists ( file ) ) 
+                bfound = true;
+            else
+                m_noFindArray.Add(key);
         }
       }
+      else{
+          if ( ::wxFileExists ( file ) ) 
+              bfound = true;;
+      }          
       
       if(!bfound){                     // try compressed version
+        if(b_useNoFind){
             if(m_noFindArray.Index(key + _T(".xz")) == wxNOT_FOUND){
                 if(::wxFileExists ( file+_T(".xz"))){
                     compfile = file + _T(".xz");
                 }
-                else{
-                    m_noFindArray.Add(key + _T(".xz"));
-                }
             }
+            else{
+                m_noFindArray.Add(key + _T(".xz"));
+            }
+        }
+        else{
+            if(::wxFileExists ( file+_T(".xz")))
+                compfile = file + _T(".xz");
+        }
       }
 
       // Try again with alternate scale character
@@ -4522,96 +4542,58 @@ int cm93chart::loadsubcell ( int cellindex, wxChar sub_char )
             wxString file1;
             file1.Printf ( _T ( "%04d%04d." ), jlat, jlon );
             file1 += new_scalechar;
-
             file1[0] = sub_char;
 
             fileroot.Printf ( _T ( "%04d%04d/" ), ilatroot, ilonroot );
             fileroot += new_scalechar;
             fileroot += _T ( "/" );
-            wxString key1 = fileroot;
-            key1 += file1;
+            key = fileroot;
+            key += file1;
 
             fileroot.Prepend ( m_prefix );
 
             file1.Prepend ( fileroot );
          
-            if(m_noFindArray.Index(key1) == wxNOT_FOUND){
-                if ( ::wxFileExists ( file ) ) {
+            if(b_useNoFind){
+                if(m_noFindArray.Index(key) == wxNOT_FOUND){
+                    if ( ::wxFileExists ( file1 ) ) {
+                        bfound = true;
+                        file = file1;                       // found the file as lowercase, substitute the name
+                    }
+                    else{
+                        m_noFindArray.Add(key);
+                    }
+                }
+            }
+            else{
+                if ( ::wxFileExists ( file1 ) ) {
                     bfound = true;
                     file = file1;                       // found the file as lowercase, substitute the name
-                }
-                else{
-                    m_noFindArray.Add(key1);
                 }
             }
             
             if(!bfound){                     // try compressed version
-                if(m_noFindArray.Index(key1 + _T(".xz")) == wxNOT_FOUND){
-                    if(::wxFileExists ( file1+_T(".xz"))){
+                if(b_useNoFind){
+                    if(m_noFindArray.Index(key + _T(".xz")) == wxNOT_FOUND){
+                        if(::wxFileExists ( file1+_T(".xz")))
+                            compfile = file1 + _T(".xz");
+                        else
+                            m_noFindArray.Add(key + _T(".xz"));
+                    }
+                }
+                else{
+                    if(::wxFileExists ( file1+_T(".xz")))
                         compfile = file1 + _T(".xz");
-                    }
-                    else{
-                        m_noFindArray.Add(key1 + _T(".xz"));
-                    }
                 }
             }
       }
 
       
-                    
-                
-#if 0           
-          
-      if ( !::wxFileExists ( file ) ) {
-          if(::wxFileExists ( file+_T(".xz")))
-              compfile = file + _T(".xz");
-          else {
-          
-            //    Try with alternate case of m_scalechar
-            wxString new_scalechar = m_scalechar.Lower();
-
-            wxString file1;
-            file1.Printf ( _T ( "%04d%04d." ), jlat, jlon );
-            file1 += new_scalechar;
-
-            file1[0] = sub_char;
-
-            fileroot.Printf ( _T ( "%04d%04d/" ), ilatroot, ilonroot );
-            fileroot += new_scalechar;
-            fileroot += _T ( "/" );
-            fileroot.Prepend ( m_prefix );
-
-            file1.Prepend ( fileroot );
-
-            if ( g_bDebugCM93 )
-            {
-                  char sfile[200];
-                  strncpy ( sfile, file1.mb_str(), 199 );
-                  sfile[199] = 0;
-                  printf ( "    alternate filename: %s\n", sfile );
-            }
-
-            if ( !::wxFileExists ( file1 ) ) {
-                if(::wxFileExists ( file1+_T(".xz")))
-                    compfile = file1 + _T(".xz");
-                else {
-
-                  //    This is not really an error if the sub_char is not '0'.  It just means there are no more subcells....
-                  if ( g_bDebugCM93 )
-                  {
-                        if ( sub_char == '0' )
-                              printf ( "   Tried to load non-existent CM93 cell\n" );
-                        else
-                              printf ( "   No sub_cells of scale(%lc) found\n", sub_char );
-                  }
-
-                  return 0;
-                }
-            }
-            file = file1;                       // found the file as lowercase, substitute the name
-          }
+      if ( g_bDebugCM93 )
+      {
+          printf("noFind count: %d\n", m_noFindArray.GetCount());
       }
-#endif
+                
       if(!bfound && !compfile.Length())
           return 0;
       
@@ -5457,7 +5439,9 @@ bool cm93compchart::DoRenderRegionViewOnGL (const wxGLContext &glc, const ViewPo
       ViewPort vp = VPoint;
 
       bool render_return = false;
-      if ( m_pcm93chart_current )
+      if ( m_pcm93chart_current == 0)
+            return render_return;
+
       {
             m_pcm93chart_current->SetVPParms ( vp );
 
@@ -5850,7 +5834,7 @@ bool cm93compchart::DoRenderRegionViewOnDC ( wxMemoryDC& dc, const ViewPort& VPo
 //      CALLGRIND_STOP_INSTRUMENTATION
 
       //    Render the cm93 cell's M_COVR outlines if called for
-      if ( m_cell_index_special_outline )
+      if ( m_cell_index_special_outline && m_pcm93chart_current)
       {
             covr_set *pcover = m_pcm93chart_current->GetCoverSet();
 
@@ -6037,8 +6021,10 @@ bool cm93compchart::RenderNextSmallerCellOutlines ( ocpnDC &dc, ViewPort& vp )
           wxPen pen = dc.GetPen();
           wxColour col = pen.GetColour();
           
-          glEnable( GL_LINE_SMOOTH );
-          glHint( GL_LINE_SMOOTH_HINT, GL_NICEST );
+          if( g_GLOptions.m_GLLineSmoothing ) {
+              glEnable( GL_LINE_SMOOTH );
+              glHint( GL_LINE_SMOOTH_HINT, GL_NICEST );
+          }
           glEnable( GL_BLEND );
           glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
           
@@ -6858,7 +6844,7 @@ CM93OffsetDialog::CM93OffsetDialog ( wxWindow *parent )
 
       m_OKButton = new wxButton ( this, wxID_ANY, _ ( "OK" ), wxDefaultPosition, wxDefaultSize, 0 );
       m_OKButton->Connect ( wxEVT_COMMAND_BUTTON_CLICKED, wxCommandEventHandler ( CM93OffsetDialog::OnOK ), NULL, this );
-      boxSizer02->Add ( m_OKButton, 0, wxALIGN_CENTER_VERTICAL|wxALL, 5 );
+      boxSizer02->Add ( m_OKButton, 0, wxALL, 5 );
       m_OKButton->SetDefault();
 
       topSizer->Add ( boxSizer02, 0, wxEXPAND|wxALL, 2 );

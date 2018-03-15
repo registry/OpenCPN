@@ -537,7 +537,10 @@ PolyTessGeo::~PolyTessGeo()
 
 int PolyTessGeo::BuildDeferredTess(void)
 {
-    return BuildTessGL();
+    if(m_pxgeom)
+        return BuildTessGL();
+    else
+        return 0;
 }
 
 
@@ -710,8 +713,8 @@ int PolyTessGeo::PolyTessGeoGL(OGRPolygon *poly, bool bSENC_SM, double ref_lat, 
 
     if((npta * 4) > s_buf_len)
     {
-        s_pwork_buf = (GLdouble *)realloc(s_pwork_buf, npta * 4 * 2 * sizeof(GLdouble *));
-        s_buf_len = npta * 4 * 2;
+        s_pwork_buf = (GLdouble *)realloc(s_pwork_buf, npta * 4 * sizeof(GLdouble));
+        s_buf_len = npta * 4;
     }
 
 
@@ -1170,8 +1173,8 @@ int PolyTessGeo::BuildTessGL(void)
 
       if((npta * 4) > s_buf_len)
       {
-            s_pwork_buf = (GLdouble *)realloc(s_pwork_buf, npta * 4 * 2 * sizeof(GLdouble *));
-            s_buf_len = npta * 4 * 2;
+            s_pwork_buf = (GLdouble *)realloc(s_pwork_buf, npta * 4 * sizeof(GLdouble));
+            s_buf_len = npta * 4;
       }
 
 

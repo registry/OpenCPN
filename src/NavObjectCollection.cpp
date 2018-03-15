@@ -53,7 +53,7 @@ NavObjectCollection1::~NavObjectCollection1()
 
 
 
-RoutePoint * GPXLoadWaypoint1( pugi::xml_node &wpt_node, 
+static RoutePoint * GPXLoadWaypoint1( pugi::xml_node &wpt_node, 
                                wxString def_symbol_name,
                                wxString GUID,
                                bool b_fullviz,
@@ -77,7 +77,7 @@ RoutePoint * GPXLoadWaypoint1( pugi::xml_node &wpt_node,
     wxString GuidString = GUID;         // default
     wxString TimeString;
     wxDateTime dt;
-    RoutePoint *pWP = NULL;
+    RoutePoint *pWP;
     
     HyperlinkList *linklist = NULL;
 
@@ -204,7 +204,7 @@ RoutePoint * GPXLoadWaypoint1( pugi::xml_node &wpt_node,
 
     if( b_layer ) {
         if( GuidString.IsEmpty() )
-            GuidString = _T("LayGUID");
+            GuidString = pWayPointMan->CreateGUID(NULL);
     }
 
     pWP = new RoutePoint( rlat, rlon, SymString, NameString, GuidString, false ); // do not add to global WP list yet...
@@ -252,10 +252,10 @@ RoutePoint * GPXLoadWaypoint1( pugi::xml_node &wpt_node,
         pWP->m_HyperlinkList = linklist;
     }
 
-    return ( pWP );
+    return pWP ;
 }
 
-TrackPoint * GPXLoadTrackPoint1( pugi::xml_node &wpt_node )
+static TrackPoint * GPXLoadTrackPoint1( pugi::xml_node &wpt_node )
 {
     wxString TimeString;
 
@@ -282,7 +282,7 @@ TrackPoint * GPXLoadTrackPoint1( pugi::xml_node &wpt_node )
     return new TrackPoint( rlat, rlon, TimeString );
 }
 
-Track *GPXLoadTrack1( pugi::xml_node &trk_node, bool b_fullviz,
+static Track *GPXLoadTrack1( pugi::xml_node &trk_node, bool b_fullviz,
                       bool b_layer,
                       bool b_layerviz,
                       int layer_id )
@@ -426,7 +426,7 @@ Track *GPXLoadTrack1( pugi::xml_node &trk_node, bool b_fullviz,
 }
 
 
-Route *GPXLoadRoute1( pugi::xml_node &wpt_node, bool b_fullviz,
+static Route *GPXLoadRoute1( pugi::xml_node &wpt_node, bool b_fullviz,
                       bool b_layer, bool b_layerviz,
                       int layer_id, bool b_change )
 {
@@ -518,7 +518,9 @@ Route *GPXLoadRoute1( pugi::xml_node &wpt_node, bool b_fullviz,
 			else
             if( ChildName == _T ( "rtept" ) ) {
                 RoutePoint *tpWp = ::GPXLoadWaypoint1(  tschild, _T("square"), _T(""), b_fullviz, b_layer, b_layerviz, layer_id);
-                RoutePoint *erp = ::WaypointExists( tpWp->m_GUID );
+                RoutePoint *erp = NULL;
+                if(!b_layer)
+                    erp = ::WaypointExists( tpWp->m_GUID );
 				// 1) if b_change is true, that means we are after crash - load the route and points as found in source file
 				// 2) if route_existing, we are loading a different route with the same guid. In this case load points as found in
 				//source file, changing the guid, but keep existing "isolated point" as found in the DB
@@ -1304,17 +1306,15 @@ bool NavObjectCollection1::LoadAllGPXObjects( bool b_full_viz )
         if( !strcmp(object.name(), "wpt") ) {
             RoutePoint *pWp = ::GPXLoadWaypoint1( object, _T("circle"), _T(""), b_full_viz, false, false, 0 );
             
-            if(pWp) {
-                pWp->m_bIsolatedMark = true;      // This is an isolated mark
-                RoutePoint *pExisting = WaypointExists( pWp->GetName(), pWp->m_lat, pWp->m_lon );
-                if( !pExisting ) {
+            pWp->m_bIsolatedMark = true;      // This is an isolated mark
+            RoutePoint *pExisting = WaypointExists( pWp->GetName(), pWp->m_lat, pWp->m_lon );
+            if( !pExisting ) {
                     if( NULL != pWayPointMan )
                         pWayPointMan->AddRoutePoint( pWp );
                      pSelect->AddSelectableRoutePoint( pWp->m_lat, pWp->m_lon, pWp );
-                }
-                else
-                    delete pWp;
             }
+            else
+                delete pWp;
         }
         else
             if( !strcmp(object.name(), "trk") ) {
@@ -1346,15 +1346,11 @@ int NavObjectCollection1::LoadAllGPXObjectsAsLayer(int layer_id, bool b_layerviz
     {
         if( !strcmp(object.name(), "wpt") ) {
             RoutePoint *pWp = ::GPXLoadWaypoint1( object, _T("circle"), _T(""), true, true, b_layerviz, layer_id );
-            pWp->m_bIsolatedMark = true;      // This is an isolated mark
             
-            if(pWp) {
-                pWayPointMan->AddRoutePoint( pWp );
-                pSelect->AddSelectableRoutePoint( pWp->m_lat, pWp->m_lon, pWp );
-                n_obj++;
-            }
-            else
-                delete pWp;
+            pWp->m_bIsolatedMark = true;      // This is an isolated mark
+            pWayPointMan->AddRoutePoint( pWp );
+            pSelect->AddSelectableRoutePoint( pWp->m_lat, pWp->m_lon, pWp );
+            n_obj++;
         }
         else{
             if( !strcmp(object.name(), "trk") ) {
@@ -1486,43 +1482,40 @@ bool NavObjectChanges::ApplyChanges(void)
     
     while(strlen(object.name()))
     {
-        if( !strcmp(object.name(), "wpt") ) {
+        if( !strcmp(object.name(), "wpt") && pWayPointMan) {
             RoutePoint *pWp = ::GPXLoadWaypoint1( object, _T("circle"), _T(""), false, false, false, 0 );
             
-            if(pWp && pWayPointMan) {
-                pWp->m_bIsolatedMark = true;
-                RoutePoint *pExisting = WaypointExists( pWp->m_GUID );
+            pWp->m_bIsolatedMark = true;
+            RoutePoint *pExisting = WaypointExists( pWp->m_GUID );
                 
-                pugi::xml_node xchild = object.child("extensions");
-                pugi::xml_node child = xchild.child("opencpn:action");
+            pugi::xml_node xchild = object.child("extensions");
+            pugi::xml_node child = xchild.child("opencpn:action");
                 
-                if(!strcmp(child.first_child().value(), "add") ){
-                    if( !pExisting ) 
-                        pWayPointMan->AddRoutePoint( pWp );
-                    pSelect->AddSelectableRoutePoint( pWp->m_lat, pWp->m_lon, pWp );
-                }                    
-                
-                else if(!strcmp(child.first_child().value(), "update") ){
-                    if( pExisting )
-                        pWayPointMan->RemoveRoutePoint( pExisting );
+            if(!strcmp(child.first_child().value(), "add") ){
+                if( !pExisting )
                     pWayPointMan->AddRoutePoint( pWp );
-                    pSelect->AddSelectableRoutePoint( pWp->m_lat, pWp->m_lon, pWp );
-                }
-                
-                else if(!strcmp(child.first_child().value(), "delete") ){
-                    if( pExisting )
-                        pWayPointMan->DestroyWaypoint( pExisting, false );
-                }
-                 
-                else
-                    delete pWp;
+                pSelect->AddSelectableRoutePoint( pWp->m_lat, pWp->m_lon, pWp );
             }
+                
+            else if(!strcmp(child.first_child().value(), "update") ){
+                if( pExisting )
+                    pWayPointMan->RemoveRoutePoint( pExisting );
+                pWayPointMan->AddRoutePoint( pWp );
+                pSelect->AddSelectableRoutePoint( pWp->m_lat, pWp->m_lon, pWp );
+            }
+
+            else if(!strcmp(child.first_child().value(), "delete") ){
+                if( pExisting )
+                    pWayPointMan->DestroyWaypoint( pExisting, false );
+            }
+            else
+                delete pWp;
         }
         else
-            if( !strcmp(object.name(), "trk") ) {
+            if( !strcmp(object.name(), "trk") && g_pRouteMan) {
                 Track * pTrack = GPXLoadTrack1( object, false, false, false, 0);
 
-                if(pTrack && g_pRouteMan) {
+                if(pTrack ) {
                     pugi::xml_node xchild = object.child("extensions");
                     pugi::xml_node child = xchild.child("opencpn:action");
                     
@@ -1534,27 +1527,27 @@ bool NavObjectChanges::ApplyChanges(void)
                              pExisting->m_TrackEndString = pTrack->m_TrackEndString;
                         }
                     }
-            
+
                     else if(!strcmp(child.first_child().value(), "delete") ){
                         if( pExisting )
                             g_pRouteMan->DeleteTrack( pExisting );
                     }
-            
+
                     else if(!strcmp(child.first_child().value(), "add") ){
                         if( !pExisting )
                             ::InsertTrack( pTrack, true );
                     }
-                
+
                     else
                         delete pTrack;
                 }
             }
             
             else
-                if( !strcmp(object.name(), "rte") ) {
+                if( !strcmp(object.name(), "rte") && g_pRouteMan) {
                     Route *pRoute = GPXLoadRoute1( object, true, false, false, 0, true );
                     
-                    if(pRoute && g_pRouteMan) {
+                    if(pRoute ) {
                         pugi::xml_node xchild = object.child("extensions");
                         pugi::xml_node child = xchild.child("opencpn:action");
 
@@ -1565,7 +1558,7 @@ bool NavObjectChanges::ApplyChanges(void)
                         else if(!strcmp(child.first_child().value(), "update") ){
                             ::UpdateRouteA( pRoute );
                         }
-                    
+
                         else if(!strcmp(child.first_child().value(), "delete") ){
                             Route *pExisting = RouteExists( pRoute->m_GUID );
                             if(pExisting){
@@ -1580,34 +1573,28 @@ bool NavObjectChanges::ApplyChanges(void)
                     }
                 }
             else
-                if( !strcmp(object.name(), "tkpt") ) {
+                if( !strcmp(object.name(), "tkpt") && pWayPointMan) {
                     TrackPoint *pWp = ::GPXLoadTrackPoint1( object );
                     
-                    if(pWp && pWayPointMan) {
 //                        RoutePoint *pExisting = WaypointExists( pWp->GetName(), pWp->m_lat, pWp->m_lon );
                         
-                        pugi::xml_node xchild = object.child("extensions");
-                        pugi::xml_node child = xchild.child("opencpn:action");
+                    pugi::xml_node xchild = object.child("extensions");
+                    pugi::xml_node child = xchild.child("opencpn:action");
 
-                        pugi::xml_node guid_child = xchild.child("opencpn:track_GUID");
-                        wxString track_GUID(guid_child.first_child().value(), wxConvUTF8);
+                    pugi::xml_node guid_child = xchild.child("opencpn:track_GUID");
+                    wxString track_GUID(guid_child.first_child().value(), wxConvUTF8);
 
-                        Track *pExistingTrack = TrackExists( track_GUID );
+                    Track *pExistingTrack = TrackExists( track_GUID );
                         
-                        if(!strcmp(child.first_child().value(), "add") ){
-                            if( pExistingTrack ) {
-                                pExistingTrack->AddPoint( pWp );
-                                pWp->m_GPXTrkSegNo = pExistingTrack->GetCurrentTrackSeg() + 1;
-                            }                                
-                        }                    
-                        
-                        else
-                            delete pWp;
+                    if(!strcmp(child.first_child().value(), "add") && pExistingTrack ) {
+                        pExistingTrack->AddPoint( pWp );
+                        pWp->m_GPXTrkSegNo = pExistingTrack->GetCurrentTrackSeg() + 1;
                     }
-        }
-    
+                    else
+                        delete pWp;
+                }
+
         object = object.next_sibling();
-                
     }
     // Check to make sure we haven't loaded tracks with less than 2 points
     wxTrackListNode *node1 = pTrackList->GetFirst();

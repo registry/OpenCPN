@@ -40,6 +40,7 @@
 #include "chartimg.h"
 #include "chart1.h"
 #include "thumbwin.h"
+#include "mbtiles.h"
 
 #ifdef ocpnUSE_GL
 #include "glChartCanvas.h"
@@ -440,6 +441,9 @@ ChartBase *ChartDB::GetChart(const wxChar *theFilePath, ChartClassDescriptor &ch
       else if (chartExt == wxT("GEO")) {
             pch = new ChartGEO;
       }
+      else if (chartExt == wxT("MBTILES")) {
+            pch = new ChartMBTiles;
+      }
 #ifdef USE_S57
       else if (chartExt == wxT("000") || chartExt == wxT("S57")) {
             LoadS57();
@@ -771,6 +775,8 @@ bool ChartDB::CopyStack(ChartStack *pa, ChartStack *pb)
 wxString ChartDB::GetFullPath(ChartStack *ps, int stackindex)
 {
       int dbIndex = ps->GetDBIndex(stackindex);
+      wxASSERT( dbIndex >= 0 );
+
       return wxString(GetChartTableEntry(dbIndex).GetpFullPath(),  wxConvUTF8);
 }
 
@@ -780,7 +786,10 @@ wxString ChartDB::GetFullPath(ChartStack *ps, int stackindex)
 
 int ChartDB::GetCSPlyPoint(ChartStack *ps, int stackindex, int plyindex, float *lat, float *lon)
 {
-      const ChartTableEntry &entry = GetChartTableEntry(ps->GetDBIndex(stackindex));
+      int dbIndex = ps->GetDBIndex(stackindex);
+      wxASSERT( dbIndex >= 0 );
+
+      const ChartTableEntry &entry = GetChartTableEntry( dbIndex );
       if(entry.GetnPlyEntries())
       {
             float *fp = entry.GetpPlyTable();
@@ -801,7 +810,10 @@ int ChartDB::GetCSPlyPoint(ChartStack *ps, int stackindex, int plyindex, float *
 //-------------------------------------------------------------------
 int ChartDB::GetStackChartScale(ChartStack *ps, int stackindex, char *buf, int nbuf)
 {
-      const ChartTableEntry &entry = GetChartTableEntry(ps->GetDBIndex(stackindex));
+      int dbindex = ps->GetDBIndex(stackindex);
+      wxASSERT(dbindex >= 0);
+
+      const ChartTableEntry &entry = GetChartTableEntry( dbindex );
       int sc = entry.GetScale();
       if(buf)
             sprintf(buf, "%d", sc);
@@ -816,7 +828,10 @@ int ChartDB::GetStackEntry(ChartStack *ps, wxString fp)
 {
       for(int i=0 ; i<ps->nEntry ; i++)
       {
-            const ChartTableEntry &entry = GetChartTableEntry(ps->GetDBIndex(i));
+            int dbindex = ps->GetDBIndex( i );
+            wxASSERT(dbindex >= 0);
+
+            const ChartTableEntry &entry = GetChartTableEntry( dbindex );
             if(fp.IsSameAs( wxString(entry.GetpFullPath(),  wxConvUTF8)) )
                   return i;
       }
@@ -829,18 +844,22 @@ int ChartDB::GetStackEntry(ChartStack *ps, wxString fp)
 //-------------------------------------------------------------------
 ChartTypeEnum ChartDB::GetCSChartType(ChartStack *ps, int stackindex)
 {
-      if((IsValid()) && (stackindex >= 0) && (stackindex < GetChartTableEntries()))
-            return (ChartTypeEnum)GetChartTableEntry(ps->GetDBIndex(stackindex)).GetChartType();
-      else
-            return CHART_TYPE_UNKNOWN;
+      if ( IsValid() ) {
+         int dbindex = ps->GetDBIndex(stackindex);
+         if (dbindex >= 0)
+            return (ChartTypeEnum)GetChartTableEntry(dbindex).GetChartType();
+      }
+      return CHART_TYPE_UNKNOWN;
 }
 
 
 ChartFamilyEnum ChartDB::GetCSChartFamily(ChartStack *ps, int stackindex)
 {
-      if((IsValid()) && (stackindex < GetChartTableEntries()))
+      if( IsValid() )
       {
-            const ChartTableEntry &entry = GetChartTableEntry(ps->GetDBIndex(stackindex));
+         int dbindex = ps->GetDBIndex(stackindex);
+         if (dbindex >= 0) {
+            const ChartTableEntry &entry = GetChartTableEntry( dbindex );
 
             ChartTypeEnum type = (ChartTypeEnum)entry.GetChartType();
             switch(type)
@@ -853,9 +872,9 @@ ChartFamilyEnum ChartDB::GetCSChartFamily(ChartStack *ps, int stackindex)
                   case  CHART_TYPE_DUMMY:        return CHART_FAMILY_RASTER;
                   default:                       return CHART_FAMILY_UNKNOWN;
             }
+         }
       }
-      else
-            return CHART_FAMILY_UNKNOWN;
+      return CHART_FAMILY_UNKNOWN;
 }
 
 
@@ -1227,12 +1246,15 @@ ChartBase *ChartDB::OpenChartUsingCache(int dbindex, ChartInitFlag init_flag)
             else if(chart_type == CHART_TYPE_GEO)
                   Ch = new ChartGEO();
 
+            else if(chart_type == CHART_TYPE_MBTILES)
+                Ch = new ChartMBTiles();
+            
 #ifdef USE_S57
             else if(chart_type == CHART_TYPE_S57)
             {
                   LoadS57();
                   Ch = new s57chart();
-                  s57chart *Chs57 = dynamic_cast<s57chart*>(Ch);
+                  s57chart *Chs57 = static_cast<s57chart*>(Ch);
 
                   Chs57->SetNativeScale(cte.GetScale());
 
@@ -1252,7 +1274,7 @@ ChartBase *ChartDB::OpenChartUsingCache(int dbindex, ChartInitFlag init_flag)
             {
                   LoadS57();
                   Ch = new cm93chart();
-                  cm93chart *Chcm93 = dynamic_cast<cm93chart*>(Ch);
+                  cm93chart *Chcm93 = static_cast<cm93chart*>(Ch);
 
                   Chcm93->SetNativeScale(cte.GetScale());
 
@@ -1271,7 +1293,7 @@ ChartBase *ChartDB::OpenChartUsingCache(int dbindex, ChartInitFlag init_flag)
                   LoadS57();
                   Ch = new cm93compchart();
 
-                  cm93compchart *Chcm93 = dynamic_cast<cm93compchart*>(Ch);
+                  cm93compchart *Chcm93 = static_cast<cm93compchart*>(Ch);
 
                   Chcm93->SetNativeScale(cte.GetScale());
 
@@ -1342,24 +1364,21 @@ ChartBase *ChartDB::OpenChartUsingCache(int dbindex, ChartInitFlag init_flag)
 #else
                   s52plib *plib = NULL;
 #endif                  
-                  
+                  wxString msg_fn(ChartFullPath);
+                  msg_fn.Replace(_T("%"), _T("%%"));
 
                   //    Vector charts need a PLIB for useful display....
                   if((chart_family != CHART_FAMILY_VECTOR) ||
                       ((chart_family == CHART_FAMILY_VECTOR) && plib) )
                   {
-                        wxString msg(_T("Initializing Chart "));
-                        msg.Append(ChartFullPath);
-                        wxLogMessage(msg);
+                        wxLogMessage(wxString::Format(_T("Initializing Chart %s"), msg_fn.c_str()));
 
                         ir = Ch->Init(ChartFullPath, init_flag);    // using the passed flag
                         Ch->SetColorScheme(/*pParent->*/GetColorScheme());
                   }
                   else
                   {
-                        wxString msg(_T("   No PLIB, Skipping vector chart "));
-                        msg.Append(ChartFullPath);
-                        wxLogMessage(msg);
+                        wxLogMessage(wxString::Format(_T("   No PLIB, Skipping vector chart  %s"), msg_fn.c_str()));
 
                         ir = INIT_FAIL_REMOVE;
 
@@ -1384,6 +1403,9 @@ ChartBase *ChartDB::OpenChartUsingCache(int dbindex, ChartInitFlag init_flag)
                                 pChartCache->Add((void *)pce);
                                 m_cache_mutex.Unlock();
                               }
+                              else {
+                                delete pce;
+                              }
                         }
                   }
                   else if(INIT_FAIL_REMOVE == ir)                 // some problem in chart Init()
@@ -1405,12 +1427,7 @@ ChartBase *ChartDB::OpenChartUsingCache(int dbindex, ChartInitFlag init_flag)
                   {
                         if(INIT_FAIL_NOERROR != ir)
                         {
-                              wxString fp = ChartFullPath;
-                              fp.Prepend(_T("   OpenChartFromStack...Error opening chart "));
-                              wxString id;
-                              id.Printf(_T("... return code %d"),  ir);
-                              fp.Append(id);
-                              wxLogMessage(fp);
+                              wxLogMessage(wxString::Format(_T("   OpenChartFromStack... Error opening chart %s ... return code %d"), msg_fn.c_str(), ir));
                         }
                   }
 

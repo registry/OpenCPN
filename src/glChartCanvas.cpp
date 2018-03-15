@@ -176,6 +176,7 @@ extern bool             g_bGLexpert;
 extern bool             g_bcompression_wait;
 extern bool             g_bresponsive;
 extern float            g_ChartScaleFactorExp;
+extern float            g_ShipScaleFactorExp;
 
 float            g_GLMinSymbolLineWidth;
 float            g_GLMinCartographicLineWidth;
@@ -831,7 +832,8 @@ void glChartCanvas::SetupOpenGL()
     if( !s_glBindBuffer || !s_glBufferData || !s_glGenBuffers || !s_glDeleteBuffers )
         g_b_EnableVBO = false;
 
-#ifdef __WXMSW__
+#if defined( __WXMSW__ ) || defined(__WXOSX__)
+        
     if( GetRendererString().Find( _T("Intel") ) != wxNOT_FOUND ) {
         wxLogMessage( _T("OpenGL-> Detected Windows Intel renderer, disabling Vertexbuffer Objects") );
         g_b_EnableVBO = false;
@@ -1146,6 +1148,7 @@ void glChartCanvas::MultMatrixViewPort(ViewPort &vp, float lat, float lon)
     switch(vp.m_projection_type) {
     case PROJECTION_MERCATOR:
     case PROJECTION_EQUIRECTANGULAR:
+    case PROJECTION_WEB_MERCATOR:
         cc1->GetDoubleCanvasPointPixVP(vp, lat, lon, &point);
         glTranslated(point.m_x, point.m_y, 0);
         glScaled(vp.view_scale_ppm/NORM_FACTOR, vp.view_scale_ppm/NORM_FACTOR, 1);
@@ -1176,6 +1179,7 @@ ViewPort glChartCanvas::NormalizedViewPort(const ViewPort &vp, float lat, float 
     switch(vp.m_projection_type) {
     case PROJECTION_MERCATOR:
     case PROJECTION_EQUIRECTANGULAR:
+    case PROJECTION_WEB_MERCATOR:
         cvp.clat = lat;
         break;
 
@@ -1195,7 +1199,7 @@ ViewPort glChartCanvas::NormalizedViewPort(const ViewPort &vp, float lat, float 
 
 bool glChartCanvas::CanClipViewport(const ViewPort &vp)
 {
-    return vp.m_projection_type == PROJECTION_MERCATOR ||
+    return vp.m_projection_type == PROJECTION_MERCATOR || vp.m_projection_type == PROJECTION_WEB_MERCATOR ||
         vp.m_projection_type == PROJECTION_EQUIRECTANGULAR;
 }
 
@@ -1387,8 +1391,8 @@ void glChartCanvas::RenderChartOutline( int dbIndex, ViewPort &vp )
     else
         color = GetGlobalColor( _T ( "UINFR" ) );
 
-//    glEnable( GL_BLEND );
-    glEnable( GL_LINE_SMOOTH );
+    if( g_GLOptions.m_GLLineSmoothing )
+        glEnable( GL_LINE_SMOOTH );
 
     glColor3ub(color.Red(), color.Green(), color.Blue());
     glLineWidth( g_GLMinSymbolLineWidth );
@@ -1409,11 +1413,13 @@ void glChartCanvas::RenderChartOutline( int dbIndex, ViewPort &vp )
         double sml[2];
         float lastplylat = 0.0;
         float lastplylon = 0.0;
+        // modulo is undefined for zero (compiler can use a div operation)
+        int modulo = (nPly == 0)?1:nPly;
         for( int i = 0; i < nPly+1; i++ ) {
             if(nAuxPlyEntries)
-                ChartData->GetDBAuxPlyPoint( dbIndex, i%nPly, j, &plylat, &plylon );
+                ChartData->GetDBAuxPlyPoint( dbIndex, i % modulo, j, &plylat, &plylon );
             else
-                ChartData->GetDBPlyPoint( dbIndex, i%nPly, &plylat, &plylon );
+                ChartData->GetDBPlyPoint( dbIndex, i % modulo, &plylat, &plylon );
 
             plylon += lon_bias;
 
@@ -1520,9 +1526,11 @@ void glChartCanvas::GridDraw( )
     // if it is known the grid has straight lines it's a bit faster
     bool straight_latitudes =
         vp.m_projection_type == PROJECTION_MERCATOR ||
+        vp.m_projection_type == PROJECTION_WEB_MERCATOR ||
         vp.m_projection_type == PROJECTION_EQUIRECTANGULAR;
     bool straight_longitudes =
         vp.m_projection_type == PROJECTION_MERCATOR ||
+        vp.m_projection_type == PROJECTION_WEB_MERCATOR ||
         vp.m_projection_type == PROJECTION_POLAR ||
         vp.m_projection_type == PROJECTION_EQUIRECTANGULAR;
 
@@ -1838,13 +1846,15 @@ void glChartCanvas::ShipDraw(ocpnDC& dc)
     int img_height = 0;
     
     if( bb_screen.PointInBox( lShipMidPoint, 20 ) ) {
-        glEnable( GL_LINE_SMOOTH );
-        glEnable( GL_POLYGON_SMOOTH );
+        if( g_GLOptions.m_GLLineSmoothing )
+            glEnable( GL_LINE_SMOOTH );
+        if( g_GLOptions.m_GLPolygonSmoothing )
+            glEnable( GL_POLYGON_SMOOTH );
         glEnableClientState(GL_VERTEX_ARRAY);
     
         if( cc1->GetVP().chart_scale > 300000 )             // According to S52, this should be 50,000
         {
-            float scale =  g_ChartScaleFactorExp;
+            float scale =  g_ShipScaleFactorExp;
         
             const int v = 12;
             // start with cross
@@ -1965,14 +1975,6 @@ void glChartCanvas::ShipDraw(ocpnDC& dc)
             int ownShipLength= 84;
             lShipMidPoint = lGPSPoint;
 
-            if( g_n_ownship_beam_meters > 0.0 &&
-                g_n_ownship_length_meters > 0.0 &&
-                g_OwnShipIconType == 1 )
-            {            
-                ownShipWidth = ownship_size.x;
-                ownShipLength= ownship_size.y;
-            }
-
             /* scaled ship? */
             if( g_OwnShipIconType != 0 )
                 cc1->ComputeShipScaleFactor
@@ -1992,36 +1994,60 @@ void glChartCanvas::ShipDraw(ocpnDC& dc)
 
         
             // Scale the generic icon to ChartScaleFactor, slightly softened....
-            if((g_ChartScaleFactorExp > 1.0) && ( g_OwnShipIconType == 0 )){
-                scale_factor_x = (log(g_ChartScaleFactorExp) + 1.0) * 1.1;   
-                scale_factor_y = (log(g_ChartScaleFactorExp) + 1.0) * 1.1;   
+            if((g_ShipScaleFactorExp > 1.0) && ( g_OwnShipIconType == 0 )){
+                scale_factor_x = (log(g_ShipScaleFactorExp) + 1.0) * 1.1;   
+                scale_factor_y = (log(g_ShipScaleFactorExp) + 1.0) * 1.1;   
             }
         
         // Set the size of the little circle showing the GPS reference position
         // Set a default early, adjust later based on render type
             float gps_circle_radius = 3.0;
 
-            glScalef(scale_factor_x, scale_factor_y, 1);
 
-            if( g_OwnShipIconType < 2 ) { // Bitmap
+            if( g_OwnShipIconType == 0 ) { // Default Bitmap
 
                 glEnable(GL_TEXTURE_2D);
                 glBindTexture(GL_TEXTURE_2D, ownship_tex);
                 glTexEnvi( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-            
+                
                 float nominal_ownship_size_mm = cc1->m_display_size_mm / 44.0;
                 nominal_ownship_size_mm = wxMin(nominal_ownship_size_mm, 15.0);
                 nominal_ownship_size_mm = wxMax(nominal_ownship_size_mm, 7.0);
-            
+                
                 float nominal_ownship_size_pixels = wxMax(20.0, cc1->GetPixPerMM() * nominal_ownship_size_mm);             // nominal length, but not less than 20 pixel
                 float h = nominal_ownship_size_pixels * scale_factor_y;
                 float w = nominal_ownship_size_pixels * scale_factor_x * ownship_size.x / ownship_size.y ;
                 float glw = ownship_tex_size.x, glh = ownship_tex_size.y;
                 float u = ownship_size.x/glw, v = ownship_size.y/glh;
+                
+                // tweak GPS reference point indicator size
+                gps_circle_radius = w / 5;
+                
+                glBegin(GL_QUADS);
+                glTexCoord2f(0, 0), glVertex2f(-w/2, -h/2);
+                glTexCoord2f(u, 0), glVertex2f(+w/2, -h/2);
+                glTexCoord2f(u, v), glVertex2f(+w/2, +h/2);
+                glTexCoord2f(0, v), glVertex2f(-w/2, +h/2);
+                glEnd();
+                
+                glDisable(GL_TEXTURE_2D);
+            } else if( g_OwnShipIconType == 1 ) { // Scaled Bitmap
+
+                glEnable(GL_TEXTURE_2D);
+                glBindTexture(GL_TEXTURE_2D, ownship_tex);
+                glTexEnvi( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
+            
+                float nominal_ownship_size_pixels_y = 84; 
+                float nominal_ownship_size_pixels_x = 22; 
+                
+                float h = nominal_ownship_size_pixels_y * scale_factor_y;
+                float w = nominal_ownship_size_pixels_x * scale_factor_x;
+                
+                float u = (float)ownship_size.x/ownship_tex_size.x, v = (float)ownship_size.y/ownship_tex_size.y;
 
             // tweak GPS reference point indicator size
                 gps_circle_radius = w / 5;
-
+                
                 glBegin(GL_QUADS);
                 glTexCoord2f(0, 0), glVertex2f(-w/2, -h/2);
                 glTexCoord2f(u, 0), glVertex2f(+w/2, -h/2);
@@ -2037,6 +2063,8 @@ void glChartCanvas::ShipDraw(ocpnDC& dc)
                                                         0, 42, 0, -42       };
 
                 glVertexPointer(2, GL_INT, 2*sizeof(GLint), s_ownship_icon);
+ 
+                glScalef(scale_factor_x, scale_factor_y, 1);
                 glDrawArrays(GL_POLYGON, 0, 6);
 
                 glColor4ub(0, 0, 0, 255);
@@ -2044,6 +2072,7 @@ void glChartCanvas::ShipDraw(ocpnDC& dc)
 
                 glDrawArrays(GL_LINE_LOOP, 0, 6);
                 glDrawArrays(GL_LINES, 6, 4);
+                
             }
             glPopMatrix();
 
@@ -2622,6 +2651,7 @@ void glChartCanvas::RenderQuiltViewGL( ViewPort &vp, const OCPNRegion &rect_regi
                 get_region.Intersect( region );
                 if( !get_region.Empty() ) {
                     if( chart->GetChartFamily() == CHART_FAMILY_RASTER ) {
+                        
                         ChartBaseBSB *Patch_Ch_BSB = dynamic_cast<ChartBaseBSB*>( chart );
                         if (Patch_Ch_BSB) {
                             SetClipRegion(vp, pqp->ActiveRegion/*pqp->quilt_region*/);
@@ -2629,6 +2659,12 @@ void glChartCanvas::RenderQuiltViewGL( ViewPort &vp, const OCPNRegion &rect_regi
                             DisableClipRegion();
                             b_rendered = true;
                         }
+                        else if(chart->GetChartType() == CHART_TYPE_MBTILES){
+                            SetClipRegion(vp, pqp->ActiveRegion/*pqp->quilt_region*/);
+                            chart->RenderRegionViewOnGL( *m_pcontext, vp, rect_region, get_region );
+                            DisableClipRegion();
+                        }
+                        
                     } else if(chart->GetChartFamily() == CHART_FAMILY_VECTOR ) {
                         RenderNoDTA(vp, get_region);
 
@@ -3037,8 +3073,12 @@ void glChartCanvas::RenderCharts(ocpnDC &dc, const OCPNRegion &rect_region)
         RenderQuiltViewGL( vp, rect_region );
     else {
         LLRegion region = vp.GetLLRegion(rect_region);
-        if( Current_Ch->GetChartFamily() == CHART_FAMILY_RASTER )
-            RenderRasterChartRegionGL( Current_Ch, vp, region );
+        if( Current_Ch->GetChartFamily() == CHART_FAMILY_RASTER ){
+            if(Current_Ch->GetChartType() == CHART_TYPE_MBTILES)
+                Current_Ch->RenderRegionViewOnGL( *m_pcontext, vp, rect_region, region );
+            else
+                RenderRasterChartRegionGL( Current_Ch, vp, region );
+        }
         else if( Current_Ch->GetChartFamily() == CHART_FAMILY_VECTOR ) {
             chart_region.Intersect(region);
             RenderNoDTA(vp, chart_region);
@@ -3084,6 +3124,7 @@ void glChartCanvas::RenderNoDTA(ViewPort &vp, ChartBase *chart)
         }
 #else
         int j = pCurrentStack->GetDBIndex(i);
+        assert (j >= 0);
         pt = (ChartTableEntry *) &ChartData->GetChartTableEntry( j );
         if(pt->GetpsFullPath()->IsSameAs(chart->GetFullPath())){
             index = j;
@@ -3231,14 +3272,15 @@ void glChartCanvas::DrawGLTidesInBBox(ocpnDC& dc, LLBBox& BBox)
             unsigned char *a = image.GetAlpha();
                 
             unsigned char mr, mg, mb;
-            image.GetOrFindMaskColour( &mr, &mg, &mb );
+            if (!a)
+                image.GetOrFindMaskColour( &mr, &mg, &mb );
                 
             unsigned char *e = new unsigned char[4 * w * h];
             if(e && d){
                 for( int y = 0; y < h; y++ )
                     for( int x = 0; x < w; x++ ) {
                         unsigned char r, g, b;
-                        int off = ( y * image.GetWidth() + x );
+                        int off = ( y * w + x );
                         r = d[off * 3 + 0];
                         g = d[off * 3 + 1];
                         b = d[off * 3 + 2];
@@ -3337,8 +3379,8 @@ void glChartCanvas::SetColorScheme(ColorScheme cs)
 int n_render;
 void glChartCanvas::Render()
 {
-    if( !m_bsetup ||
-        ( cc1->VPoint.b_quilt && cc1->m_pQuilt && !cc1->m_pQuilt->IsComposed() ) ||
+    if( !m_bsetup || !cc1->m_pQuilt ||
+        ( cc1->VPoint.b_quilt && !cc1->m_pQuilt->IsComposed() ) ||
         ( !cc1->VPoint.b_quilt && !Current_Ch ) ) {
 #ifdef __WXGTK__  // for some reason in gtk, a swap is needed here to get an initial screen update
             SwapBuffers();
@@ -3392,8 +3434,10 @@ void glChartCanvas::Render()
     // set opengl settings that don't normally change
     // this should be able to go in SetupOpenGL, but it's
     // safer here incase a plugin mangles these
-    glHint( GL_LINE_SMOOTH_HINT, GL_NICEST );
-    glHint( GL_POLYGON_SMOOTH_HINT, GL_NICEST );
+    if( g_GLOptions.m_GLLineSmoothing )
+        glHint( GL_LINE_SMOOTH_HINT, GL_NICEST );
+    if( g_GLOptions.m_GLPolygonSmoothing )
+        glHint( GL_POLYGON_SMOOTH_HINT, GL_NICEST );
     glBlendFunc( GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA );
 
     //  Delete any textures known to the GPU that
@@ -3601,6 +3645,22 @@ void glChartCanvas::Render()
                         glViewport( 0, 0, (GLint) sx, (GLint) sy );
                     }
                     else{
+#if 0                        
+                        // Should not really need to clear the screen, but consider this case:
+                        // A previous installation of OCPN loaded some PlugIn charts, so setting their coverage in the database.
+                        // In this installation, the PlugIns are not available, for whatever reason.
+                        // As a result, some areas on screen will not be rendered by the PlugIn, and
+                        // The backing chart is eclipsed by the unrendered chart coverage region.
+                        //  Result: leftover garbage in the unrendered regions.
+
+                        wxColour color = GetGlobalColor( _T ( "NODTA" ) );
+                        if( color.IsOk() )
+                            glClearColor( color.Red() / 256., color.Green()/256., color.Blue()/256., 1.0 );
+                        else
+                            glClearColor(0, 0., 0, 1.0);
+                        glClear(GL_COLOR_BUFFER_BIT);
+#endif
+
                         m_fbo_offsetx = 0;
                         m_fbo_offsety = 0;
                         m_fbo_swidth = sx;
@@ -3723,6 +3783,9 @@ void glChartCanvas::Render()
     DrawEmboss(cc1->EmbossDepthScale() );
     DrawEmboss(cc1->EmbossOverzoomIndicator( gldc ) );
 
+    if( cc1->m_pTrackRolloverWin )
+        cc1->m_pTrackRolloverWin->Draw(gldc);
+
     if( cc1->m_pRouteRolloverWin )
         cc1->m_pRouteRolloverWin->Draw(gldc);
 
@@ -3825,7 +3888,7 @@ void glChartCanvas::Render()
 
 
 
-void glChartCanvas::RenderCanvasBackingChart( ocpnDC dc, OCPNRegion valid_region)
+void glChartCanvas::RenderCanvasBackingChart( ocpnDC &dc, OCPNRegion valid_region)
 {
  
     glPushMatrix();

@@ -47,7 +47,7 @@
 //************************************************************************************************************************
 
 DashboardInstrument_WindDirHistory::DashboardInstrument_WindDirHistory( wxWindow *parent, wxWindowID id, wxString title) :
-    DashboardInstrument(parent, id, title, OCPN_DBP_STC_TWD | OCPN_DBP_STC_TWS, true)
+      DashboardInstrument(parent, id, title, OCPN_DBP_STC_TWD | OCPN_DBP_STC_TWS)
 {     SetDrawSoloInPane(true);
       m_MaxWindDir = -1;
       m_WindDir = -1;
@@ -77,11 +77,19 @@ DashboardInstrument_WindDirHistory::DashboardInstrument_WindDirHistory( wxWindow
       m_WindowRect=GetClientRect();
       m_DrawAreaRect=GetClientRect();
       m_DrawAreaRect.SetHeight(m_WindowRect.height-m_TopLineHeight-m_TitleHeight);
+}
 
+wxSize DashboardInstrument_WindDirHistory::GetSize( int orient, wxSize hint )
+{
       wxClientDC dc(this);
       int w;
       dc.GetTextExtent(m_title, &w, &m_TitleHeight, 0, 0, g_pFontTitle);
-      SetMinSize( wxSize(MinWidth, m_TitleHeight+40));
+      if( orient == wxHORIZONTAL ) {
+        return wxSize( DefaultWidth, wxMax(m_TitleHeight+140, hint.y) );
+      }
+      else {
+        return wxSize( wxMax(hint.x, DefaultWidth), wxMax(m_TitleHeight+140, hint.y) );
+      }
 }
 void DashboardInstrument_WindDirHistory::SetData(int st, double data, wxString unit)
 {
@@ -410,7 +418,7 @@ void DashboardInstrument_WindDirHistory::DrawBackground(wxGCDC* dc)
   dc->DrawLine(m_LeftLegend+3, (int)(m_TopLineHeight+m_DrawAreaRect.height*0.25), m_WindowRect.width-3-m_RightLegend, (int)(m_TopLineHeight+m_DrawAreaRect.height*0.25));
   dc->DrawLine(m_LeftLegend+3, (int)(m_TopLineHeight+m_DrawAreaRect.height*0.75), m_WindowRect.width-3-m_RightLegend, (int)(m_TopLineHeight+m_DrawAreaRect.height*0.75));
 #ifdef __WXMSW__
-  pen.SetStyle(wxSHORT_DASH);
+  pen.SetStyle(wxPENSTYLE_SHORT_DASH);
   dc->SetPen(pen);
 #endif
   dc->DrawLine(m_LeftLegend+3, (int)(m_TopLineHeight+m_DrawAreaRect.height*0.5), m_WindowRect.width-3-m_RightLegend, (int)(m_TopLineHeight+m_DrawAreaRect.height*0.5));

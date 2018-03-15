@@ -130,6 +130,8 @@ extern int              g_chart_zoom_modifier_vector;
 extern double           g_display_size_mm;
 extern bool             g_bopengl;
 
+extern ChartGroupArray  *g_pGroupArray;
+
 unsigned int      gs_plib_flags;
 
 enum
@@ -522,7 +524,8 @@ bool PlugInManager::CallLateInit(void)
                     wxLogMessage(msg);
 
                     opencpn_plugin_110* ppi = dynamic_cast<opencpn_plugin_110*>(pic->m_pplugin);
-                    ppi->LateInit();
+                    if (ppi)
+                        ppi->LateInit();
                     }
                 break;
         }
@@ -818,7 +821,7 @@ bool ReadModuleInfoFromELF( const wxString& file, const ModuleInfo::DependencySe
         b_libelf_usable = true;
     }
 
-    int file_handle = 0;
+    int file_handle;
     Elf *elf_handle = NULL;
     GElf_Ehdr elf_file_header;
     Elf_Scn *elf_section_handle = NULL;
@@ -929,7 +932,7 @@ SuccessEpilogue:
 FailureEpilogue:
     if( elf_handle != NULL )
         elf_end( elf_handle );
-    if( file_handle != 0 )
+    if( file_handle >= 0 )
         close( file_handle );
     return false;
 }
@@ -1929,6 +1932,7 @@ void PlugInManager::SendConfigToAllPlugIns()
         v[_T("OpenCPN S52PLIB ShowSoundings")] = ps52plib->GetShowSoundings();
         v[_T("OpenCPN S52PLIB ShowLights")] = !ps52plib->GetLightsOff();
         v[_T("OpenCPN S52PLIB ShowAnchorConditions")] = ps52plib->GetAnchorOn();
+        v[_T("OpenCPN S52PLIB ShowQualityOfData")] = ps52plib->GetQualityOfDataOn();
         v[_T("OpenCPN S52PLIB DisplayCategory")] = ps52plib->GetDisplayCategory();
     }
 
@@ -2685,7 +2689,12 @@ int AddChartToDBInPlace( wxString &full_path, bool b_RefreshCanvas )
             delete ChartData;
             ChartData = new ChartDB();
             ChartData->LoadBinary(ChartListFileName, XnewChartDirArray);
-
+            
+            // Update group contents
+            if(g_pGroupArray)
+                ChartData->ApplyGroupArray(g_pGroupArray);
+            
+            
             if(g_boptionsactive){
                 g_options->UpdateDisplayedChartDirList(ChartData->GetChartDirArray());
             }
@@ -2718,7 +2727,11 @@ int RemoveChartFromDBInPlace( wxString &full_path )
         delete ChartData;
         ChartData = new ChartDB();
         ChartData->LoadBinary(ChartListFileName, XnewChartDirArray);
-    
+
+        // Update group contents
+        if(g_pGroupArray)
+            ChartData->ApplyGroupArray(g_pGroupArray);
+        
         if(g_boptionsactive){
             g_options->UpdateDisplayedChartDirList(ChartData->GetChartDirArray());
         }
@@ -4079,12 +4092,16 @@ void PluginPanel::SetEnabled( bool enabled )
         m_pName->SetForegroundColour(*wxBLACK);
         m_pVersion->SetForegroundColour(*wxBLACK);
         m_pDescription->SetForegroundColour(*wxBLACK);
-        m_pDescription->SetLabel( m_pPlugin->m_long_description ); //Pick up translation, if any
+        m_pDescription->SetLabel( m_pPlugin->m_short_description ); //Pick up translation, if any
         if ( enabled )
             m_pButtonEnable->SetLabel(_("Disable"));
         else
             m_pButtonEnable->SetLabel(_("Enable"));
     }
+    
+    if(m_bSelected)
+        m_pDescription->SetLabel( m_pPlugin->m_long_description ); //Pick up translation, if any
+        
     m_pButtonPreferences->Enable( enabled && (m_pPlugin->m_cap_flag & WANTS_PREFERENCES) );
     
 }
@@ -6394,3 +6411,18 @@ double PlugInGetDisplaySizeMM()
 {
     return g_Platform->GetDisplaySizeMM();
 }
+
+wxFont* FindOrCreateFont_PlugIn( int point_size, wxFontFamily family, 
+                    wxFontStyle style, wxFontWeight weight, bool underline,
+                    const wxString &facename,
+                    wxFontEncoding encoding)
+{
+    return FontMgr::Get().FindOrCreateFont(point_size, family, style, weight, underline, facename, encoding);
+}
+
+int PluginGetMinAvailableGshhgQuality() { return cc1->GetMinAvailableGshhgQuality(); }
+int PluginGetMaxAvailableGshhgQuality() { return cc1->GetMaxAvailableGshhgQuality(); }
+
+/* API 1.16 */
+// disable builtin console canvas, and autopilot nmea sentences
+void PlugInHandleAutopilotRoute(bool enable) { g_bPluginHandleAutopilotRoute = enable; }

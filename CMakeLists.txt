@@ -35,6 +35,9 @@ IF (COMMAND cmake_policy)
   if (POLICY CMP0043)
     CMAKE_POLICY(SET CMP0043 NEW)
   endif (POLICY CMP0043)
+  if (POLICY CMP0025)
+    CMAKE_POLICY(SET CMP0025 NEW)
+  endif ()
 ENDIF (COMMAND cmake_policy)
  
 PROJECT(OpenCPN)
@@ -47,7 +50,51 @@ ELSE(APPLE)
   SET(PACKAGE_NAME opencpn)
 ENDIF(APPLE)
 
-OPTION(OCPN_USE_LIBCPP "Use C++11 and libc++ instead of libstdc++ on macOS" OFF)
+if (CMAKE_VERSION VERSION_LESS "3.1")
+  include(CheckCXXCompilerFlag)
+  CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+  CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
+  if(COMPILER_SUPPORTS_CXX11)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+    message(STATUS "Setting C++11 standard via CXX flags")
+  elseif(COMPILER_SUPPORTS_CXX0X)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
+    message(STATUS "Setting C++0x standard via CXX FLAGS")
+  else()
+        message(STATUS "The compiler ${CMAKE_CXX_COMPILER} has no C++11 support. Please use a different C++ compiler.")
+  endif()
+else ()
+  set (CMAKE_CXX_STANDARD 11)
+  message(STATUS "Setting C++11 standard via cmake standard mecahnism")
+endif ()
+
+OPTION(OCPN_USE_LIBCPP "Use C++11 and libc++ instead of libstdc++ on macOS" ON)
+
+if ( CMAKE_VERSION VERSION_GREATER 3.4 )
+  set(ENABLE_CLANG_TIDY OFF CACHE BOOL "Add clang-tidy automatically to builds")
+  if (ENABLE_CLANG_TIDY)
+    find_program (CLANG_TIDY_EXE NAMES "clang-tidy" PATHS /usr/local/opt/llvm/bin )
+    if (CLANG_TIDY_EXE)
+      message(STATUS "clang-tidy found: ${CLANG_TIDY_EXE}")
+      #For more, see http://clang.llvm.org/extra/clang-tidy/
+      #set(CLANG_TIDY_CHECKS "-*,modernize-*")
+      set(CLANG_TIDY_CHECKS "-*,performance-*")
+      set(CMAKE_CXX_CLANG_TIDY "${CLANG_TIDY_EXE};-checks=${CLANG_TIDY_CHECKS};-header-filter='${CMAKE_SOURCE_DIR}/*'"
+        CACHE STRING "" FORCE)
+    else()
+      message(AUTHOR_WARNING "clang-tidy not found!")
+      set(CMAKE_CXX_CLANG_TIDY "" CACHE STRING "" FORCE) # delete it
+    endif()
+  endif()
+endif()
+
+if ( CMAKE_VERSION VERSION_GREATER 3.9 )
+  set(ENABLE_CPPCHECK OFF CACHE BOOL "Add cppcheck automatically to builds")
+  if (ENABLE_CPPCHECK)
+      find_program (CPPCHECK_EXECUTABLE NAMES "cppcheck" )
+      set(CMAKE_CXX_CPPCHECK ${CPPCHECK_EXECUTABLE})
+  endif()
+endif()
 
 INCLUDE( ${CMAKE_SOURCE_DIR}/VERSION.cmake )
 SET(PACKAGE_VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}" )
@@ -69,7 +116,7 @@ IF (NOT WIN32)
   SET (LIB_INSTALL_DIR "lib")
   IF (EXISTS /etc/debian_version)
     SET (PACKAGE_FORMAT "DEB")
-    SET (PACKAGE_DEPS "libc6, libwxgtk3.0-0, wx3.0-i18n, libglu1-mesa (>= 7.0.0), libgl1-mesa-glx (>= 7.0.0), zlib1g, bzip2, libtinyxml2.6.2, libportaudio2")
+    SET (PACKAGE_DEPS "libc6, libwxgtk3.0-0, wx3.0-i18n, libglu1-mesa (>= 7.0.0), libgl1-mesa-glx (>= 7.0.0), zlib1g, bzip2, libtinyxml2.6.2, libportaudio2, libsqlite3")
     SET (PACKAGE_RECS "xcalib,xdg-utils")
     SET (LIB_INSTALL_DIR "lib")
     IF (CMAKE_SYSTEM_PROCESSOR MATCHES "arm*")
@@ -402,6 +449,10 @@ SET( wxWidgets_USE_UNICODE ON)
 SET( wxWidgets_USE_UNIVERSAL OFF)
 SET( wxWidgets_USE_STATIC OFF)
 
+set (WXWIDGETS_FORCE_VERSION CACHE VERSION "Force usage of a specific wxWidgets version.")
+if(WXWIDGETS_FORCE_VERSION)
+  set (wxWidgets_CONFIG_OPTIONS --version=${WXWIDGETS_FORCE_VERSION})
+endif()
 FIND_PACKAGE(wxWidgets REQUIRED)
 
 IF(MSYS)
@@ -579,6 +630,8 @@ IF(OCPN_USE_CURL)
     ADD_DEFINITIONS(-D__OCPN_USE_CURL__)
 
 IF(WIN32)
+    INSTALL(FILES "${CMAKE_SOURCE_DIR}/buildwin/curl-ca-bundle.crt" "${CMAKE_SOURCE_DIR}/buildwin/libeay32.dll" "${CMAKE_SOURCE_DIR}/buildwin/ssleay32.dll" DESTINATION ".")
+    INSTALL(FILES "${CMAKE_SOURCE_DIR}/buildwin/curl-ca-bundle.crt" DESTINATION ".")
     OPTION(OCPN_USE_EXTERN_CURL "Use external libcurl" OFF)
 ELSE(WIN32)
     SET(OCPN_USE_EXTERN_CURL ON)
@@ -629,6 +682,7 @@ ENDIF(NOT QT_ANDROID)
 ENDIF(OCPN_USE_CURL)
 
 OPTION(OCPN_USE_SVG "Use SVG graphics" ON)
+OPTION(OCPN_USE_LZMA "Use LZMA for chart compression" ON)
 
 IF(OCPN_USE_SVG)
   MESSAGE(STATUS "SVG support enabled...")
@@ -703,25 +757,6 @@ IF(OCPN_USE_SVG)
         message(STATUS "Cairo Extra Libraries: " ${CAIRO_EXTRA_LIBRARIES})
       ENDIF ( CAIRO_EXTRAS_FOUND ) 
 
- 
-      IF(NOT WIN32 AND NOT APPLE)
-        OPTION(OCPN_FORCE_GTK3 "Force the build to use GTK3" OFF)
-
-        IF(NOT OCPN_FORCE_GTK3)
-          FIND_PACKAGE(GTK2)
-        ENDIF(NOT OCPN_FORCE_GTK3)
-
-        IF(GTK2_FOUND)
-          INCLUDE_DIRECTORIES(${GTK2_INCLUDE_DIRS})
-          SET(GTK_LIBRARIES ${GTK2_LIBRARIES})
-          MESSAGE(STATUS "Building against GTK2...")
-        ELSE(GTK2_FOUND)
-          FIND_PACKAGE(GTK3)
-          INCLUDE_DIRECTORIES(${GTK3_INCLUDE_DIRS})
-          SET(GTK_LIBRARIES ${GTK3_LIBRARIES})
-          MESSAGE(STATUS "Building against GTK3...")
-        ENDIF(GTK2_FOUND)
-      ENDIF(NOT WIN32 AND NOT APPLE)
 
       # Find FFMPEG - we have it disabled in our wxSVG
       #set(FFmpeg_FIND_COMPONENTS AVCODEC AVFORMAT AVUTIL SWSCALE SWRESAMPLE AVRESAMPLE)
@@ -733,9 +768,10 @@ IF(OCPN_USE_SVG)
       #set(VIDEO_FFMPEG_LIBRARIES ${FFMPEG_LIBRARIES} ${SWSCALE_LIBRARIES})
 
        FIND_PACKAGE(EXPAT REQUIRED)
+       INCLUDE(FindEXIF.cmake)
     ELSE(NOT WIN32)
       #On Windows, we have our own expat
-      SET(EXPAT_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/buildwin/expat-2.1.0/include)
+      SET(EXPAT_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/buildwin/expat-2.2.5/include)
       INCLUDE_DIRECTORIES(${EXPAT_INCLUDE_DIR})
       #And cairo
       SET(CAIRO_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/buildwin/gtk/include)
@@ -753,11 +789,12 @@ IF(OCPN_USE_SVG)
     IF(WIN32)
       SET(SVG_LIBS
         ${CMAKE_SOURCE_DIR}/buildwin/gtk/cairo.lib
-	${CMAKE_SOURCE_DIR}/buildwin/expat-2.1.0/expat.lib
+	${CMAKE_SOURCE_DIR}/buildwin/expat-2.2.5/expat.lib
+${CMAKE_SOURCE_DIR}/buildwin/archive.lib
       )
       FILE(GLOB gtkdll_files "${CMAKE_CURRENT_SOURCE_DIR}/buildwin/gtk/*.dll")
       INSTALL(FILES ${gtkdll_files} DESTINATION ".")
-      FILE(GLOB expatdll_files "${CMAKE_CURRENT_SOURCE_DIR}/buildwin/expat-2.1.0/*.dll")
+      FILE(GLOB expatdll_files "${CMAKE_CURRENT_SOURCE_DIR}/buildwin/expat-2.2.5/*.dll")
       INSTALL(FILES ${expatdll_files} DESTINATION ".")
       MESSAGE(STATUS "GTK and Expat DLLs bundled into the installer package...")
     ELSE(WIN32)
@@ -766,6 +803,7 @@ IF(OCPN_USE_SVG)
         ${CAIRO_EXTRA_LIBRARIES}
 #        ${FFMPEG_LIBRARIES}
         ${EXPAT_LIBRARIES}
+        ${EXIF_LIBRARIES}
         ${GTK_LIBRARIES}
       )
     ENDIF(WIN32)
@@ -839,6 +877,12 @@ IF(OCPN_USE_SVG)
       src/wxsvg/src/svgxml/svgxml.cpp
       src/wxsvg/src/svgxml/svgxmlhelpr.cpp
     )
+    if(EXIF_FOUND)
+        SET(SRC_WXSVG ${SRC_WXSVG}
+            src/wxsvg/src/ExifHandler.cpp
+        )
+        ADD_DEFINITIONS(-DwxsvgUSE_EXIF) 
+    endif()
     ADD_LIBRARY(WXSVG ${SRC_WXSVG})
     TARGET_LINK_LIBRARIES(WXSVG ${SVG_LIBS})
     INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/src/wxsvg/include/wxSVG)
@@ -849,6 +893,84 @@ IF(OCPN_USE_SVG)
   ENDIF(NOT QT_ANDROID)
 ENDIF(OCPN_USE_SVG)
 
+ 
+IF(NOT WIN32 AND NOT APPLE AND NOT QT_ANDROID)
+  OPTION(OCPN_FORCE_GTK3 "Force the build to use GTK3" OFF)
+
+  IF(NOT OCPN_FORCE_GTK3)
+    FIND_PACKAGE(GTK2)
+  ENDIF(NOT OCPN_FORCE_GTK3)
+
+  IF(GTK2_FOUND)
+    INCLUDE_DIRECTORIES(${GTK2_INCLUDE_DIRS})
+    SET(GTK_LIBRARIES ${GTK2_LIBRARIES})
+    MESSAGE(STATUS "Building against GTK2...")
+  ELSE(GTK2_FOUND)
+    FIND_PACKAGE(GTK3)
+    INCLUDE_DIRECTORIES(${GTK3_INCLUDE_DIRS})
+    SET(GTK_LIBRARIES ${GTK3_LIBRARIES})
+    MESSAGE(STATUS "Building against GTK3...")
+  ENDIF(GTK2_FOUND)
+        
+  SET(EXTRA_LIBS ${EXTRA_LIBS} ${GTK_LIBRARIES})
+ENDIF(NOT WIN32 AND NOT APPLE AND NOT QT_ANDROID)
+
+# SQLite3 support required for MBTiles.
+
+set(SQLITECPP_SRC
+ ${CMAKE_CURRENT_SOURCE_DIR}/src/SQLiteCpp/src/Backup.cpp
+ ${CMAKE_CURRENT_SOURCE_DIR}/src/SQLiteCpp/src/Column.cpp
+ ${CMAKE_CURRENT_SOURCE_DIR}/src/SQLiteCpp/src/Database.cpp
+ ${CMAKE_CURRENT_SOURCE_DIR}/src/SQLiteCpp/src/Exception.cpp
+ ${CMAKE_CURRENT_SOURCE_DIR}/src/SQLiteCpp/src/Statement.cpp
+ ${CMAKE_CURRENT_SOURCE_DIR}/src/SQLiteCpp/src/Transaction.cpp
+)
+# list of header files of the library
+set(SQLITECPP_INC
+ ${CMAKE_CURRENT_SOURCE_DIR}/src/SQLiteCpp/include/SQLiteCpp/SQLiteCpp.h
+ ${CMAKE_CURRENT_SOURCE_DIR}/src/SQLiteCpp/include/SQLiteCpp/Assertion.h
+ ${CMAKE_CURRENT_SOURCE_DIR}/src/SQLiteCpp/include/SQLiteCpp/Backup.h
+ ${CMAKE_CURRENT_SOURCE_DIR}/src/SQLiteCpp/include/SQLiteCpp/Column.h
+ ${CMAKE_CURRENT_SOURCE_DIR}/src/SQLiteCpp/include/SQLiteCpp/Database.h
+ ${CMAKE_CURRENT_SOURCE_DIR}/src/SQLiteCpp/include/SQLiteCpp/Exception.h
+ ${CMAKE_CURRENT_SOURCE_DIR}/src/SQLiteCpp/include/SQLiteCpp/Statement.h
+ ${CMAKE_CURRENT_SOURCE_DIR}/src/SQLiteCpp/include/SQLiteCpp/Transaction.h
+ ${CMAKE_CURRENT_SOURCE_DIR}/src/SQLiteCpp/include/SQLiteCpp/Utils.h
+ ${CMAKE_CURRENT_SOURCE_DIR}/src/SQLiteCpp/include/SQLiteCpp/VariadicBind.h
+)
+include_directories( src/SQLiteCpp/include )
+ADD_LIBRARY(SQLiteCpp ${SQLITECPP_SRC} ${SQLITECPP_INC})
+SET(EXTRA_LIBS ${EXTRA_LIBS} SQLiteCpp)
+
+
+IF(UNIX AND NOT APPLE)
+    SET(SQLITE3_INC_LOOK_PATHS /usr/local/include /usr/include )
+    FIND_PATH( SQLITE3_INCLUDE_DIR sqlite3.h
+              PATHS ${SQLITE3_INC_LOOK_PATHS})
+
+    message(STATUS " SQLite3 include directory found: ${SQLITE3_INCLUDE_DIR}")
+
+    SET(SQLITE3_LIB_LOOK_PATHS /usr/lib /usr/local/lib /usr/lib/i386-linux-gnu)
+    FIND_LIBRARY(SQLITE3_LIBRARY NAMES PATHS ${SQLITE3_LIB_LOOK_PATHS} NAMES sqlite3 libsqlite3)
+    message(STATUS " SQLite3 runtime library: ${SQLITE3_LIBRARY}")
+    
+    IF( SQLITE3_INCLUDE_DIR AND SQLITE3_LIBRARY )
+      MESSAGE(STATUS "Found SQLite3 dev environment.")
+      INCLUDE_DIRECTORIES(${SQLITE3_INCLUDE_DIR})
+    ELSE(SQLITE3_INCLUDE_DIR AND SQLITE3_LIBRARY)
+      MESSAGE(STATUS "Could not find SQLite3 dev environment.")
+    ENDIF(SQLITE3_INCLUDE_DIR AND SQLITE3_LIBRARY)
+    
+    add_definitions(-DSQLITE_USE_LEGACY_STRUCT)
+   
+ENDIF(UNIX AND NOT APPLE)
+
+IF(WIN32 OR APPLE)
+    ADD_LIBRARY(sqlite3 ${CMAKE_CURRENT_SOURCE_DIR}/src/SQLiteCpp/sqlite3/sqlite3.c ${CMAKE_CURRENT_SOURCE_DIR}/src/SQLiteCpp/sqlite3/sqlite3.h)
+    include_directories( src/SQLiteCpp/sqlite3 )
+    SET(EXTRA_LIBS ${EXTRA_LIBS} sqlite3)
+ENDIF(WIN32 OR APPLE)
+
 FIND_PACKAGE(Gettext REQUIRED)
 
 IF(UNIX)
@@ -858,19 +980,29 @@ IF(UNIX)
     FIND_PACKAGE(ZLIB REQUIRED)
     FIND_PACKAGE(X11)
     INCLUDE_DIRECTORIES(${ZLIB_INCLUDE_DIR})
-    FIND_PACKAGE(TinyXML)
+    IF(NOT APPLE)
+      #TinyXML from Homebrew is not good enough for our GpxDocument needs
+      #We should probably replace it with pugixml completely anyway...
+      FIND_PACKAGE(TinyXML)
+    ENDIF(NOT APPLE)
   ENDIF(NOT QT_ANDROID)
 ENDIF(UNIX)
 
 # check for lzma support for reading compressed charts
-FIND_PACKAGE(LibLZMA)
-IF(LIBLZMA_FOUND)
+IF(WIN32)
+  LIST(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/buildwin")
+  LIST(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/buildwin/include")
+ENDIF(WIN32)
+IF(OCPN_USE_LZMA)
+  FIND_PACKAGE(LibLZMA)
+  IF(LIBLZMA_FOUND)
     message (STATUS "Building with lzma support")
     ADD_DEFINITIONS(-DUSE_LZMA)
     INCLUDE_DIRECTORIES(${LIBLZMA_INCLUDE_DIR})
-ELSE(LIBLZMA_FOUND)
+  ELSE(LIBLZMA_FOUND)
     message (STATUS "lzma library not found")
-ENDIF(LIBLZMA_FOUND)
+  ENDIF(LIBLZMA_FOUND)
+ENDIF(OCPN_USE_LZMA)
 
 # For convenience we define the sources as a variable. You can add
 # header files and cpp/c files and CMake will sort them out
@@ -1049,6 +1181,8 @@ SET(HDRS
                 include/S57Sector.h
                 include/FlexHash.h
                 include/iENCToolbar.h
+                include/mbtiles.h
+
 )
 
 SET(SRCS
@@ -1143,6 +1277,7 @@ SET(SRCS
                 src/OCPNPlatform.cpp 
                 src/FlexHash.cpp
                 src/iENCToolbar.cpp
+                src/mbtiles.cpp
     )
 
 IF(NOT WIN32 AND NOT APPLE AND NOT QT_ANDROID)
@@ -1404,10 +1539,10 @@ IF (OPENGL_FOUND)
       IF (( ARCH MATCHES "i386" OR ARCH MATCHES "amd64" OR ARCH MATCHES "x86_64") AND NOT QT_ANDROID)
         # using sse which makes the compression run about 50% faster
         message (STATUS "Compiling texture compression library with sse support")
-        set_property(TARGET TEXCMP PROPERTY COMPILE_FLAGS "-O3 -msse2 -DSQUISH_USE_SSE=2")
+        set_property(TARGET TEXCMP PROPERTY COMPILE_FLAGS "-O3 -msse2 -DSQUISH_USE_SSE=2 -fPIC")
       ELSE ()
         # use standard optimizations for other architectures
-        set_property(TARGET TEXCMP PROPERTY COMPILE_FLAGS "-O3")
+        set_property(TARGET TEXCMP PROPERTY COMPILE_FLAGS "-O3 -fPIC")
       ENDIF ()
   ELSE (NOT MSVC)
         # try to use sse on x86 based systems
@@ -1449,7 +1584,9 @@ IF (OPENGL_FOUND)
         ENDIF("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 
       ELSE ()
-        set_source_files_properties(src/mipmap/mipmap_neon.c PROPERTIES COMPILE_FLAGS "-mfpu=neon")
+        IF(NOT (ARCH MATCHES "arm64" OR ARCH MATCHES "aarch64"))
+          set_source_files_properties(src/mipmap/mipmap_neon.c PROPERTIES COMPILE_FLAGS "-mfpu=neon")
+        ENDIF()
       ENDIF ()
   ELSE (NOT MSVC)
         # try to use sse on x86 based systems
@@ -1642,6 +1779,7 @@ IF(WIN32)
 
     ENDIF(MSVC)
 ADD_EXECUTABLE(${PACKAGE_NAME} WIN32 ${HDRS} ${SRCS})
+
 ENDIF(WIN32)
 
 
@@ -1846,6 +1984,8 @@ TARGET_LINK_LIBRARIES(${PACKAGE_NAME}
       ${GETTEXT_LIBRARY}
       ${BZIP2_LIBRARIES}
       ${ZLIB_LIBRARY}
+      SQLiteCpp
+      sqlite3
       )
 
 IF(X11_FOUND AND NOT APPLE)
@@ -1946,8 +2086,10 @@ ENDIF(BUNDLE_DOCS MATCHES "ON")
 
 IF(UNIX)
   INSTALL(FILES data/opencpn.png DESTINATION ${PREFIX_DATA}/icons/hicolor/48x48/apps PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
+  INSTALL(FILES src/bitmaps/opencpn-64.png DESTINATION ${PREFIX_DATA}/icons/hicolor/64x64/apps/opencpn.png PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
   INSTALL(FILES src/bitmaps/other_svg_src/opencpn.svg DESTINATION ${PREFIX_DATA}/icons/hicolor/scalable/apps PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
   INSTALL(FILES data/opencpn.desktop DESTINATION ${PREFIX_DATA}/applications PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ )
+  INSTALL(FILES data/opencpn.appdata.xml DESTINATION ${PREFIX_DATA}/appdata PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ )
 ENDIF(UNIX)
 
 ENDIF(NOT APPLE)
@@ -2053,6 +2195,9 @@ GETTEXT_BUILD_MO(po/opencpn_zh_TW.po zh_TW)
 GETTEXT_BUILD_MO(po/opencpn_hu_HU.po hu_HU)
 GETTEXT_BUILD_MO(po/opencpn_gl_ES.po gl_ES)
 GETTEXT_BUILD_MO(po/opencpn_ca_ES.po ca_ES)
+GETTEXT_BUILD_MO(po/opencpn_ar_SA.po ar_SA)
+GETTEXT_BUILD_MO(po/opencpn_ja_JP.po ja_JP)
+GETTEXT_BUILD_MO(po/opencpn_vi_VN.po vi_VN)
 ADD_CUSTOM_TARGET(i18n COMMENT "i18n: Done." DEPENDS ${_gmoFiles})
 
 IF(NOT QT_ANDROID)
@@ -2096,6 +2241,12 @@ IF(WIN32 AND NOT UNIX)
         INSTALL(FILES ${vcdll_files} DESTINATION ".")
 	MESSAGE(STATUS "MSVC redistributable DLLs bundled into the installer package...")
     ENDIF(BUNDLE_VCDLLS)
+    OPTION (BUNDLE_LIBARCHIVEDLLS "Bundle the prebuilt LibArchive and LibLZMA DLLs" ON)
+    IF(BUNDLE_LIBARCHIVEDLLS)
+        FILE(GLOB libarchivedll_files "${CMAKE_CURRENT_SOURCE_DIR}/buildwin/archive.dll" "${CMAKE_CURRENT_SOURCE_DIR}/buildwin/liblzma.dll"  "${CMAKE_CURRENT_SOURCE_DIR}/buildwin/zlib1.dll")
+        INSTALL(FILES ${libarchivedll_files} DESTINATION ".")
+	MESSAGE(STATUS "LibArchive DLLs bundled into the installer package...")
+    ENDIF(BUNDLE_LIBARCHIVEDLLS)
 ENDIF(WIN32 AND NOT UNIX)
 
 IF(MSVC AND OCPN_USE_CRASHREPORT)
@@ -2104,7 +2255,6 @@ IF(MSVC AND OCPN_USE_CRASHREPORT)
     INSTALL(FILES ${CMAKE_SOURCE_DIR}/buildwin/crashrpt/crashrpt_lang.ini DESTINATION ${PREFIX_PKGDATA} PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
     INSTALL(FILES ${CMAKE_SOURCE_DIR}/buildwin/crashrpt/dbghelp.dll DESTINATION ${PREFIX_PKGDATA} PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
     INSTALL(FILES ${CMAKE_SOURCE_DIR}/buildwin/crashrpt/PrivacyPolicy.txt DESTINATION ${PREFIX_PKGDATA} PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
-    INSTALL(FILES ${CMAKE_SOURCE_DIR}/buildwin/ocpn_gltest1.exe DESTINATION ${PREFIX_PKGDATA} PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
     MESSAGE(STATUS "CrashRpt bundled into the installer package...")
 ENDIF(MSVC AND OCPN_USE_CRASHREPORT)
 
@@ -2272,9 +2422,14 @@ IF(APPLE)
   SET(APPS "\${CMAKE_INSTALL_PREFIX}/bin/OpenCPN.app")
   SET(DIRS "")
 
+#INSTALL(DIRECTORY DESTINATION "bin/OpenCPN.app/Contents/PlugIns")
+  INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/plugins/dashboard_pi/libdashboard_pi.dylib DESTINATION "bin/OpenCPN.app/Contents/PlugIns")
+  INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/plugins/grib_pi/libgrib_pi.dylib DESTINATION "bin/OpenCPN.app/Contents/PlugIns")
+  INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/plugins/chartdldr_pi/libchartdldr_pi.dylib DESTINATION "bin/OpenCPN.app/Contents/PlugIns")
+  INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/plugins/wmm_pi/libwmm_pi.dylib DESTINATION "bin/OpenCPN.app/Contents/PlugIns")  
+
   SET(LIBS "\${CMAKE_INSTALL_PREFIX}/bin/OpenCPN.app/Contents/PlugIns/libdashboard_pi.dylib")
   SET(LIBS ${LIBS} "\${CMAKE_INSTALL_PREFIX}/bin/OpenCPN.app/Contents/PlugIns/libgrib_pi.dylib")
-
   SET(LIBS ${LIBS} "\${CMAKE_INSTALL_PREFIX}/bin/OpenCPN.app/Contents/PlugIns/libchartdldr_pi.dylib")
   SET(LIBS ${LIBS} "\${CMAKE_INSTALL_PREFIX}/bin/OpenCPN.app/Contents/PlugIns/libwmm_pi.dylib")
 

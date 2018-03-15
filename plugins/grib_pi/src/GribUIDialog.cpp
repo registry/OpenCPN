@@ -696,9 +696,12 @@ void GRIBUICtrlBar::SetDialogsStyleSizePosition( bool force_recompute )
     }
     Layout();
     Fit();
-    SetMinSize( GetBestSize() );
-    SetSize( GetBestSize() );
-    Update();
+    wxSize sd = GetSize();
+#ifdef __WXGTK__
+    if( m_HasCaption && sd.y == GetClientSize().y ) sd.y += 30;
+#endif
+    SetSize( wxSize( sd.x, sd.y ) );
+    SetMinSize( wxSize( sd.x, sd.y ) );
     pPlugIn->MoveDialog( this, pPlugIn->GetCtrlBarXY() );
     m_old_DialogStyle = m_DialogStyle;
 }
@@ -877,47 +880,11 @@ void GRIBUICtrlBar::ContextMenuItemCallback(int id)
     //
     wxFileConfig *pConf = GetOCPNConfigObject();
 
-    int x = -1;
-    int y = -1;
-    int w = m_vp->pix_width - 30;
-    int h = m_vp->pix_height - 30;
-
-    if(pConf) {
-        pConf->SetPath ( _T ( "/Settings/GRIB" ) );
-
-        pConf->Read( _T ( "GribDataTablePosition_x" ), &x, -1 );
-        pConf->Read( _T ( "GribDataTablePosition_y" ), &y, -1 );
-        pConf->Read( _T ( "GribDataTableWidth" ), &w );
-        pConf->Read( _T ( "GribDataTableHeight" ), &h );
-    }
-    //Correct an eventuelly oversized dialog
-    w = ( w > m_vp->pix_width - 30 )? m_vp->pix_width - 30: w;
-    h = ( h > m_vp->pix_height - 30)? m_vp->pix_height - 30: h;
-    //init centered position and default size if not set yet
-    if(x==-1 && y == -1) { x = (m_vp->pix_width - w) / 2; y = (m_vp->pix_height - h) /2; }
-
     ArrayOfGribRecordSets *rsa = m_bGRIBActiveFile->GetRecordSetArrayPtr();
     GRIBTable *table = new GRIBTable(*this);
 
-    table->InitGribTable( pPlugIn->GetTimeZone(), rsa );
-    table->m_pButtonTableOK->SetLabel(_("Close"));
-
-    //set dialog size and position
-    table->SetSize(w, h);
-    table->SetPosition(wxPoint(x, y));
-
-    //try to show and highlight current dateTime step column
-    int i = 0,vcol = GetNearestIndex( GetNow(), 0);
-    wxColour colour;
-    GetGlobalColor(_T("GREEN1"), &colour);
-    table->m_pGribTable->SetCellBackgroundColour( 0, vcol, colour ); //mark current column
-    table->m_pGribTable->SetCellBackgroundColour( 1, vcol, colour );
-    while( table->m_pGribTable->IsVisible( 0, i, true) ) {           //ensure it's visible
-        i++;
-    }
-    vcol += i - 2;
-    table->m_pGribTable->GoToCell( 0, vcol );
-    //
+    table->InitGribTable(pPlugIn->GetTimeZone(), rsa,  GetNearestIndex( GetNow(), 0));
+    table->SetTableSizePosition(m_vp->pix_width, m_vp->pix_height);
 
     table->ShowModal();
 
@@ -1919,13 +1886,18 @@ GRIBFile::~GRIBFile()
 //               GRIB Cursor Data Ctrl & Display implementation
 //---------------------------------------------------------------------------------------
 GRIBUICData::GRIBUICData( GRIBUICtrlBar &parent )
-		: GRIBUICDataBase( &parent), m_gpparent(parent)
+#ifdef __WXOSX__
+    : GRIBUICDataBase( parent.pParent, CURSOR_DATA, _("GRIB Display Control"), wxDefaultPosition, wxDefaultSize, wxSYSTEM_MENU|wxNO_BORDER|wxSTAY_ON_TOP)
+#else
+    : GRIBUICDataBase( &parent, CURSOR_DATA, _("GRIB Display Control"), wxDefaultPosition, wxDefaultSize, wxSYSTEM_MENU|wxNO_BORDER)
+#endif
+    , m_gpparent(parent)
 {
    // m_gGrabber = new GribGrabberWin( this );
   //  fgSizer58->Add( m_gGrabber, 0, wxALL, 0 );
 
     m_gCursorData = new CursorData( this, m_gpparent );
-        m_fgCdataSizer->Add( m_gCursorData, 0, wxALL, 0 );
+    m_fgCdataSizer->Add( m_gCursorData, 0, wxALL, 0 );
 
     Connect( wxEVT_MOVE, wxMoveEventHandler( GRIBUICData::OnMove ) );
 }

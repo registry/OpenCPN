@@ -53,6 +53,9 @@ public:
 
     int m_iTextureDimension;
     int m_iTextureMemorySize;
+    
+    bool m_GLPolygonSmoothing;
+    bool m_GLLineSmoothing;
 };
 
 class ocpnDC;
@@ -97,7 +100,7 @@ public:
     void MouseEvent(wxMouseEvent& event);
     void FastPan(int dx, int dy);
     void FastZoom(float factor);
-    void RenderCanvasBackingChart( ocpnDC dc, OCPNRegion chart_get_region);
+    void RenderCanvasBackingChart( ocpnDC &dc, OCPNRegion chart_get_region);
     
 #ifdef __OCPN__ANDROID__    
     void OnEvtPanGesture( wxQT_PanGestureEvent &event);

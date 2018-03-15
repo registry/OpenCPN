@@ -60,6 +60,14 @@ extern bool g_bopengl;
 
 #define GetChartTableEntry(i) GetChartTable()[i]
 
+//  Calculating the chart coverage region with extremely complicated shape is very expensive,
+//  put a limit on the complefity of "not covered" areas to prevent the application from slowing
+//  down to total unusability.
+//  On US ENC charts, the number of NOCOVR PLYs seems to always be under 300, but on the SCS ENCs it
+//  can get as high as 10000 and make the application totally unusable with chart quilting enabled
+//  while bringing little real effect.
+#define NOCOVR_PLY_PERF_LIMIT 500
+#define AUX_PLY_PERF_LIMIT 500
 
 static int CompareScales( int *i1, int *i2 )
 {
@@ -488,11 +496,16 @@ LLRegion Quilt::GetChartQuiltRegion( const ChartTableEntry &cte, ViewPort &vp )
 
     //    If the chart has an aux ply table, use it for finer region precision
     int nAuxPlyEntries = cte.GetnAuxPlyEntries();
+    bool aux_ply_skipped = false;
     if( nAuxPlyEntries >= 1 ) {
         for( int ip = 0; ip < nAuxPlyEntries; ip++ ) {
-            float *pfp = cte.GetpAuxPlyTableEntry( ip );
             int nAuxPly = cte.GetAuxCntTableEntry( ip );
-
+            if( nAuxPly > AUX_PLY_PERF_LIMIT ) {
+                //wxLogMessage("PLY calculation skipped for %s, nAuxPly: %d", cte.GetpFullPath(), nAuxPly);
+                aux_ply_skipped = true;
+                break;
+            }
+            float *pfp = cte.GetpAuxPlyTableEntry( ip );
             LLRegion t_region(nAuxPly, pfp);
             t_region.Intersect(screen_region);
 //            OCPNRegion t_region = vp.GetVPRegionIntersect( screen_region, nAuxPly, pfp,
@@ -502,7 +515,7 @@ LLRegion Quilt::GetChartQuiltRegion( const ChartTableEntry &cte, ViewPort &vp )
         }
     }
 
-    else {
+    if( aux_ply_skipped || nAuxPlyEntries == 0 ) {
         int n_ply_entries = cte.GetnPlyEntries();
         float *pfp = cte.GetpPlyTable();
 
@@ -523,8 +536,12 @@ LLRegion Quilt::GetChartQuiltRegion( const ChartTableEntry &cte, ViewPort &vp )
     int nNoCovrPlyEntries = cte.GetnNoCovrPlyEntries();
     if( nNoCovrPlyEntries ) {
         for( int ip = 0; ip < nNoCovrPlyEntries; ip++ ) {
-            float *pfp = cte.GetpNoCovrPlyTableEntry( ip );
             int nNoCovrPly = cte.GetNoCovrCntTableEntry( ip );
+            if( nNoCovrPly > NOCOVR_PLY_PERF_LIMIT ) {
+                //wxLogMessage("NOCOVR calculation skipped for %s, nNoCovrPly: %d", cte.GetpFullPath(), nNoCovrPly);
+                continue;
+            }
+            float *pfp = cte.GetpNoCovrPlyTableEntry( ip );
 
             LLRegion t_region(nNoCovrPly, pfp);
             t_region.Intersect(screen_region);
@@ -809,7 +826,10 @@ int Quilt::GetNomScaleMin(int scale, ChartTypeEnum type, ChartFamilyEnum family)
 
     switch(family){
         case CHART_FAMILY_RASTER:{
-            return scale * 1 * mod;
+            if(CHART_TYPE_MBTILES == type)
+                return scale * 4 * mod;         // MBTiles are fast enough
+            else
+                return scale * 1 * mod;
         }
 
         case CHART_FAMILY_VECTOR:{
@@ -1102,6 +1122,8 @@ bool Quilt::BuildExtendedChartStackAndCandidateArray(bool b_fullscreen, int ref_
     //    Building the quilt candidate array
     for( int ics = 0; ics < n_charts; ics++ ) {
         int i = pCurrentStack->GetDBIndex( ics );
+        if (i < 0)
+            continue;
         m_extended_stack_array.Add( i );
 
         //  If the reference chart is cm93, we need not add any charts to the candidate array from the vp center.
@@ -2354,7 +2376,8 @@ bool Quilt::DoRenderQuiltRegionViewOnDC( wxMemoryDC &dc, ViewPort &vp, OCPNRegio
                         if( !get_region.Empty() ) {
 #ifdef USE_S57
                             s57chart *Chs57 = dynamic_cast<s57chart*>( chart );
-                            Chs57->RenderOverlayRegionViewOnDC( tmp_dc, vp, get_screen_region );
+                            if (Chs57)
+                                Chs57->RenderOverlayRegionViewOnDC( tmp_dc, vp, get_screen_region );
 #endif
                             OCPNRegionIterator upd( get_screen_region );
                             while( upd.HaveRects() ) {
