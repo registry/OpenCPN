@@ -46,7 +46,6 @@
 #include "WMMHeader.h"
 #include "MagneticPlotMap.h"
 
-<<<<<<< HEAD
 
 #ifndef __WXMSW__
 using namespace std;
@@ -62,8 +61,7 @@ using namespace std;
 #define isnan(x) _isnan(x)
 #endif  // __WIN32__
 
-=======
->>>>>>> 94e05c6a8c92cca0782cd827e5a0f3081f33c08d
+
 static const long long lNaN = 0xfff8000000000000;
 #define qNan (*(double*)&lNaN)
 

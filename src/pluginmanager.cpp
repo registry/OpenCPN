@@ -73,7 +73,6 @@
 #include "gshhs.h"
 #include "mygeom.h"
 #include "OCPNPlatform.h"
-#include "version.h"
 #include "toolbar.h"
 #include "Track.h"
 #include "main_version.h"

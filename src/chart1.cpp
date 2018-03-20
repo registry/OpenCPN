@@ -40,7 +40,6 @@
 #include <wx/listctrl.h>
 #include <wx/aui/aui.h>
 #include <wx/version.h> //Gunther
-#include <version.h>
 #include <wx/dialog.h>
 #include <wx/progdlg.h>
 #include <wx/clrpicker.h>

@@ -58,6 +58,8 @@
   #include "unarr.h"
 #endif
 
+#include "myversion.h"
+
 #include <wx/arrimpl.cpp>
     WX_DEFINE_OBJARRAY(wxArrayOfDateTime);
 

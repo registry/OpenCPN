@@ -22,10 +22,10 @@ struct sqlite3_value;
 
 #if !defined( _SQLITE3_H_ ) && !defined( SQLITE3_H ) //This forward define may be problematic so let's try it only if needed
 #ifndef SQLITE_USE_LEGACY_STRUCT // Since SQLITE 3.19 (used by default since SQLiteCpp 2.1.0)
-typedef struct sqlite3_value sqlite3_value;adfa
+typedef struct sqlite3_value sqlite3_value;
 #else // Before SQLite 3.19 (legacy struct forward declaration can be activated with CMake SQLITECPP_LEGACY_STRUCT var)
-//struct Mem;
-//typedef struct Mem sqlite3_value;
+struct Mem;
+typedef struct Mem sqlite3_value;
 #endif
 #endif // !defined( _SQLITE3_H_ ) && !defined( SQLITE3_H )
 
