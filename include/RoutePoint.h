@@ -30,7 +30,6 @@
 #include <wx/gauge.h>
 #include <wx/clrpicker.h>
 #include "Hyperlink.h"
-#include "gpxdocument.h"
 
 class ocpnDC;
 class wxDC;
@@ -40,7 +39,7 @@ enum BouyPassingSide { BOUY_NONE=0, BOUY_SB=1, BOUY_P=2, BOUY_GATE=3, BOUY_AHEAD
 class RoutePoint
 {
 public:
-      RoutePoint(double lat, double lon, const wxString& icon_ident, const wxString& name, const wxString &pGUID = GPX_EMPTY_STRING, bool bAddToList = true);
+      RoutePoint(double lat, double lon, const wxString& icon_ident, const wxString& name, const wxString &pGUID = wxEmptyString, bool bAddToList = true);
       RoutePoint( RoutePoint* orig );
       RoutePoint();
       virtual ~RoutePoint(void);
