@@ -4613,7 +4613,7 @@ void ChartCanvas::JaggyCircle( ocpnDC &dc, wxPen pen, int x, int y, int radius )
         double ra = ra_min + ( ( (double) rand() / RAND_MAX ) * ( ra_max - ra_min ) );
 
         double r;
-        if( i % 1 ) r = radius + ra;
+        if( i & 1 ) r = radius + ra;
         else
             r = radius - ra;
 
