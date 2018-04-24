@@ -187,6 +187,7 @@ DashboardInstrument_Single::DashboardInstrument_Single(wxWindow *pparent, wxWind
 {
       m_format = format;
       m_data = _T("---");
+      m_DataHeight = 0;
 }
 
 wxSize DashboardInstrument_Single::GetSize( int orient, wxSize hint )
@@ -281,6 +282,7 @@ DashboardInstrument_Position::DashboardInstrument_Position(wxWindow *pparent, wx
       m_data2 = _T("---");
       m_cap_flag1 = cap_flag1;
       m_cap_flag2 = cap_flag2;
+      m_DataHeight = 0;
 }
 
 wxSize DashboardInstrument_Position::GetSize( int orient, wxSize hint )
