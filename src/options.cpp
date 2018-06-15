@@ -86,6 +86,9 @@ extern GLuint g_raster_format;
 #include "androidUTIL.h"
 #endif
 
+#ifdef __WXOSX__
+#include "DarkMode.h"
+#endif
 
 #include "OCPNPlatform.h"
 
@@ -293,6 +296,7 @@ extern float g_ShipScaleFactorExp;
 extern double g_config_display_size_mm;
 extern bool g_config_display_size_manual;
 extern bool g_bInlandEcdis;
+extern bool g_bDarkDecorations;
 extern bool g_bSpaceDropMark;
 
 extern "C" bool CheckSerialAccess(void);
@@ -4585,7 +4589,13 @@ void options::CreatePanel_UI(size_t parent, int border_size,
   pInlandEcdis = new wxCheckBox(itemPanelFont, ID_INLANDECDISBOX,
                                 _("Use Settings for Inland ECDIS Version 2.3"));
   miscOptions->Add(pInlandEcdis, 0, wxALL, border_size);
-  
+
+#ifdef __WXOSX__
+  pDarkDecorations = new wxCheckBox(itemPanelFont, ID_DARKDECORATIONSBOX,
+                                  _("Use dark window decorations"));
+  miscOptions->Add(pDarkDecorations, 0, wxALL, border_size);
+#endif
+    
   miscOptions->AddSpacer(10);
 
   wxFlexGridSizer* sliderSizer;
@@ -5051,8 +5061,10 @@ void options::SetInitialSettings(void) {
   pResponsive->SetValue(g_bresponsive);
   pOverzoomEmphasis->SetValue(!g_fog_overzoom);
   pOZScaleVector->SetValue(!g_oz_vector_scale);
-  pInlandEcdis->SetValue(g_bInlandEcdis); 
-
+  pInlandEcdis->SetValue(g_bInlandEcdis);
+#ifdef __WXOSX__
+  pDarkDecorations->SetValue(g_bDarkDecorations);
+#endif
   pOpenGL->SetValue(g_bopengl);
   pSmoothPanZoom->SetValue(g_bsmoothpanzoom);
   pCBTrueShow->SetValue(g_bShowTrue);
@@ -6448,6 +6460,15 @@ void options::OnApplyClick(wxCommandEvent& event) {
         SwitchInlandEcdisMode( g_bInlandEcdis );
         m_returnChanges |= TOOLBAR_CHANGED;    
     }
+#ifdef __WXOSX__
+    if ( g_bDarkDecorations != pDarkDecorations->GetValue() ) {
+        g_bDarkDecorations = pDarkDecorations->GetValue();
+       
+        OCPNMessageBox(this,
+                       _("The changes to the window decorations will take full effect the next time you start OpenCPN."),
+                       _("OpenCPN"));
+    }
+#endif
   // PlugIn Manager Panel
 
   // Pick up any changes to selections
@@ -7034,8 +7055,10 @@ void options::OnChartsPageChange(wxListbookEvent& event) {
   }
   else if(1 == i){              // Vector charts panel
     LoadS57();
-    if (!m_bVectorInit)
+    if (!m_bVectorInit){
         SetInitialVectorSettings();
+        UpdateOptionsUnits();  // sets depth values, overriding defaults
+    }
   }
   
   event.Skip();  // Allow continued event processing
@@ -7262,12 +7285,7 @@ void options::OnButtonSelectSound(wxCommandEvent& event) {
 #endif
 
   if (response == wxID_OK) {
-    if (g_bportable) {
-      wxFileName f(sel_file);
-      f.MakeRelativeTo(g_Platform->GetHomeDir());
-      g_sAIS_Alert_Sound_File = f.GetFullPath();
-    } else
-      g_sAIS_Alert_Sound_File = sel_file;
+    g_sAIS_Alert_Sound_File = g_Platform->NormalizePath(sel_file);
 
     g_anchorwatch_sound.UnLoad();
   }
@@ -7877,22 +7895,12 @@ void options::OnInsertTideDataLocation(wxCommandEvent& event) {
 #endif
 
   if (response == wxID_OK) {
-    if (g_bportable) {
-      wxFileName f(sel_file);
-      f.MakeRelativeTo(g_Platform->GetHomeDir());
-      tcDataSelected->Append(f.GetFullPath());
-    } else
-      tcDataSelected->Append(sel_file);
+    tcDataSelected->Append(g_Platform->NormalizePath(sel_file));
 
     //    Record the currently selected directory for later use
     wxFileName fn(sel_file);
     wxString data_dir = fn.GetPath();
-    if (g_bportable) {
-      wxFileName f(data_dir);
-      f.MakeRelativeTo(g_Platform->GetHomeDir());
-      g_TCData_Dir = f.GetFullPath();
-    } else
-      g_TCData_Dir = data_dir;
+     g_TCData_Dir = g_Platform->NormalizePath(data_dir);
   }
 }
 

@@ -102,7 +102,8 @@ public:
 
       double GetRouteArrivalRadius(void){ return m_ArrivalRadius;}
       void SetRouteArrivalRadius(double radius){m_ArrivalRadius = radius;}
-     // bool isTrack(){ return m_bisTrack; }
+    
+      wxString GetName() const { return m_RouteNameString; }
 
       wxString   GetRouteStart() { return m_RouteStartString; }
       wxString   GetRouteEnd()   { return m_RouteEndString; }

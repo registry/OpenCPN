@@ -128,23 +128,22 @@ private:
 WX_DEFINE_LIST ( TrackList );
 
 TrackPoint::TrackPoint(double lat, double lon, wxString ts)
-    : m_lat(lat), m_lon(lon), m_timestring(NULL)
+    : m_lat(lat), m_lon(lon), m_GPXTrkSegNo(1), m_timestring(NULL)
 {
     SetCreateTime(ts);
 }
 
 TrackPoint::TrackPoint(double lat, double lon, wxDateTime dt)
-    : m_lat(lat), m_lon(lon), m_timestring(NULL)
+    : m_lat(lat), m_lon(lon), m_GPXTrkSegNo(1), m_timestring(NULL)
 {
     SetCreateTime(dt);
 }
 
 // Copy Constructor
 TrackPoint::TrackPoint( TrackPoint* orig )
-    : m_lat(orig->m_lat), m_lon(orig->m_lon), m_timestring(NULL)
+    : m_lat(orig->m_lat), m_lon(orig->m_lon), m_GPXTrkSegNo(1), m_timestring(NULL)
 {
     SetCreateTime(orig->GetCreateTime());
-    m_GPXTrkSegNo = 1;
 }
 
 TrackPoint::~TrackPoint()
@@ -365,8 +364,8 @@ Track *ActiveTrack::DoExtendDaily()
         if( pLastPoint->GetCreateTime() == pExtendPoint->GetCreateTime() ) begin = 2;
         pSelect->DeleteAllSelectableTrackSegments( pExtendTrack );
         wxString suffix = _T("");
-        if( m_TrackNameString.IsNull() ) {
-            suffix = pExtendTrack->m_TrackNameString;
+        if( GetName().IsNull() ) {
+            suffix = pExtendTrack->GetName();
             if( suffix.IsNull() ) suffix = wxDateTime::Today().FormatISODate();
         }
         pExtendTrack->Clone( this, begin, GetnPoints(), suffix );
@@ -375,8 +374,8 @@ Track *ActiveTrack::DoExtendDaily()
 
         return pExtendTrack;
     } else {
-        if( m_TrackNameString.IsNull() )
-            m_TrackNameString = wxDateTime::Today().FormatISODate();
+        if( GetName().IsNull() )
+            SetName(wxDateTime::Today().FormatISODate());
         return NULL;
     }
 }
@@ -968,7 +967,6 @@ void Track::AddPointFinalized( TrackPoint *pNewPoint )
 TrackPoint* Track::AddNewPoint( vector2D point, wxDateTime time )
 {
     TrackPoint *tPoint = new TrackPoint( point.lat, point.lon, time );
-    tPoint->m_GPXTrkSegNo = 1;
 
     AddPointFinalized( tPoint );
 

@@ -38,6 +38,10 @@
 #include "dychart.h"
 #include "OCPNPlatform.h"
 
+#ifdef __WXOSX__
+#include "DarkMode.h"
+#endif
+
 #include <wx/listimpl.cpp>
 
 #include "chcanv.h"
@@ -222,6 +226,8 @@ extern bool             g_bEnableZoomToCursor;
 extern bool             g_bShowChartBar;
 extern bool             g_bInlandEcdis;
 
+extern bool             g_bDarkDecorations;
+
 extern AISTargetAlertDialog    *g_pais_alert_dialog_active;
 extern AISTargetQueryDialog    *g_pais_query_dialog_active;
 extern int              g_ais_query_dialog_x, g_ais_query_dialog_y;
@@ -378,6 +384,7 @@ ChartCanvas::ChartCanvas ( wxFrame *frame ) :
     m_bMayToggleMenuBar = true;
 
     m_bFollow = false;
+    m_bShowNavobjects = true;
     m_bTCupdate = false;
     m_bAppendingRoute = false;          // was true in MSW, why??
     pThumbDIBShow = NULL;
@@ -1698,6 +1705,9 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
             parent_frame->ToggleQuiltMode();
             break;
 
+        case 'P':
+            parent_frame->ToggleTestPause();
+            break;
 #if 0
         case 'R':
             parent_frame->ToggleRocks();
@@ -1713,6 +1723,10 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
 
         case 'U':
             parent_frame->ToggleDataQuality();
+            break;
+
+        case 'V':
+            parent_frame->ToggleNavobjects();
             break;
 
         case 1:                      // Ctrl A
@@ -2175,10 +2189,10 @@ void ChartCanvas::SetColorScheme( ColorScheme cs )
     if( cs == GLOBAL_COLOR_SCHEME_DUSK || cs == GLOBAL_COLOR_SCHEME_NIGHT ) {
         SetBackgroundColour( wxColour(0,0,0) );
         
-        SetWindowStyleFlag( (GetWindowStyleFlag() & !wxSIMPLE_BORDER) | wxNO_BORDER);
+        SetWindowStyleFlag( (GetWindowStyleFlag() & ~wxSIMPLE_BORDER) | wxNO_BORDER);
     }
     else{
-        SetWindowStyleFlag( (GetWindowStyleFlag() & !wxNO_BORDER) | wxSIMPLE_BORDER);
+        SetWindowStyleFlag( (GetWindowStyleFlag() & ~wxNO_BORDER) | wxSIMPLE_BORDER);
         SetBackgroundColour( wxNullColour );
     }
         
@@ -2506,9 +2520,10 @@ void ChartCanvas::OnRolloverPopupTimerEvent( wxTimerEvent& event )
                     else
                         s.Append( _("Layer Track: ") );
 
-                    if( pt->m_TrackNameString.IsEmpty() ) s.Append( _("(unnamed)") );
+                    if( pt->GetName().IsEmpty() )
+                        s.Append( _("(unnamed)") );
                     else
-                        s.Append( pt->m_TrackNameString );
+                        s.Append( pt->GetName() );
 
                     s << _T("\n") << _("Total Length: ") << FormatDistanceAdaptive( pt->Length())
                     << _T("\n");
@@ -5400,6 +5415,13 @@ void ChartCanvas::CallPopupMenu(int x, int y)
         m_pFoundRoutePoint->Draw( dc );
         RefreshRect( m_pFoundRoutePoint->CurrentRect_in_DC );
     }
+
+	/**in touch mode a route point could have been selected and draghandle icon shown so clear the selection*/
+	if (g_btouch && m_pRoutePointEditTarget) {
+		m_pRoutePointEditTarget->m_bIsBeingEdited = false;
+		m_pRoutePointEditTarget->m_bPtIsSelected = false;
+		m_pRoutePointEditTarget->EnableDragHandle(false);
+	}
     
     //      Get all the selectable things at the cursor
     pFindAIS = pSelectAIS->FindSelection( slat, slon, SELTYPE_AISTARGET );
@@ -5743,6 +5765,8 @@ bool ChartCanvas::MouseEventProcessObjects( wxMouseEvent& event )
             else {
                 m_pRoutePointEditTarget->m_bIsBeingEdited = false;
                 m_pRoutePointEditTarget->m_bPtIsSelected = false;
+				if (g_btouch)
+					m_pRoutePointEditTarget->EnableDragHandle(false);
                 wxRect wp_rect;
                 m_pRoutePointEditTarget->CalculateDCRect( m_dc_route, &wp_rect );
                 m_pRoutePointEditTarget = NULL;         //cancel selection
@@ -6481,6 +6505,13 @@ bool ChartCanvas::MouseEventProcessObjects( wxMouseEvent& event )
                     if( g_bWayPointPreventDragging ) bSelectAllowed = false;
                 } else if( !pMarkPropDialog->IsShown() && g_bWayPointPreventDragging )
                     bSelectAllowed = false;
+
+				/*if this left up happens at the end of a route point dragging and if the cursor/thumb is on the 
+				draghandle icon, not on the point iself a new selection will select nothing and the drag will never
+				be ended, so the legs around this point never selectable. At this step we don't need a new selection,
+				just keep the previoulsly selected and dragged point */
+				if (m_bRoutePoinDragging)
+					bSelectAllowed = false;
                 
                 if(bSelectAllowed){
                     
@@ -6488,6 +6519,10 @@ bool ChartCanvas::MouseEventProcessObjects( wxMouseEvent& event )
                 bool b_was_editing_route = m_bRouteEditing;
                 FindRoutePointsAtCursor( SelectRadius, true );    // Possibly selecting a point in a route for later dragging
                 
+				/*route and a mark points in layer can't be dragged so should't be selected and no draghandle icon*/
+				if (m_pRoutePointEditTarget && m_pRoutePointEditTarget->m_bIsInLayer)
+					m_pRoutePointEditTarget = NULL;
+
                 if( !b_was_editing_route ) {
                     if( m_pEditRouteArray ) {
                         b_startedit_route = true;
@@ -7453,13 +7488,12 @@ void pupHandler_PasteTrack() {
     TrackPoint* newPoint;
     TrackPoint* prevPoint = NULL;
 
-    newTrack->m_TrackNameString = pasted->m_TrackNameString;
+    newTrack->SetName(pasted->GetName());
 
     for( int i = 0; i < pasted->GetnPoints(); i++ ) {
         curPoint = pasted->GetPoint( i );
 
         newPoint = new TrackPoint( curPoint );
-        newPoint->m_GPXTrkSegNo = 1;
 
         wxDateTime now = wxDateTime::Now();
         newPoint->SetCreateTime(curPoint->GetCreateTime());
@@ -8899,11 +8933,16 @@ void ChartCanvas::DrawOverlayObjects( ocpnDC &dc, const wxRegion& ru )
         wxDCClipper( *pdc, ru );
     }
 
-    DrawAllTracksInBBox( dc, GetVP().GetBBox() );
-    DrawAllRoutesInBBox( dc, GetVP().GetBBox() );
-    DrawAllWaypointsInBBox( dc, GetVP().GetBBox() );
-    DrawAnchorWatchPoints( dc );
-
+    if( m_bShowNavobjects ) {
+        DrawAllTracksInBBox( dc, GetVP().GetBBox() );
+        DrawAllRoutesInBBox( dc, GetVP().GetBBox() );
+        DrawAllWaypointsInBBox( dc, GetVP().GetBBox() );
+        DrawAnchorWatchPoints( dc );
+    } else {
+        DrawActiveTrackInBBox( dc, GetVP().GetBBox() );
+        DrawActiveRouteInBBox( dc, GetVP().GetBBox() );
+    }
+    
     AISDraw( dc, GetVP(), this );
     ShipDraw( dc );
     AlertDraw( dc );
@@ -9150,6 +9189,23 @@ void ChartCanvas::DrawAllTracksInBBox( ocpnDC& dc, LLBBox& BltBBox )
 }
 
 
+void ChartCanvas::DrawActiveTrackInBBox( ocpnDC& dc, LLBBox& BltBBox )
+{
+    Track *active_track = NULL;
+    for(wxTrackListNode *node = pTrackList->GetFirst();
+        node; node = node->GetNext()) {
+        Track *pTrackDraw = node->GetData();
+        
+        if( g_pActiveTrack == pTrackDraw ) {
+            active_track = pTrackDraw;
+            break;
+        }
+    }
+    if( active_track )
+        active_track->Draw( dc, GetVP(), BltBBox );
+}
+
+
 void ChartCanvas::DrawAllRoutesInBBox( ocpnDC& dc, LLBBox& BltBBox )
 {
     Route *active_route = NULL;
@@ -9167,6 +9223,23 @@ void ChartCanvas::DrawAllRoutesInBBox( ocpnDC& dc, LLBBox& BltBBox )
     }
 
     //  Draw any active or selected route (or track) last, so that is is always on top
+    if( active_route )
+        active_route->Draw( dc, GetVP(), BltBBox );
+}
+
+void ChartCanvas::DrawActiveRouteInBBox( ocpnDC& dc, LLBBox& BltBBox )
+{
+    Route *active_route = NULL;
+    
+    for(wxRouteListNode *node = pRouteList->GetFirst();
+        node; node = node->GetNext()) {
+        Route *pRouteDraw = node->GetData();
+        if( pRouteDraw->IsActive() || pRouteDraw->IsSelected() ) {
+            active_route = pRouteDraw;
+            break;
+        }
+        
+    }
     if( active_route )
         active_route->Draw( dc, GetVP(), BltBBox );
 }
@@ -10382,14 +10455,18 @@ void DimeControl( wxWindow* ctrl, wxColour col, wxColour window_back_color, wxCo
         if( cs == GLOBAL_COLOR_SCHEME_DAY || cs == GLOBAL_COLOR_SCHEME_RGB ) {
 #ifdef __WXOSX__
             window_back_color = wxSystemSettings::GetColour(wxSYS_COLOUR_WINDOWFRAME);
+            ctrl->SetBackgroundColour( window_back_color );
+            if( g_bDarkDecorations ) {
+                applyDarkAppearanceToWindow(ctrl->MacGetTopLevelWindowRef(), false, true, true);
+            }
 #else
             window_back_color = wxNullColour;
+            ctrl->SetBackgroundColour( window_back_color );
 #endif
 
             col = wxSystemSettings::GetColour(wxSYS_COLOUR_LISTBOX);
         }
 
-        ctrl->SetBackgroundColour( window_back_color );
     }
 
     wxWindowList kids = ctrl->GetChildren();

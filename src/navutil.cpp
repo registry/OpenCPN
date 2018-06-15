@@ -418,6 +418,8 @@ extern wxString         g_uiStyle;
 
 int                     g_nCPUCount;
 
+extern bool             g_bDarkDecorations;
+
 #ifdef ocpnUSE_GL
 extern ocpnGLOptions g_GLOptions;
 #endif
@@ -439,7 +441,8 @@ wxString GetLayerName( int id )
     int index = 0;
     for( it = ( *pLayerList ).begin(); it != ( *pLayerList ).end(); ++it, ++index ) {
         Layer *lay = (Layer *) ( *it );
-        if( lay->m_LayerID == id ) return ( lay->m_LayerName );
+        if( lay->m_LayerID == id )
+            return ( lay->m_LayerName );
     }
     return ( name );
 }
@@ -545,6 +548,8 @@ int MyConfig::LoadMyConfig()
     Read( _T ( "NCacheLimit" ), &g_nCacheLimit, 0 );
      
     Read( _T ( "InlandEcdis" ), &g_bInlandEcdis, 0 );// First read if in iENC mode as this will override some config settings
+    
+    Read( _T ("DarkDecorations" ), &g_bDarkDecorations, 0 );
 
     Read( _T( "SpaceDropMark" ), &g_bSpaceDropMark, 0 );
     int mem_limit;
@@ -1912,6 +1917,9 @@ void MyConfig::UpdateSettings()
     Write( _T ( "ConfigVersionString" ), g_config_version_string );
     Write( _T ( "NavMessageShown" ), n_NavMessageShown );
     Write( _T ( "InlandEcdis" ), g_bInlandEcdis );
+    
+    Write( _T ( "DarkDecorations"), g_bDarkDecorations );
+    
     Write( _T ( "UIexpert" ), g_bUIexpert );
     Write( _T( "SpaceDropMark" ), g_bSpaceDropMark );
     Write( _T ( "UIStyle" ), g_StyleManager->GetStyleNextInvocation() );
@@ -2249,8 +2257,8 @@ void MyConfig::UpdateSettings()
     Write( _T ( "InitChartDir" ), *pInit_Chart_Dir );
     Write( _T ( "GPXIODir" ), m_gpx_path );
     Write( _T ( "TCDataDir" ), g_TCData_Dir );
-    Write( _T ( "BasemapDir" ), gWorldMapLocation );
-
+    Write( _T ( "BasemapDir" ), g_Platform->NormalizePath(gWorldMapLocation) );
+    
     SetPath( _T ( "/Settings/NMEADataSource" ) );
     wxString connectionconfigs;
     for (size_t i = 0; i < g_pConnectionParams->Count(); i++)

@@ -3,7 +3,7 @@
  * Project:  OpenCPN
  *
  ***************************************************************************
- *   Copyright (C) 2010 by David S. Register                               *
+ *   Copyright (C) 2018 by David S. Register                               *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
  *   it under the terms of the GNU General Public License as published by  *
@@ -22,38 +22,10 @@
  ***************************************************************************
  */
 
-#ifndef __LAYER_H__
-#define __LAYER_H__
+#include "wx/wxprec.h"
 
-#include <wx/string.h>
-#include <wx/list.h>
-#include <wx/datetime.h>
 
-class Layer
-{
-public:
-      Layer(void);
-      ~Layer(void);
-      wxString CreatePropString(void) { return m_LayerFileName; }
-      bool IsVisibleOnChart() { return m_bIsVisibleOnChart; }
-      void SetVisibleOnChart(bool viz = true){ m_bIsVisibleOnChart = viz; }
-      bool IsVisibleOnListing() { return m_bIsVisibleOnListing; }
-      void SetVisibleOnListing(bool viz = true){ m_bIsVisibleOnListing = viz; }
-      bool HasVisibleNames() { return m_bHasVisibleNames; }
-      void SetVisibleNames(bool viz = true){ m_bHasVisibleNames = viz; }
+#include "wx/osx/private.h"
 
-      bool m_bIsVisibleOnChart;
-      bool m_bIsVisibleOnListing;
-      bool m_bHasVisibleNames;
-      long m_NoOfItems;
-      int m_LayerID;
-    
-      wxString          m_LayerName;
-      wxString          m_LayerFileName;
-      wxString          m_LayerDescription;
-      wxDateTime        m_CreateTime;
-};
+void applyDarkAppearanceToWindow(NSWindow *window, bool vibrant = false, bool flat = false, bool subviews = false);
 
-WX_DECLARE_LIST(Layer, LayerList);// establish class as list member
-
-#endif

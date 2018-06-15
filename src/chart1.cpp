@@ -155,6 +155,10 @@
 #include "crashprint.h"
 #endif
 
+#ifdef __WXOSX__
+#include "DarkMode.h"
+#endif
+
 #include <wx/arrimpl.cpp>
 WX_DEFINE_OBJARRAY( ArrayOfCDI );
 
@@ -170,7 +174,9 @@ OCPNPlatform              *g_Platform;
 
 bool                      g_bFirstRun;
 
+bool                      g_bPauseTest;
 int                       g_unit_test_1;
+int                       g_unit_test_2;
 bool                      g_start_fullscreen;
 bool                      g_rebuild_gl_cache;
 bool                      g_parse_all_enc;
@@ -681,6 +687,8 @@ bool                      g_bMagneticAPB;
 
 bool                      g_bInlandEcdis;
 
+bool                      g_bDarkDecorations;
+
 //                        OpenGL Globals
 int                       g_GPU_MemSize;
 
@@ -940,11 +948,15 @@ void MyApp::OnInitCmdLine( wxCmdLineParser& parser )
     parser.AddSwitch( _T("rebuild_gl_raster_cache"), wxEmptyString, _T("Rebuild OpenGL raster cache on start.") );
     parser.AddSwitch( _T("parse_all_enc"), wxEmptyString, _T("Convert all S-57 charts to OpenCPN's internal format on start.") );
     parser.AddOption( _T("unit_test_1"), wxEmptyString, _("Display a slideshow of <num> charts and then exit. Zero or negative <num> specifies no limit."), wxCMD_LINE_VAL_NUMBER );
+
+    parser.AddSwitch( _T("unit_test_2") );
 }
 
 bool MyApp::OnCmdLineParsed( wxCmdLineParser& parser )
 {
     long number;
+
+    g_unit_test_2 = parser.Found( _T("unit_test_2") );
     g_bportable = parser.Found( _T("p") );
     g_start_fullscreen = parser.Found( _T("fullscreen") );
     g_bdisable_opengl = parser.Found( _T("no_opengl") );
@@ -1219,6 +1231,8 @@ void LoadS57()
 }
 
 #if defined(__WXGTK__) && defined(OCPN_HAVE_X11)
+
+// Note: use XFree to free this pointer. Use unique_ptr in the future.
 static char *get_X11_property (Display *disp, Window win,
                             Atom xa_prop_type, const char *prop_name) {
     Atom xa_prop_name;
@@ -1228,31 +1242,64 @@ static char *get_X11_property (Display *disp, Window win,
     unsigned long ret_bytes_after;
     unsigned long tmp_size;
     unsigned char *ret_prop;
-    char *ret;
 
     xa_prop_name = XInternAtom(disp, prop_name, False);
 
+    // For XGetWindowProperty source see
+    // https://github.com/mirror/libX11/blob/master/src/GetProp.c#L107
+    // it is quite tricky. Some notes.
+    // + Results are already NULL terminated.
+    // + 32 as a ret_format means sizeof(long) in the API...
+    // + but as xlib does the null termination we can just ignore the sizes.
     if (XGetWindowProperty(disp, win, xa_prop_name, 0, 1024, False,
                            xa_prop_type, &xa_ret_type, &ret_format,
-                           &ret_nitems, &ret_bytes_after, &ret_prop) != Success) {
+                           &ret_nitems, &ret_bytes_after, &ret_prop) != Success)
         return NULL;
-    }
 
     if (xa_ret_type != xa_prop_type) {
-        XFree(ret_prop);
-        return NULL;
+       XFree(ret_prop);
+       return NULL;
     }
-
-    /* null terminate the result to make string handling easier */
-    tmp_size = (ret_format / 8) * ret_nitems;
-    ret = (char*)malloc(tmp_size + 1);
-    memcpy(ret, ret_prop, tmp_size);
-    ret[tmp_size] = '\0';
-
-    XFree(ret_prop);
-    return ret;
+    return (char*)ret_prop;
 }
 #endif
+
+// Determine if a transparent toolbar is possible under linux with opengl
+static bool isTransparentToolbarInOpenGLOK(void) {
+#ifdef __WXOSX__
+    return true;
+#else
+    bool status = false;
+#ifndef __WXQT__
+#ifdef OCPN_HAVE_X11
+    if(!g_bdisable_opengl) {
+        Display *disp = XOpenDisplay(NULL);
+        Window *sup_window;
+        if ((sup_window = (Window *)get_X11_property(disp, DefaultRootWindow(disp),
+                                                 XA_WINDOW, "_NET_SUPPORTING_WM_CHECK")) ||
+            (sup_window = (Window *)get_X11_property(disp, DefaultRootWindow(disp),
+                                                 XA_CARDINAL, "_WIN_SUPPORTING_WM_CHECK"))) {
+            /* WM_NAME */
+            char *wm_name;
+            if ((wm_name = get_X11_property(disp, *sup_window,
+                                        XInternAtom(disp, "UTF8_STRING", False), "_NET_WM_NAME")) ||
+                (wm_name = get_X11_property(disp, *sup_window,
+                                        XA_STRING, "_NET_WM_NAME"))) {
+                // we know it works in xfce4, add other checks as we can validate them
+                if(strstr(wm_name, "Xfwm4") || strstr(wm_name, "Compiz"))
+                    status = true;
+
+                XFree(wm_name);
+            }
+            XFree(sup_window);
+        }
+        XCloseDisplay(disp);
+    }
+#endif
+#endif
+    return status;
+#endif
+}
 
 static wxStopWatch init_sw;
 class ParseENCWorkerThread : public wxThread
@@ -1895,39 +1942,7 @@ bool MyApp::OnInit()
         setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1);
 #endif
 
-    // Determine if a transparent toolbar is possible under linux with opengl
-    g_bTransparentToolbarInOpenGLOK = false;
-#ifndef __WXQT__
-#ifdef OCPN_HAVE_X11
-    if(!g_bdisable_opengl) {
-        Display *disp = XOpenDisplay(NULL);
-        Window *sup_window;
-        if ((sup_window = (Window *)get_X11_property(disp, DefaultRootWindow(disp),
-                                                 XA_WINDOW, "_NET_SUPPORTING_WM_CHECK")) ||
-            (sup_window = (Window *)get_X11_property(disp, DefaultRootWindow(disp),
-                                                 XA_CARDINAL, "_WIN_SUPPORTING_WM_CHECK"))) {
-            /* WM_NAME */
-            char *wm_name;
-            if ((wm_name = get_X11_property(disp, *sup_window,
-                                        XInternAtom(disp, "UTF8_STRING", False), "_NET_WM_NAME")) ||
-                (wm_name = get_X11_property(disp, *sup_window,
-                                        XA_STRING, "_NET_WM_NAME"))) {
-                // we know it works in xfce4, add other checks as we can validate them
-                if(strstr(wm_name, "Xfwm4") || strstr(wm_name, "Compiz"))
-                    g_bTransparentToolbarInOpenGLOK = true;
-
-                free(wm_name);
-            }
-            free(sup_window);
-        }
-        XCloseDisplay(disp);
-    }
-#endif
-#ifdef __WXOSX__
-    g_bTransparentToolbarInOpenGLOK = true;
-#endif
-#endif
-
+    g_bTransparentToolbarInOpenGLOK = isTransparentToolbarInOpenGLOK();
 
     // On Windows platforms, establish a default cache managment policy
     // as allowing OpenCPN a percentage of available physical memory,
@@ -1980,22 +1995,16 @@ bool MyApp::OnInit()
     //  If empty, preset one default (US) Ascii data source
     wxString default_tcdata =  ( g_Platform->GetSharedDataDir() + _T("tcdata") +
              wxFileName::GetPathSeparator() + _T("HARMONIC.IDX"));
-    wxFileName fdefault( default_tcdata );
-
+    
     if(!TideCurrentDataSet.GetCount()) {
-        if( g_bportable ) {
-            fdefault.MakeRelativeTo( g_Platform->GetPrivateDataDir() );
-            TideCurrentDataSet.Add( fdefault.GetFullPath() );
-        }
-        else
-            TideCurrentDataSet.Add( default_tcdata );
+        TideCurrentDataSet.Add(g_Platform->NormalizePath(default_tcdata) );
     }
     else {
         wxString first_tide = TideCurrentDataSet.Item(0);
         wxFileName ft(first_tide);
         if(!ft.FileExists()){
             TideCurrentDataSet.RemoveAt(0);
-            TideCurrentDataSet.Insert( default_tcdata, 0 );
+            TideCurrentDataSet.Insert(g_Platform->NormalizePath(default_tcdata), 0 );
         }
     }
 
@@ -2006,14 +2015,7 @@ bool MyApp::OnInit()
         wxString default_sound =  ( g_Platform->GetSharedDataDir() + _T("sounds") +
         wxFileName::GetPathSeparator() +
         _T("2bells.wav"));
-
-        if( g_bportable ) {
-            wxFileName f( default_sound );
-            f.MakeRelativeTo( g_Platform->GetPrivateDataDir() );
-            g_sAIS_Alert_Sound_File = f.GetFullPath();
-        }
-        else
-            g_sAIS_Alert_Sound_File = default_sound ;
+        g_sAIS_Alert_Sound_File = g_Platform->NormalizePath(default_sound);
     }
 
 
@@ -2416,12 +2418,6 @@ extern ocpnGLOptions g_GLOptions;
 
     FontMgr::Get().ScrubList(); // Clean the font list, removing nonsensical entries
 
-//      Start up the ticker....
-    gFrame->FrameTimer1.Start( TIMER_GFRAME_1, wxTIMER_CONTINUOUS );
-
-//      Start up the ViewPort Rotation angle Averaging Timer....
-    if(g_bCourseUp)
-        gFrame->FrameCOGTimer.Start( 10, wxTIMER_CONTINUOUS );
 
     cc1->ReloadVP();                  // once more, and good to go
 
@@ -2476,6 +2472,13 @@ extern ocpnGLOptions g_GLOptions;
     gFrame->ShowTides( g_bShowTide );
     gFrame->ShowCurrents( g_bShowCurrent );
  
+//      Start up the ticker....
+    gFrame->FrameTimer1.Start( TIMER_GFRAME_1, wxTIMER_CONTINUOUS );
+
+//      Start up the ViewPort Rotation angle Averaging Timer....
+    if(g_bCourseUp)
+        gFrame->FrameCOGTimer.Start( 10, wxTIMER_CONTINUOUS );
+
     // Start delayed initialization chain after 100 milliseconds
     gFrame->InitTimer.Start( 100, wxTIMER_CONTINUOUS );
 
@@ -2944,15 +2947,25 @@ void MyFrame::SetAndApplyColorScheme( ColorScheme cs )
     g_Piano->ResetRollover();
     g_Piano->SetColorScheme( cs );
 
-    if( g_options ) g_options->SetColorScheme( cs );
+    if( g_options ) {
+        g_options->SetColorScheme( cs );
+    }
 
-    if( console ) console->SetColorScheme( cs );
+    if( console ) {
+        console->SetColorScheme( cs );
+    }
 
-    if( g_pRouteMan ) g_pRouteMan->SetColorScheme( cs );
+    if( g_pRouteMan ) {
+        g_pRouteMan->SetColorScheme( cs );
+    }
 
-    if( pMarkPropDialog ) pMarkPropDialog->SetColorScheme( cs );
+    if( pMarkPropDialog ) {
+        pMarkPropDialog->SetColorScheme( cs );
+    }
     
-    if( pRoutePropDialog ) pRoutePropDialog->SetColorScheme( cs );
+    if( pRoutePropDialog ) {
+        pRoutePropDialog->SetColorScheme( cs );
+    }
     
     //    For the AIS target query dialog, we must rebuild it to incorporate the style desired for the colorscheme selected
     if( g_pais_query_dialog_active ) {
@@ -2981,6 +2994,11 @@ void MyFrame::SetAndApplyColorScheme( ColorScheme cs )
     UpdateToolbar( cs );
 
     if( g_pi_manager ) g_pi_manager->SetColorSchemeForAllPlugIns( cs );
+#ifdef __WXOSX__
+    if( g_bDarkDecorations ) {
+        applyDarkAppearanceToWindow(MacGetTopLevelWindowRef(), true);
+    }
+#endif
 }
 
 void MyFrame::ApplyGlobalColorSchemetoStatusBar( void )
@@ -3684,6 +3702,10 @@ void MyFrame::OnCloseWindow( wxCloseEvent& event )
         }
     }
 
+    //  Clear the cache, and thus close all charts to avoid memory leaks
+    if(ChartData)
+        ChartData->PurgeCache();
+    
     // pthumbwin is a cc1 child 
     pthumbwin = NULL;
     cc1->Destroy();
@@ -4274,6 +4296,11 @@ void MyFrame::OnToolLeftClick( wxCommandEvent& event )
         }
 #endif
 
+        case ID_MENU_SHOW_NAVOBJECTS : {
+            ToggleNavobjects();
+            break;
+        }
+
         case ID_MENU_AIS_TARGETS: {
             if ( g_bShowAIS ) SetAISDisplayStyle(2);
             else SetAISDisplayStyle(0);
@@ -4838,7 +4865,7 @@ void MyFrame::TrackOn( void )
     wxJSONValue v;
     wxDateTime now;
     now = now.Now().ToUTC();
-    wxString name = g_pActiveTrack->m_TrackNameString;
+    wxString name = g_pActiveTrack->GetName();
     if(name.IsEmpty())
     {
         TrackPoint *tp = g_pActiveTrack->GetPoint( 0 );
@@ -5231,6 +5258,13 @@ void MyFrame::TogglebFollow( void )
 
 }
 
+void MyFrame::ToggleNavobjects( void )
+{
+    cc1->m_bShowNavobjects = !cc1->m_bShowNavobjects;
+    SetMenubarItemState( ID_MENU_SHOW_NAVOBJECTS, cc1->m_bShowNavobjects );
+    cc1->Refresh();
+}
+
 void MyFrame::SetbFollow( void )
 {
     JumpToPosition(gLat, gLon, cc1->GetVPScale());
@@ -5281,6 +5315,11 @@ void MyFrame::ToggleChartOutlines( void )
 #endif
 
     SetMenubarItemState( ID_MENU_CHART_OUTLINES, g_bShowOutlines );
+}
+
+void MyFrame::ToggleTestPause( void )
+{
+    g_bPauseTest = !g_bPauseTest;
 }
 
 void MyFrame::SetMenubarItemState( int item_id, bool state )
@@ -5444,12 +5483,14 @@ void MyFrame::RegisterGlobalMenuItems()
     view_menu->AppendCheckItem( ID_MENU_ENC_SOUNDINGS, _menuText(_("Show ENC Soundings"), _T("S")) );
     view_menu->AppendCheckItem( ID_MENU_ENC_ANCHOR, _menuText(_("Show ENC Anchoring Info"), _T("A")) );
     view_menu->AppendCheckItem( ID_MENU_ENC_DATA_QUALITY, _menuText(_("Show ENC Data Quality"), _T("U")) );
+    view_menu->AppendCheckItem( ID_MENU_SHOW_NAVOBJECTS, _menuText(_("Show Navobjects"), _T("V")) );
 #else
     view_menu->AppendCheckItem( ID_MENU_ENC_TEXT, _menuText(_("Show ENC text"), _T("Alt-T")) );
     view_menu->AppendCheckItem( ID_MENU_ENC_LIGHTS, _menuText(_("Show ENC Lights"), _T("Alt-L")) );
     view_menu->AppendCheckItem( ID_MENU_ENC_SOUNDINGS, _menuText(_("Show ENC Soundings"), _T("Alt-S")) );
     view_menu->AppendCheckItem( ID_MENU_ENC_ANCHOR, _menuText(_("Show ENC Anchoring Info"), _T("Alt-A")) );
     view_menu->AppendCheckItem( ID_MENU_ENC_DATA_QUALITY, _menuText(_("Show ENC Data Quality"), _T("Alt-U")) );
+    view_menu->AppendCheckItem( ID_MENU_SHOW_NAVOBJECTS, _menuText(_("Show Navobjects"), _T("Alt-V")) );
 #endif
 #endif
     view_menu->AppendSeparator();
@@ -5535,6 +5576,7 @@ void MyFrame::UpdateGlobalMenuItems()
     m_pMenuBar->FindItem( ID_MENU_AIS_TRACKS )->Check( g_bAISShowTracks );
     m_pMenuBar->FindItem( ID_MENU_AIS_CPADIALOG )->Check( g_bAIS_CPA_Alert );
     m_pMenuBar->FindItem( ID_MENU_AIS_CPASOUND )->Check( g_bAIS_CPA_Alert_Audio );
+    m_pMenuBar->FindItem( ID_MENU_SHOW_NAVOBJECTS )->Check( cc1->m_bShowNavobjects );
 #ifdef USE_S57
     if( ps52plib ) {
         m_pMenuBar->FindItem( ID_MENU_ENC_TEXT )->Check( ps52plib->GetShowS57Text() );
@@ -5675,7 +5717,9 @@ int MyFrame::DoOptionsDialog()
     if(NULL == g_options) {
         g_Platform->ShowBusySpinner();
         g_options = new options( this, -1, _("Options") );
-        g_options->SetColorScheme(global_color_scheme);
+        //g_options->SetColorScheme(global_color_scheme);
+        //applyDarkAppearanceToWindow(g_options->MacGetTopLevelWindowRef());
+
         g_Platform->HideBusySpinner();
     }
 
@@ -6683,7 +6727,8 @@ void MyFrame::OnInitTimer(wxTimerEvent& event)
         case 4:
         {
             g_options = new options( this, -1, _("Options") );
-            g_options->SetColorScheme(global_color_scheme);
+            //g_options->SetColorScheme(global_color_scheme);
+            //applyDarkAppearanceToWindow(g_options->MacGetTopLevelWindowRef());
             
             if( g_MainToolbar )
                 g_MainToolbar->EnableTool( ID_SETTINGS, true );
@@ -6811,7 +6856,8 @@ int ut_index;
 void MyFrame::OnFrameTimer1( wxTimerEvent& event )
 {
 
-    if( g_unit_test_1 ) {
+
+    if( ! g_bPauseTest && (g_unit_test_1 || g_unit_test_2) ) {
 //            if((0 == ut_index) && GetQuiltMode())
 //                  ToggleQuiltMode();
 
@@ -6822,24 +6868,49 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
         int ut_index_max = ( ( g_unit_test_1 > 0 ) ? ( g_unit_test_1 - 1 ) : INT_MAX );
 
         if( ChartData ) {
+            if( g_GroupIndex > 0 ) {
+                while (ut_index < ChartData->GetChartTableEntries() && !ChartData->IsChartInGroup( ut_index, g_GroupIndex ) ) {
+                    ut_index++;
+                }
+            }
             if( ut_index < ChartData->GetChartTableEntries() ) {
-                printf("%d / %d\n", ut_index, ChartData->GetChartTableEntries());
+                // printf("%d / %d\n", ut_index, ChartData->GetChartTableEntries());
                 const ChartTableEntry *cte = &ChartData->GetChartTableEntry( ut_index );
-                double lat = ( cte->GetLatMax() + cte->GetLatMin() ) / 2;
-                double lon = ( cte->GetLonMax() + cte->GetLonMin() ) / 2;
 
-                vLat = lat;
-                vLon = lon;
+                double clat = ( cte->GetLatMax() + cte->GetLatMin() ) / 2;
+                double clon = ( cte->GetLonMax() + cte->GetLonMin() ) / 2;
 
-                cc1->SetViewPoint( lat, lon );
+                vLat = clat;
+                vLon = clon;
+
+                cc1->SetViewPoint( clat, clon );
 
                 if( cc1->GetQuiltMode() ) {
                     if( cc1->IsChartQuiltableRef( ut_index ) ) SelectQuiltRefdbChart( ut_index );
                 } else
                     SelectdbChart( ut_index );
 
-                double ppm = cc1->GetCanvasScaleFactor() / cte->GetScale();
-                ppm /= 2;
+                double ppm; // final ppm scale to use
+                if (g_unit_test_1) {
+                    ppm = cc1->GetCanvasScaleFactor() / cte->GetScale();
+                    ppm /= 2;
+                }
+                else {
+                    double rw, rh; // width, height
+                    int ww, wh;    // chart window width, height
+
+                    // width in nm
+                    DistanceBearingMercator( cte->GetLatMin(), cte->GetLonMin(), cte->GetLatMin(),
+                              cte->GetLonMax(), NULL, &rw );
+
+                    // height in nm
+                    DistanceBearingMercator( cte->GetLatMin(), cte->GetLonMin(), cte->GetLatMax(),
+                             cte->GetLonMin(), NULL, &rh );
+
+                    cc1->GetSize( &ww, &wh );
+                    ppm = wxMin(ww/(rw*1852), wh/(rh*1852)) * ( 100 - fabs( clat ) ) / 90;
+                    ppm = wxMin(ppm, 1.0);
+                }
                 cc1->SetVPScale( ppm );
 
                 cc1->ReloadVP();
@@ -6848,8 +6919,9 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
                 if( ut_index > ut_index_max )
                     exit(0);
             }
-            else
-                exit(0);
+            else {
+                _exit(0);
+            }
         }
     }
     g_tick++;
@@ -7228,7 +7300,10 @@ void MyFrame::OnFrameTimer1( wxTimerEvent& event )
             m_bdefer_resize = false;
         }
     }
-    FrameTimer1.Start( TIMER_GFRAME_1, wxTIMER_CONTINUOUS );
+    if (g_unit_test_2)
+        FrameTimer1.Start( TIMER_GFRAME_1*3, wxTIMER_CONTINUOUS );
+    else 
+        FrameTimer1.Start( TIMER_GFRAME_1, wxTIMER_CONTINUOUS );
 }
 
 double MyFrame::GetMag(double a)
@@ -9009,7 +9084,7 @@ void MyFrame::OnEvtPlugInMessage( OCPN_MsgEvent & event )
             wxString name = wxEmptyString;
             if((*it)->m_GUID == trk_id)
             {
-                name = (*it)->m_TrackNameString;
+                name = (*it)->GetName();
                 if(name.IsEmpty())
                 {
                     TrackPoint *rp = (*it)->GetPoint( 0 );
@@ -9137,7 +9212,7 @@ void MyFrame::OnEvtPlugInMessage( OCPN_MsgEvent & event )
             } else { // track
                 for(TrackList::iterator it = pTrackList->begin(); it != pTrackList->end(); it++)
                 {
-                    wxString name = (*it)->m_TrackNameString;
+                    wxString name = (*it)->GetName();
                     if(name.IsEmpty())
                     {
                         TrackPoint *tp = (*it)->GetPoint( 0 );
@@ -11707,7 +11782,7 @@ void SetSystemColors( ColorScheme cs )
 
 wxColor GetDimColor(wxColor c)
 {
-    if( (global_color_scheme == GLOBAL_COLOR_SCHEME_DAY) || (global_color_scheme == GLOBAL_COLOR_SCHEME_DAY))
+    if( (global_color_scheme == GLOBAL_COLOR_SCHEME_DAY) || (global_color_scheme == GLOBAL_COLOR_SCHEME_RGB))
         return c;
     
     float factor = 1.0;
