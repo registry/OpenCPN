@@ -2804,6 +2804,7 @@ MyFrame::MyFrame( wxFrame *frame, const wxString& title, const wxPoint& pos, con
 
 MyFrame::~MyFrame()
 {
+try {
     FrameTimer1.Stop();
     delete ChartData;
     delete pCurrentStack;
@@ -2818,6 +2819,11 @@ MyFrame::~MyFrame()
         node = node->GetNext();
     }
     delete pRouteList;
+    }
+    catch ( std::exception & e)
+    {
+    	std::cout << "Exception " << e.what() << std::endl;
+    }
 }
 
 void MyFrame::OnEraseBackground( wxEraseEvent& event )
