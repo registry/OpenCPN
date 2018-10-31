@@ -70,6 +70,7 @@
 #include <X11/Xatom.h>
 #endif
 
+#include "version.h"
 #include "main_version.h"
 #include "chart1.h"
 #include "chcanv.h"
