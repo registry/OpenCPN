@@ -1740,7 +1740,8 @@ void ChartCanvas::OnKeyDown( wxKeyEvent &event )
 
         case 13:             // Ctrl M // Drop Marker at cursor
         {
-            DropMarker(false);
+            if(event.ControlDown())
+                DropMarker(false);
             break;
         }
 
