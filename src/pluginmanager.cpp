@@ -136,6 +136,7 @@ extern double           g_display_size_mm;
 extern bool             g_bopengl;
 
 extern ChartGroupArray  *g_pGroupArray;
+extern unsigned int     g_canvasConfig;
 
 #ifdef __WXMSW__
 static const char PATH_SEP = ';';
@@ -345,6 +346,7 @@ PlugInManager::PlugInManager(MyFrame *parent)
 #ifndef __OCPN__ANDROID__
 #ifdef __OCPN_USE_CURL__
     m_pCurlThread = NULL;
+    m_pCurl = 0;
 #endif    
 #endif
     pParent = parent;
@@ -593,7 +595,8 @@ bool PlugInManager::LoadPlugInDirectory(const wxString &plugin_dir, bool load_en
         m_benable_blackdialog_done = true;
 
     // Tell all the PlugIns about the current OCPN configuration
-    SendConfigToAllPlugIns();
+    SendBaseConfigToAllPlugIns();
+    SendS52ConfigToAllPlugIns( true );
     
     // Inform Plugins of OpenGL configuration, if enabled
     if(g_bopengl){
@@ -1584,7 +1587,7 @@ bool PlugInManager::RenderAllCanvasOverlayPlugIns( ocpnDC &dc, const ViewPort &v
     return true;
 }
 
-bool PlugInManager::RenderAllGLCanvasOverlayPlugIns( wxGLContext *pcontext, const ViewPort &vp)
+bool PlugInManager::RenderAllGLCanvasOverlayPlugIns( wxGLContext *pcontext, const ViewPort &vp, bool render)
 {
     for(unsigned int i = 0; i < plugin_array.GetCount(); i++)
     {
@@ -1600,7 +1603,7 @@ bool PlugInManager::RenderAllGLCanvasOverlayPlugIns( wxGLContext *pcontext, cons
                 case 107:
                 {
                     opencpn_plugin_17 *ppi = dynamic_cast<opencpn_plugin_17 *>(pic->m_pplugin);
-                    if(ppi)
+                    if(ppi && render)
                         ppi->RenderGLOverlay(pcontext, &pivp);
                     break;
                 }
@@ -1615,10 +1618,14 @@ bool PlugInManager::RenderAllGLCanvasOverlayPlugIns( wxGLContext *pcontext, cons
                 case 115:
                 case 116:    
                 {
-                    opencpn_plugin_18 *ppi = dynamic_cast<opencpn_plugin_18 *>(pic->m_pplugin);
-                    if(ppi)
-                        ppi->RenderGLOverlay(pcontext, &pivp);
-                    break;
+                     opencpn_plugin_18 *ppi = dynamic_cast<opencpn_plugin_18 *>(pic->m_pplugin);
+                     if (ppi && render)
+                          ppi->RenderGLOverlay(pcontext, &pivp);
+                     opencpn_plugin_116 *ppi116 = dynamic_cast<opencpn_plugin_116 *>(pic->m_pplugin);
+                     if (ppi116) {
+                          ppi116->RenderGLOverlayMultiCanvas(pcontext, &pivp, g_canvasConfig);
+                     }
+                     break;
                 }
                 default:
                     break;
@@ -1784,7 +1791,7 @@ void PlugInManager::CloseAllPlugInPanels( int ok_apply_cancel)
 
 }
 
-int PlugInManager::AddCanvasContextMenuItem(wxMenuItem *pitem, opencpn_plugin *pplugin )
+int PlugInManager::AddCanvasContextMenuItem(wxMenuItem *pitem, opencpn_plugin *pplugin, const char *name )
 {
     PlugInMenuItemContainer *pmic = new PlugInMenuItemContainer;
     pmic->pmenu_item = pitem;
@@ -1792,6 +1799,7 @@ int PlugInManager::AddCanvasContextMenuItem(wxMenuItem *pitem, opencpn_plugin *p
     pmic->id = pitem->GetId()==wxID_SEPARATOR?wxID_SEPARATOR:m_plugin_menu_item_id_next;
     pmic->b_viz = true;
     pmic->b_grey = false;
+    pmic->m_in_menu = name;
 
     m_PlugInMenuItems.Add(pmic);
 
@@ -1803,13 +1811,13 @@ int PlugInManager::AddCanvasContextMenuItem(wxMenuItem *pitem, opencpn_plugin *p
 
 
 
-void PlugInManager::RemoveCanvasContextMenuItem(int item)
+void PlugInManager::RemoveCanvasContextMenuItem(int item, const char *name )
 {
     for(unsigned int i=0; i < m_PlugInMenuItems.GetCount(); i++)
     {
         PlugInMenuItemContainer *pimis = m_PlugInMenuItems[i];
         {
-            if(pimis->id == item)
+            if(pimis->id == item && !strcmp(name, pimis->m_in_menu))
             {
                 m_PlugInMenuItems.Remove(pimis);
                 delete pimis;
@@ -1819,13 +1827,13 @@ void PlugInManager::RemoveCanvasContextMenuItem(int item)
     }
 }
 
-void PlugInManager::SetCanvasContextMenuItemViz(int item, bool viz)
+void PlugInManager::SetCanvasContextMenuItemViz(int item, bool viz, const char *name)
 {
     for(unsigned int i=0; i < m_PlugInMenuItems.GetCount(); i++)
     {
         PlugInMenuItemContainer *pimis = m_PlugInMenuItems[i];
         {
-            if(pimis->id == item)
+            if(pimis->id == item && !strcmp(name, pimis->m_in_menu))
             {
                 pimis->b_viz = viz;
                 break;
@@ -1834,13 +1842,13 @@ void PlugInManager::SetCanvasContextMenuItemViz(int item, bool viz)
     }
 }
 
-void PlugInManager::SetCanvasContextMenuItemGrey(int item, bool grey)
+void PlugInManager::SetCanvasContextMenuItemGrey(int item, bool grey, const char *name)
 {
     for(unsigned int i=0; i < m_PlugInMenuItems.GetCount(); i++)
     {
         PlugInMenuItemContainer *pimis = m_PlugInMenuItems[i];
         {
-            if(pimis->id == item)
+            if(pimis->id == item && !strcmp(name, pimis->m_in_menu))
             {
                 pimis->b_grey = grey;
                 break;
@@ -2038,7 +2046,7 @@ void PlugInManager::SetColorSchemeForAllPlugIns(ColorScheme cs)
     }
 }
 
-void PlugInManager::SendConfigToAllPlugIns()
+void PlugInManager::SendBaseConfigToAllPlugIns()
 {
     // Send the current run-time configuration to all PlugIns
     wxJSONValue v;
@@ -2046,25 +2054,6 @@ void PlugInManager::SendConfigToAllPlugIns()
     v[_T("OpenCPN Version Minor")] = VERSION_MINOR;
     v[_T("OpenCPN Version Patch")] = VERSION_PATCH;
     v[_T("OpenCPN Version Date")] = VERSION_DATE;
-    
-    //  S52PLIB state
-    if(ps52plib){
-        v[_T("OpenCPN S52PLIB ShowText")] = ps52plib->GetShowS57Text();
-        v[_T("OpenCPN S52PLIB ShowSoundings")] = ps52plib->GetShowSoundings();
-        v[_T("OpenCPN S52PLIB ShowLights")] = !ps52plib->GetLightsOff();
-        v[_T("OpenCPN S52PLIB ShowAnchorConditions")] = ps52plib->GetAnchorOn();
-        v[_T("OpenCPN S52PLIB ShowQualityOfData")] = ps52plib->GetQualityOfData();
-        v[_T("OpenCPN S52PLIB DisplayCategory")] = ps52plib->GetDisplayCategory();
-        v[_T("OpenCPN S52PLIB MetaDisplay")] = ps52plib->m_bShowMeta;
-        v[_T("OpenCPN S52PLIB DeclutterText")] = ps52plib->m_bDeClutterText;
-        v[_T("OpenCPN S52PLIB ShowNationalText")] = ps52plib->m_bShowNationalTexts;
-        v[_T("OpenCPN S52PLIB ShowImpartantTextOnly")] = ps52plib->m_bShowS57ImportantTextOnly;
-        v[_T("OpenCPN S52PLIB UseSCAMIN")] = ps52plib->m_bUseSCAMIN;
-        v[_T("OpenCPN S52PLIB SymbolStyle")] = ps52plib->m_nSymbolStyle;
-        v[_T("OpenCPN S52PLIB BoundaryStyle")] = ps52plib->m_nBoundaryStyle;
-        v[_T("OpenCPN S52PLIB ColorShades")] = S52_getMarinerParam( S52_MAR_TWO_SHADES );
-    }
-    
     
     // Some useful display metrics
     if(g_MainToolbar){
@@ -2078,6 +2067,46 @@ void PlugInManager::SendConfigToAllPlugIns()
     v[_T("OpenCPN Zoom Mod Vector")] = g_chart_zoom_modifier_vector;
     v[_T("OpenCPN Zoom Mod Other")] = g_chart_zoom_modifier;
     v[_T("OpenCPN Display Width")] = (int)g_display_size_mm;
+    
+    wxJSONWriter w;
+    wxString out;
+    w.Write(v, out);
+    SendMessageToAllPlugins(wxString(_T("OpenCPN Config")), out);
+}
+
+void PlugInManager::SendS52ConfigToAllPlugIns( bool bReconfig )
+{
+    // Send the current run-time configuration to all PlugIns
+    wxJSONValue v;
+    v[_T("OpenCPN Version Major")] = VERSION_MAJOR;
+    v[_T("OpenCPN Version Minor")] = VERSION_MINOR;
+    v[_T("OpenCPN Version Patch")] = VERSION_PATCH;
+    v[_T("OpenCPN Version Date")] = VERSION_DATE;
+    
+    //  S52PLIB state
+    if(ps52plib){
+//         v[_T("OpenCPN S52PLIB ShowText")] = ps52plib->GetShowS57Text();
+//         v[_T("OpenCPN S52PLIB ShowSoundings")] = ps52plib->GetShowSoundings();
+//         v[_T("OpenCPN S52PLIB ShowLights")] = !ps52plib->GetLightsOff();
+        v[_T("OpenCPN S52PLIB ShowAnchorConditions")] = ps52plib->GetAnchorOn();
+        v[_T("OpenCPN S52PLIB ShowQualityOfData")] = ps52plib->GetQualityOfData();
+//         v[_T("OpenCPN S52PLIB DisplayCategory")] = ps52plib->GetDisplayCategory();
+        
+        // Global parameters
+        v[_T("OpenCPN S52PLIB MetaDisplay")] = ps52plib->m_bShowMeta;
+        v[_T("OpenCPN S52PLIB DeclutterText")] = ps52plib->m_bDeClutterText;
+        v[_T("OpenCPN S52PLIB ShowNationalText")] = ps52plib->m_bShowNationalTexts;
+        v[_T("OpenCPN S52PLIB ShowImportantTextOnly")] = ps52plib->m_bShowS57ImportantTextOnly;
+        v[_T("OpenCPN S52PLIB UseSCAMIN")] = ps52plib->m_bUseSCAMIN;
+        v[_T("OpenCPN S52PLIB SymbolStyle")] = ps52plib->m_nSymbolStyle;
+        v[_T("OpenCPN S52PLIB BoundaryStyle")] = ps52plib->m_nBoundaryStyle;
+        v[_T("OpenCPN S52PLIB ColorShades")] = S52_getMarinerParam( S52_MAR_TWO_SHADES );
+    }
+    
+    // Notify plugins that S52PLIB may have reconfigured global options
+    v[_T("OpenCPN S52PLIB GlobalReconfig")] = bReconfig;
+    
+    
     
     wxJSONWriter w;
     wxString out;
@@ -2503,33 +2532,54 @@ void SetToolbarToolBitmapsSVG(int item, wxString SVGfile, wxString SVGfileRollov
 }
 
 
-
-int AddCanvasContextMenuItem(wxMenuItem *pitem, opencpn_plugin *pplugin )
+int AddCanvasMenuItem(wxMenuItem *pitem, opencpn_plugin *pplugin, const char *name  )
 {
     if(s_ppim)
-        return s_ppim->AddCanvasContextMenuItem(pitem, pplugin );
+        return s_ppim->AddCanvasContextMenuItem(pitem, pplugin, name );
     else
         return -1;
 }
 
+void SetCanvasMenuItemViz(int item, bool viz, const char *name)
+{
+    if(s_ppim)
+        s_ppim->SetCanvasContextMenuItemViz(item, viz, name);
+}
+
+void SetCanvasMenuItemGrey(int item, bool grey, const char *name)
+{
+    if(s_ppim)
+        s_ppim->SetCanvasContextMenuItemGrey(item, grey, name);
+}
+
+
+void RemoveCanvasMenuItem(int item, const char *name)
+{
+    if(s_ppim)
+        s_ppim->RemoveCanvasContextMenuItem(item, name);
+}
+
+
+int AddCanvasContextMenuItem(wxMenuItem *pitem, opencpn_plugin *pplugin )
+{
+    /* main context popup menu */
+    return AddCanvasMenuItem(pitem, pplugin, "");
+}
 
 void SetCanvasContextMenuItemViz(int item, bool viz)
 {
-    if(s_ppim)
-        s_ppim->SetCanvasContextMenuItemViz(item, viz);
+   SetCanvasMenuItemViz(item, viz);
 }
 
 void SetCanvasContextMenuItemGrey(int item, bool grey)
 {
-    if(s_ppim)
-        s_ppim->SetCanvasContextMenuItemGrey(item, grey);
+   SetCanvasMenuItemGrey(item, grey);
 }
 
 
 void RemoveCanvasContextMenuItem(int item)
 {
-    if(s_ppim)
-        s_ppim->RemoveCanvasContextMenuItem(item);
+   RemoveCanvasMenuItem(item);
 }
 
 
@@ -3187,6 +3237,28 @@ bool AddCustomWaypointIcon( wxBitmap *pimage, wxString key, wxString description
     return true;
 }
 
+static void cloneHyperlinkList(RoutePoint *dst, const PlugIn_Waypoint *src)
+{
+    //  Transcribe (clone) the html HyperLink List, if present
+    if( src->m_HyperlinkList == nullptr)
+       return;
+
+    if( src->m_HyperlinkList->GetCount() > 0 ) {
+       wxPlugin_HyperlinkListNode *linknode = src->m_HyperlinkList->GetFirst();
+       while( linknode ) {
+           Plugin_Hyperlink *link = linknode->GetData();
+
+           Hyperlink* h = new Hyperlink();
+           h->DescrText = link->DescrText;
+           h->Link = link->Link;
+           h->LType = link->Type;
+
+           dst->m_HyperlinkList->Append( h );
+
+           linknode = linknode->GetNext();
+       }
+    }
+}
 
 bool AddSingleWaypoint( PlugIn_Waypoint *pwaypoint, bool b_permanent)
 {
@@ -3215,29 +3287,11 @@ bool AddSingleWaypoint( PlugIn_Waypoint *pwaypoint, bool b_permanent)
 
     pWP->m_bIsolatedMark = true;                      // This is an isolated mark
 
-
-    //  Transcribe (clone) the html HyperLink List, if present
-    if( pwaypoint->m_HyperlinkList ) {
-        if( pwaypoint->m_HyperlinkList->GetCount() > 0 ) {
-            wxPlugin_HyperlinkListNode *linknode = pwaypoint->m_HyperlinkList->GetFirst();
-            while( linknode ) {
-                Plugin_Hyperlink *link = linknode->GetData();
-
-                Hyperlink* h = new Hyperlink();
-                h->DescrText = link->DescrText;
-                h->Link = link->Link;
-                h->LType = link->Type;
-            
-                pWP->m_HyperlinkList->Append( h );
-
-                linknode = linknode->GetNext();
-            }
-        }
-    }
+    cloneHyperlinkList(pWP, pwaypoint);
 
     pWP->m_MarkDescription = pwaypoint->m_MarkDescription;
-	pWP->SetCreateTime(pwaypoint->m_CreateTime);
-	pWP->m_btemp = (b_permanent == false);
+    pWP->SetCreateTime(pwaypoint->m_CreateTime);
+    pWP->m_btemp = (b_permanent == false);
 
     pSelect->AddSelectableRoutePoint( pwaypoint->m_lat, pwaypoint->m_lon, pWP );
     if(b_permanent)
@@ -3326,6 +3380,44 @@ bool UpdateSingleWaypoint( PlugIn_Waypoint *pwaypoint )
     return b_found;
 }
 
+// translate O route class to Plugin one
+static void PlugInFromRoutePoint(PlugIn_Waypoint *dst, /* const*/ RoutePoint *src)
+{
+    dst->m_lat = src->m_lat;
+    dst->m_lon = src->m_lon;
+    dst->m_IconName = src->GetIconName();
+    dst->m_MarkName = src->GetName(  );
+    dst->m_MarkDescription = src->m_MarkDescription;
+    dst->m_IsVisible = src->IsVisible();
+    dst->m_CreateTime = src->GetCreateTime(); // not const
+    dst->m_GUID = src->m_GUID;
+
+    //  Transcribe (clone) the html HyperLink List, if present
+    if( src->m_HyperlinkList == nullptr )
+        return;
+
+    delete dst->m_HyperlinkList;
+    dst->m_HyperlinkList = nullptr;
+
+    if( src->m_HyperlinkList->GetCount() > 0 ) {
+        dst->m_HyperlinkList = new Plugin_HyperlinkList;
+
+        wxHyperlinkListNode *linknode = src->m_HyperlinkList->GetFirst();
+        while( linknode ) {
+            Hyperlink *link = linknode->GetData();
+
+            Plugin_Hyperlink* h = new Plugin_Hyperlink();
+            h->DescrText = link->DescrText;
+            h->Link = link->Link;
+            h->Type = link->LType;
+
+            dst->m_HyperlinkList->Append( h );
+
+            linknode = linknode->GetNext();
+        }
+    }
+}
+
 bool GetSingleWaypoint(wxString GUID, PlugIn_Waypoint *pwaypoint)
 {
     //  Find the RoutePoint
@@ -3335,38 +3427,7 @@ bool GetSingleWaypoint(wxString GUID, PlugIn_Waypoint *pwaypoint)
     if(!prp)
         return false;
 
-    pwaypoint->m_lat = prp->m_lat;
-    pwaypoint->m_lon = prp->m_lon;
-    pwaypoint->m_IconName = prp->GetIconName();
-    pwaypoint->m_MarkName = prp->GetName(  );
-    pwaypoint->m_MarkDescription = prp->m_MarkDescription;
-	pwaypoint->m_IsVisible = prp->IsVisible();
-	pwaypoint->m_CreateTime = prp->GetCreateTime();
-
-    //  Transcribe (clone) the html HyperLink List, if present
-
-    if( prp->m_HyperlinkList ) {
-        delete pwaypoint->m_HyperlinkList;
-        pwaypoint->m_HyperlinkList = NULL;
-
-        if( prp->m_HyperlinkList->GetCount() > 0 ) {
-            pwaypoint->m_HyperlinkList = new Plugin_HyperlinkList;
-
-            wxHyperlinkListNode *linknode = prp->m_HyperlinkList->GetFirst();
-            while( linknode ) {
-                Hyperlink *link = linknode->GetData();
-                
-                Plugin_Hyperlink* h = new Plugin_Hyperlink();
-                h->DescrText = link->DescrText;
-                h->Link = link->Link;
-                h->Type = link->LType;
-                    
-                pwaypoint->m_HyperlinkList->Append( h );
-                
-                linknode = linknode->GetNext();
-            }
-        }
-    }
+    PlugInFromRoutePoint(pwaypoint, prp);
 
     return true;
 }
@@ -3415,24 +3476,7 @@ bool AddPlugInRoute( PlugIn_Route *proute, bool b_permanent )
                                           pwp->m_GUID );
 
         //  Transcribe (clone) the html HyperLink List, if present
-        if( pwp->m_HyperlinkList ) {
-            if( pwp->m_HyperlinkList->GetCount() > 0 ) {
-                wxPlugin_HyperlinkListNode *linknode = pwp->m_HyperlinkList->GetFirst();
-                while( linknode ) {
-                    Plugin_Hyperlink *link = linknode->GetData();
-
-                    Hyperlink* h = new Hyperlink();
-                    h->DescrText = link->DescrText;
-                    h->Link = link->Link;
-                    h->LType = link->Type;
-                    
-                    pWP->m_HyperlinkList->Append( h );
-
-                    linknode = linknode->GetNext();
-                }
-            }
-        }
-
+        cloneHyperlinkList(pWP, pwp);
         pWP->m_MarkDescription = pwp->m_MarkDescription;
         pWP->m_bShowName = false;
         pWP->SetCreateTime(pwp->m_CreateTime);
@@ -3928,6 +3972,11 @@ opencpn_plugin_116::opencpn_plugin_116(void *pmgr)
 
 opencpn_plugin_116::~opencpn_plugin_116(void)
 {
+}
+
+bool opencpn_plugin_116::RenderGLOverlayMultiCanvas(wxGLContext *pcontext, PlugIn_ViewPort *vp, int max_canvas)
+{
+     return false;
 }
 
 //          Helper and interface classes
@@ -6378,12 +6427,21 @@ _OCPN_DLStatus OCPN_downloadFileBackground( const wxString& url, const wxString 
     if( g_pi_manager->m_pCurlThread ) //We allow just one download at a time. Do we want more? Or at least return some other status in this case?
         return OCPN_DL_FAILED;
     g_pi_manager->m_pCurlThread = new wxCurlDownloadThread( g_pi_manager, CurlThreadId );
+    bool http = (url.StartsWith(wxS("http:")) || url.StartsWith(wxS("https:")));
+    bool keep = false;
+    if (http && g_pi_manager->m_pCurl && dynamic_cast<wxCurlHTTP*>(g_pi_manager->m_pCurl.get())) {
+        keep = true;
+    }
+    if (!keep)  {
+        g_pi_manager->m_pCurl = 0;
+    }
 
     bool failed = false;
-    if ( !g_pi_manager->HandleCurlThreadError( g_pi_manager->m_pCurlThread->SetURL( url ), g_pi_manager->m_pCurlThread, url ) )
+    if ( !g_pi_manager->HandleCurlThreadError( g_pi_manager->m_pCurlThread->SetURL( url, g_pi_manager->m_pCurl ), g_pi_manager->m_pCurlThread, url ) )
         failed = true;
     if (!failed)
     {
+        g_pi_manager->m_pCurl = g_pi_manager->m_pCurlThread->GetCurlSharedPtr();
         if (!g_pi_manager->HandleCurlThreadError(g_pi_manager->m_pCurlThread->SetOutputStream(new wxFileOutputStream(outputFile)), g_pi_manager->m_pCurlThread))
             failed = true;
     }
@@ -6414,7 +6472,8 @@ _OCPN_DLStatus OCPN_downloadFileBackground( const wxString& url, const wxString 
         g_pi_manager->m_download_evHandler = NULL;
         g_pi_manager->m_downloadHandle = NULL;
     }
-#endif
+    g_pi_manager->m_pCurl = 0;
+ #endif
 
     return OCPN_DL_FAILED;
 #else
@@ -6440,7 +6499,8 @@ void OCPN_cancelDownloadFileBackground( long handle )
         g_pi_manager->m_download_evHandler = NULL;
         g_pi_manager->m_downloadHandle = NULL;
     }
-#endif
+    g_pi_manager->m_pCurl = 0;
+ #endif
 #endif
 }
 
@@ -6502,6 +6562,7 @@ void PlugInManager::OnEndPerformCurlDownload(wxCurlEndPerformEvent &ev)
         event.setDLEventStatus( OCPN_DL_NO_ERROR );
     }
     else {
+        g_pi_manager->m_pCurl = 0;
         event.setDLEventStatus( OCPN_DL_FAILED );
     }
     event.setDLEventCondition( OCPN_DL_EVENT_TYPE_END );
@@ -6620,8 +6681,79 @@ int PluginGetMaxAvailableGshhgQuality() { return gFrame->GetPrimaryCanvas()->Get
 // disable builtin console canvas, and autopilot nmea sentences
 void PlugInHandleAutopilotRoute(bool enable) { g_bPluginHandleAutopilotRoute = enable; }
 
-
 /* API 1.16 */
+wxString GetSelectedWaypointGUID_Plugin(  )
+{
+    ChartCanvas *cc = gFrame->GetFocusCanvas();
+    if (cc && cc->GetSelectedRoutePoint() ) {
+        return cc->GetSelectedRoutePoint()->m_GUID;
+    }
+    return wxEmptyString;
+}
+
+wxString GetSelectedRouteGUID_Plugin( )
+{
+    ChartCanvas *cc = gFrame->GetFocusCanvas();
+    if (cc && cc->GetSelectedRoute() ) {
+        return cc->GetSelectedRoute()->m_GUID;
+    }
+    return wxEmptyString;
+}
+
+wxString GetSelectedTrackGUID_Plugin( )
+{
+    ChartCanvas *cc = gFrame->GetFocusCanvas();
+    if (cc && cc->GetSelectedTrack() ) {
+        return cc->GetSelectedTrack()->m_GUID;
+    }
+    return wxEmptyString;
+}
+
+std::unique_ptr<PlugIn_Waypoint> GetWaypoint_Plugin( const wxString& GUID)
+{
+   std::unique_ptr<PlugIn_Waypoint> w(new PlugIn_Waypoint);
+   GetSingleWaypoint(GUID, w.get());
+   return w;
+}
+
+std::unique_ptr<PlugIn_Route> GetRoute_Plugin( const wxString& GUID)
+{
+   std::unique_ptr<PlugIn_Route> r;
+   Route *route = g_pRouteMan->FindRouteByGUID( GUID );
+   if (route == nullptr)
+       return r;
+
+   r = std::unique_ptr<PlugIn_Route>(new PlugIn_Route);
+   PlugIn_Route *dst_route = r.get();
+
+   // PlugIn_Waypoint *pwp;
+   RoutePoint *src_wp;
+   int ip = 0;
+   wxRoutePointListNode *node = route->pRoutePointList->GetFirst();
+
+   while( node ) {
+        src_wp = node->GetData();
+
+        PlugIn_Waypoint *dst_wp = new PlugIn_Waypoint();
+        PlugInFromRoutePoint(dst_wp, src_wp);
+
+        dst_route->pWaypointList->Append( dst_wp );
+
+        node = node->GetNext();
+   }
+   dst_route->m_NameString = route->m_RouteNameString;
+   dst_route->m_StartString = route->m_RouteStartString;
+   dst_route->m_EndString = route->m_RouteEndString;
+   dst_route->m_GUID = route->m_GUID;
+
+   return r;
+}
+
+std::unique_ptr<PlugIn_Track> GetTrack_Plugin( const wxString& GUID)
+{
+   std::unique_ptr<PlugIn_Track> t;
+   return t;
+}
 
 wxWindow* PluginGetFocusCanvas()
 {
@@ -6643,4 +6775,3 @@ void CanvasJumpToPosition( wxWindow *canvas, double lat, double lon, double scal
         gFrame->JumpToPosition( oCanvas, lat, lon, scale);
 
 }
-

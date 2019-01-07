@@ -293,6 +293,7 @@ extern bool             g_b_assume_azerty;
 
 extern ChartGroupArray  *g_pGroupArray;
 extern wxString         g_default_wp_icon;
+extern wxString         g_default_routepoint_icon;
 
 extern int              g_current_arrow_scale;
 extern int              g_tide_rectangle_scale;
@@ -7439,7 +7440,7 @@ bool ChartCanvas::MouseEventProcessObjects( wxMouseEvent& event )
                 }
                 
                 if( NULL == pMousePoint ) {                 // need a new point
-                    pMousePoint = new RoutePoint( rlat, rlon, _T("diamond"), _T(""), wxEmptyString );
+                    pMousePoint = new RoutePoint( rlat, rlon, g_default_routepoint_icon, _T(""), wxEmptyString );
                     pMousePoint->SetNameShown( false );
                     
                     pConfig->AddNewWayPoint( pMousePoint, -1 );    // use auto next num
@@ -7889,7 +7890,7 @@ bool ChartCanvas::MouseEventProcessObjects( wxMouseEvent& event )
                 }
                 
                 if( NULL == pMousePoint ) {                 // need a new point
-                    pMousePoint = new RoutePoint( rlat, rlon, _T("diamond"), _T(""), wxEmptyString );
+                    pMousePoint = new RoutePoint( rlat, rlon, g_default_routepoint_icon, _T(""), wxEmptyString );
                     pMousePoint->SetNameShown( false );
                     
                     pConfig->AddNewWayPoint( pMousePoint, -1 );    // use auto next num
@@ -8326,6 +8327,7 @@ bool ChartCanvas::MouseEventProcessObjects( wxMouseEvent& event )
     }           // left up
     
     if( event.RightDown() ) {
+        SetFocus();           //  This is to let a plugin know which canvas is right-clicked
         last_drag.x = mx;
         last_drag.y = my;
         
@@ -9581,6 +9583,9 @@ void ChartCanvas::UpdateCanvasS52PLIBConfig()
         v[_T("OpenCPN S52PLIB ShowLightDescription")] = GetShowENCLightDesc();
 
         v[_T("OpenCPN S52PLIB DisplayCategory")] = GetENCDisplayCategory();
+        
+        // Global options
+/*        
         v[_T("OpenCPN S52PLIB MetaDisplay")] = ps52plib->m_bShowMeta;
         v[_T("OpenCPN S52PLIB DeclutterText")] = ps52plib->m_bDeClutterText;
         v[_T("OpenCPN S52PLIB ShowNationalText")] = ps52plib->m_bShowNationalTexts;
@@ -9589,7 +9594,7 @@ void ChartCanvas::UpdateCanvasS52PLIBConfig()
         v[_T("OpenCPN S52PLIB SymbolStyle")] = ps52plib->m_nSymbolStyle;
         v[_T("OpenCPN S52PLIB BoundaryStyle")] = ps52plib->m_nBoundaryStyle;
         v[_T("OpenCPN S52PLIB ColorShades")] = S52_getMarinerParam( S52_MAR_TWO_SHADES );
-        
+*/        
         wxJSONWriter w;
         wxString out;
         w.Write(v, out);

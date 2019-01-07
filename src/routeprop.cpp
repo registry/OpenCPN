@@ -321,36 +321,10 @@ WX_DECLARE_LIST(wxBitmap, BitmapList);
 #include <wx/listimpl.cpp>
 WX_DEFINE_LIST(BitmapList);
 
-WX_DECLARE_OBJARRAY(wxBitmap,      ArrayOfBitmaps);
 #include <wx/arrimpl.cpp> 
 WX_DEFINE_OBJARRAY(ArrayOfBitmaps);
 
 
-class  OCPNIconCombo : public wxOwnerDrawnComboBox
-{
-public:
-    
-    OCPNIconCombo(wxWindow* parent, wxWindowID id, const wxString& value = _T(""),
-                  const wxPoint& pos = wxDefaultPosition, const wxSize& size = wxDefaultSize,
-                  int n = 0, const wxString choices[] = NULL,
-                  long style = 0, const wxValidator& validator = wxDefaultValidator, const wxString& name = _T("OCPNIconCombo") );
-    
-    
-    
-    ~OCPNIconCombo ();
-    
-    void OnDrawItem(wxDC& dc, const wxRect& rect, int item, int flags) const;
-    wxCoord OnMeasureItem(size_t item) const;
-    wxCoord OnMeasureItemWidth(size_t item) const;
-    
-    int Append(const wxString& item, wxBitmap bmp);
-    void Clear( void );
-    
-private:
-    int         itemHeight;
-    ArrayOfBitmaps  bmpArray;
-    
-};
 
 
 OCPNIconCombo::OCPNIconCombo (wxWindow* parent, wxWindowID id, const wxString& value,
@@ -513,6 +487,7 @@ RouteProp::RouteProp( wxWindow* parent, wxWindowID id, const wxString& caption, 
 #endif
     
     RecalculateSize();
+    Centre();
 }
 
 void RouteProp::RecalculateSize( void )
@@ -549,8 +524,6 @@ void RouteProp::RecalculateSize( void )
         if(m_wpList->GetItemCount())
             Layout();
     }
-    
-    Centre();
 }
 
 
@@ -3008,6 +2981,7 @@ bool MarkInfoImpl::UpdateProperties( bool positionOnly )
             m_choiceWaypointRangeRingsNumber->Enable( false );
             m_textWaypointRangeRingsStep->SetEditable( false );
             m_chColor->Enable( false );
+            m_notebookProperties->SetSelection(1);
         } else {
             m_staticTextLayer->Enable( false );
             m_staticTextLayer->Show( false );
@@ -3027,6 +3001,7 @@ bool MarkInfoImpl::UpdateProperties( bool positionOnly )
             m_choiceWaypointRangeRingsNumber->Enable( true );
             m_textWaypointRangeRingsStep->SetEditable( true );
             m_chColor->Enable( true );
+            m_notebookProperties->SetSelection(0);
         }
         m_textName->SetValue( m_pRoutePoint->GetName() );
 
