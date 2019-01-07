@@ -40,7 +40,7 @@
 #include <wx/tokenzr.h>
 #include <wx/version.h>
 
-#include "main_version.h"
+#include "my_version.h"
 #include "about.h"
 #include "chart1.h"
 #include "chcanv.h"

@@ -92,6 +92,7 @@
 #include "MUIBar.h"
 #include "CanvasConfig.h"
 #include <version.h>
+#include "my_version.h"
 #include "CanvasOptions.h"
 
 #ifdef __OCPN__ANDROID__

@@ -82,7 +82,7 @@
 #include "Route.h"
 #include "OCPN_AUIManager.h"
 #include "chcanv.h"
-#include "main_version.h"
+#include "my_version.h"
 
 #ifdef __OCPN__ANDROID__
 #include "androidUTIL.h"
