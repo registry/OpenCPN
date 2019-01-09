@@ -209,6 +209,9 @@ extern double                    g_display_size_mm;
 extern double                    g_config_display_size_mm;
 extern bool                      g_config_display_size_manual;
 
+extern float                     g_selection_radius_mm;
+extern float                     g_selection_radius_touch_mm;
+
 extern bool                     g_bTrackDaily;
 extern double                   g_PlanSpeed;
 extern bool                     g_bFullScreenQuilt;
@@ -690,15 +693,20 @@ wxString OCPNPlatform::GetAdjustedAppLocale()
     //  user's selected install language.
     //  If so, override the config file value and use this selection for opencpn...
     #if defined(__WXMSW__)
-    if( g_bFirstRun ) {
+    if ( g_bFirstRun || wxIsEmpty(adjLocale) ) {
         wxRegKey RegKey( wxString( _T("HKEY_LOCAL_MACHINE\\SOFTWARE\\OpenCPN") ) );
         if( RegKey.Exists() ) {
             wxLogMessage( _("Retrieving initial language selection from Windows Registry") );
             RegKey.QueryValue( wxString( _T("InstallerLanguage") ), adjLocale );
         }
     }
+    if (wxIsEmpty(adjLocale)) {
+        if (g_localeOverride.Length())
+            adjLocale = g_localeOverride;
+        else
+           adjLocale = GetDefaultSystemLocale();
+    }
     #endif
-    
     #if defined(__OCPN__ANDROID__)
     if(g_localeOverride.Length())
         adjLocale = g_localeOverride;
@@ -706,7 +714,7 @@ wxString OCPNPlatform::GetAdjustedAppLocale()
         adjLocale = GetDefaultSystemLocale();
     #endif
         
-        return adjLocale;
+    return adjLocale;
 }
 
 
@@ -1659,6 +1667,11 @@ double OCPNPlatform::GetDisplayDPmm()
     double r = getDisplaySize().x;            // dots
     return r / GetDisplaySizeMM();
 #endif    
+}
+                    
+unsigned int OCPNPlatform::GetSelectRadiusPix()
+{
+    return GetDisplayDPmm() * (g_btouch ? g_selection_radius_touch_mm : g_selection_radius_mm);
 }
 
 void OCPNPlatform::onStagedResizeFinal()

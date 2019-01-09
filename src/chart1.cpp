@@ -225,7 +225,7 @@ Select                    *pSelectAIS;
 
 Routeman                  *g_pRouteMan;
 WayPointman               *pWayPointMan;
-MarkInfoImpl              *pMarkPropDialog;
+MarkInfoDlg               *g_pMarkInfoDialog;
 RouteProp                 *pRoutePropDialog;
 TrackPropDlg              *pTrackPropDialog;
 RouteManagerDialog        *pRouteManagerDialog;
@@ -378,6 +378,8 @@ int                       g_lastClientRecth;
 double                    g_display_size_mm;
 double                    g_config_display_size_mm;
 bool                      g_config_display_size_manual;
+float                     g_selection_radius_mm = 2.0;
+float                     g_selection_radius_touch_mm = 10.0;
 
 int                       g_GUIScaleFactor;
 int                       g_ChartScaleFactor;
@@ -3011,8 +3013,8 @@ void MyFrame::SetAndApplyColorScheme( ColorScheme cs )
         g_pRouteMan->SetColorScheme( cs );
     }
 
-    if( pMarkPropDialog ) {
-        pMarkPropDialog->SetColorScheme( cs );
+    if( g_pMarkInfoDialog ) {
+        g_pMarkInfoDialog->SetColorScheme( cs );
     }
     
     if( pRoutePropDialog ) {
@@ -4243,10 +4245,10 @@ void MyFrame::DestroyPersistentDialogs()
         pTrackPropDialog = NULL;
     }
 
-    if( pMarkPropDialog ) {
-        pMarkPropDialog->Hide();
-        pMarkPropDialog->Destroy();
-        pMarkPropDialog = NULL;
+    if( g_pMarkInfoDialog ) {
+        g_pMarkInfoDialog->Hide();
+        g_pMarkInfoDialog->Destroy();
+        g_pMarkInfoDialog = NULL;
     }
 
     if( g_pObjectQueryDialog ) {
@@ -6051,10 +6053,10 @@ int MyFrame::DoOptionsDialog()
     }
     
     //  Pick up chart object icon size changes (g_ChartScaleFactorExp)
-    if( pMarkPropDialog ) {
-        pMarkPropDialog->Hide();
-        pMarkPropDialog->Destroy();
-        pMarkPropDialog = NULL;
+    if( g_pMarkInfoDialog ) {
+        g_pMarkInfoDialog->Hide();
+        g_pMarkInfoDialog->Destroy();
+        g_pMarkInfoDialog = NULL;
     }
     
 #if wxUSE_XLOCALE    
