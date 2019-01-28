@@ -373,6 +373,9 @@ class options : private Uncopyable,
   wxCheckBox *pOZScaleVector, *pToolbarAutoHideCB, *pInlandEcdis, *pDarkDecorations;
   wxTextCtrl *pCOGUPUpdateSecs, *m_pText_OSCOG_Predictor, *pScreenMM;
   wxTextCtrl *pToolbarHideSecs, *m_pText_OSHDT_Predictor;
+
+  wxTextCtrl *pCmdSoundString;
+
   wxChoice *m_pShipIconType, *m_pcTCDatasets;
   wxSlider *m_pSlider_Zoom, *m_pSlider_GUI_Factor, *m_pSlider_Chart_Factor, *m_pSlider_Ship_Factor;
   wxSlider *m_pSlider_Zoom_Vector;
@@ -399,13 +402,12 @@ class options : private Uncopyable,
   wxStaticText *m_stTalkerIdText;
   wxStaticText *m_stNetComment, *m_stSerialComment;
   wxTextCtrl *m_tNetComment, *m_tSerialComment;
- 
+  wxStaticBox *m_sbConnEdit;
   wxChoice *m_choiceBTDataSources, *m_choiceBaudRate, *m_choiceSerialProtocol;
   wxChoice *m_choicePriority, *m_choicePrecision;
   wxScrolledWindow *m_scrollWinConnections; 
   wxBoxSizer *boxSizerConnections;
-  ConnectionParamsPanel *mSelectedConnectionPanel;
-  std::vector <ConnectionParamsPanel *> mConnectionsPanelList;
+  ConnectionParams *mSelectedConnection;
   
   // For the Display\Units page
   wxStaticText* itemStaticTextUserVar;
@@ -534,6 +536,8 @@ class options : private Uncopyable,
 
   OCPNIconCombo *pWaypointDefaultIconChoice;
   OCPNIconCombo *pRoutepointDefaultIconChoice;
+  wxCheckBox    *pScaMinChckB, *pScaMinOverruleChckB;
+  wxTextCtrl*   m_pText_ScaMin;
   
   // For the font page
   wxBoxSizer *m_itemBoxSizerFontPanel;
@@ -568,7 +572,7 @@ class options : private Uncopyable,
 #endif  
   wxRadioButton *pTrackRotateComputerTime, *pTrackRotateUTC, *pTrackRotateLMT;
   wxColourPickerCtrl *m_colourWaypointRangeRingsColour;
-  wxSpinCtrl *pSoundDeviceIndex;
+  wxChoice *pSoundDeviceIndex;
   wxArrayPtrVoid OBJLBoxArray;
   wxString m_init_chart_dir;
   wxArrayString *m_pSerialArray;
@@ -627,7 +631,11 @@ class options : private Uncopyable,
   void SetDefaultConnectionParams(void);
   void SetDSFormRWStates();
   void FillSourceList();
+  void UpdateSourceList( bool bResort );
+  bool SortSourceList(void);
+
   ConnectionParams *CreateConnectionParamsFromSelectedItem();
+  ConnectionParams *UpdateConnectionParamsFromSelectedItem(ConnectionParams *pConnectionParams);
 
   int m_screenConfig;
   

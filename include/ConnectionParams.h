@@ -78,7 +78,7 @@ class ConnectionParamsPanel: public wxPanel
 {
 public:
     ConnectionParamsPanel( wxWindow *parent, wxWindowID id, const wxPoint &pos, const wxSize &size,
-                           ConnectionParams *p_itemConnectionParams, options *pContainer, int index );
+                           ConnectionParams *p_itemConnectionParams, options *pContainer );
     ~ConnectionParamsPanel();
     
     void OnSelected( wxMouseEvent &event );
@@ -87,11 +87,11 @@ public:
     void OnEraseBackground( wxEraseEvent &event );
     void CreateControls( void );
     void OnEnableCBClick(wxCommandEvent &event);
-    
+    void Update( ConnectionParams *ConnectionParams);
+ 
     bool GetSelected(){ return m_bSelected; }
     int GetUnselectedHeight(){ return m_unselectedHeight; }
     ConnectionParams *m_pConnectionParams;
-    int m_index;
     
 private:
     options *m_pContainer;
@@ -100,6 +100,16 @@ private:
     wxColour m_boxColour;
     int m_unselectedHeight;
     wxCheckBox *m_cbEnable;
+    wxStaticText *t2;
+    wxStaticText *t4;
+    wxStaticText *t6;
+    wxStaticText *t12;
+    wxStaticText *t14;
+    wxStaticText *t16;
+    wxStaticText *t18;
+
+    wxStaticText *t21;
+
     
     DECLARE_EVENT_TABLE()
 };
@@ -111,6 +121,7 @@ class ConnectionParams
 {
 public:
     ConnectionParams();
+    ~ConnectionParams();
     ConnectionParams(const wxString &configStr);
 
     ConnectionType  Type;
@@ -154,6 +165,7 @@ public:
     
     bool            Valid;
     bool            b_IsSetup;
+    ConnectionParamsPanel *m_optionsPanel;
 private:
     wxString FilterTypeToStr(ListType type, FilterDirection dir);
     

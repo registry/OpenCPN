@@ -22,7 +22,7 @@
  *   Free Software Foundation, Inc.,                                       *
  *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301,  USA.         *
  **************************************************************************/
-
+#include <memory>
 // For compilers that support precompilation, includes "wx/wx.h".
 #include "wx/wxprec.h"
 
@@ -41,6 +41,7 @@
 #include <wx/clrpicker.h>
 #include <wx/stdpaths.h>
 #include "wx/tokenzr.h"
+#include <wx/mediactrl.h>
 #include "wx/dir.h"
 
 #if wxCHECK_VERSION(2, 9, \
@@ -50,6 +51,8 @@
 #if defined(__WXGTK__) || defined(__WXQT__)
 #include <wx/colordlg.h>
 #endif
+
+#include "config.h"
 
 #include "dychart.h"
 #include "chart1.h"
@@ -66,11 +69,12 @@ extern GLuint g_raster_format;
 #include "multiplexer.h"
 #include "FontMgr.h"
 #include "OCPN_Sound.h"
+#include "SoundFactory.h"
 #include "NMEALogWindow.h"
 #include "wx28compat.h"
 #include "routeman.h"
 #include "chcanv.h"
-#include "routeprop.h"
+#include "MarkInfo.h"
 
 #include "ais.h"
 #include "AIS_Decoder.h"
@@ -128,6 +132,7 @@ extern int g_chart_zoom_modifier_vector;
 extern int g_NMEAAPBPrecision;
 extern wxString g_TalkerIdText;
 extern int g_nDepthUnitDisplay;
+extern bool g_bUIexpert;
 
 extern wxString* pInit_Chart_Dir;
 extern wxArrayOfConnPrm* g_pConnectionParams;
@@ -190,6 +195,9 @@ extern int g_own_ship_sog_cog_calc_damp_sec;
 
 extern bool g_bPreserveScaleOnX;
 extern bool g_bPlayShipsBells;
+
+extern wxString g_CmdSoundString;
+
 extern int g_iSoundDeviceIndex;
 extern bool g_bFullscreenToolbar;
 extern bool g_bTransparentToolbar;
@@ -247,7 +255,7 @@ extern bool g_bGarminHostUpload;
 extern wxLocale* plocale_def_lang;
 #endif
 
-extern OCPN_Sound g_anchorwatch_sound;
+extern OcpnSound* g_anchorwatch_sound;
 extern bool g_bMagneticAPB;
 
 extern bool g_fog_overzoom;
@@ -308,6 +316,9 @@ extern bool g_useMUI;
 extern wxString g_lastAppliedTemplateGUID;
 extern wxString g_default_wp_icon;
 extern wxString g_default_routepoint_icon;
+extern int      g_iWpt_ScaMin;
+extern bool     g_bUseWptScaMin;
+bool            g_bOverruleScaMin;
 
 extern "C" bool CheckSerialAccess(void);
 
@@ -324,6 +335,7 @@ static wxBitmap LoadSVG( const wxString filename, unsigned int width, unsigned i
         return wxBitmap(width, height);
         #endif // ocpnUSE_SVG
 }
+
 
 // sort callback for Connections list  Sort by priority.
 #if wxCHECK_VERSION(2, 9, 0)
@@ -1035,6 +1047,8 @@ EVT_CHAR_HOOK(options::OnCharHook)
 EVT_TIMER(ID_BT_SCANTIMER, options::onBTScanTimer)
 END_EVENT_TABLE()
 
+
+
 options::options(MyFrame* parent, wxWindowID id, const wxString& caption,
                  const wxPoint& pos, const wxSize& size, long style) {
   Init();
@@ -1045,7 +1059,6 @@ options::options(MyFrame* parent, wxWindowID id, const wxString& caption,
   SetExtraStyle(wxWS_EX_BLOCK_EVENTS);
 
   wxDialog::Create(parent, id, caption, pos, size, wstyle);
-
   SetFont(*dialogFont);
 
   CreateControls();
@@ -1104,11 +1117,10 @@ void options::RecalculateSize(void) {
 
   wxSize fsize = GetSize();
   wxSize canvas_size = GetParent()->GetSize();
-  wxPoint canvas_pos = GetParent()->GetPosition();
+  wxPoint screen_pos = GetParent()->GetScreenPosition();
   int xp = (canvas_size.x - fsize.x) / 2;
   int yp = (canvas_size.y - fsize.y) / 2;
-  wxPoint xxp = GetParent()->ClientToScreen(canvas_pos);
-  Move(xxp.x + xp, xxp.y + yp);
+  Move(screen_pos.x + xp, screen_pos.y + yp);
   
   m_nCharWidthMax = GetSize().x / GetCharWidth();
 }
@@ -1132,6 +1144,8 @@ void options::Init(void) {
   k_tides = 0;
   m_pConfig = NULL;
   
+  pSoundDeviceIndex = NULL;
+
   pCBNorthUp = NULL;
   pCBCourseUp = NULL;
   pCBLookAhead = NULL;
@@ -1187,7 +1201,7 @@ void options::Init(void) {
   // for deferred loading
   m_pPlugInCtrl = NULL;
   m_pNMEAForm = NULL;
-  mSelectedConnectionPanel = NULL;
+  mSelectedConnection = NULL;
   
 #ifdef __OCPN__ANDROID__
   m_scrollRate = 1;
@@ -1209,6 +1223,7 @@ void options::Init(void) {
 #ifdef __OCPN__ANDROID__
   m_bcompact = true;
 #endif
+  pCmdSoundString = NULL;
 }
 
 size_t options::CreatePanel(const wxString& title) {
@@ -2022,13 +2037,14 @@ void options::CreatePanel_NMEA(size_t parent, int border_size,
   m_scrollWinConnections->SetSizer(boxSizerConnections);
 
   
-  
-  
+  bSizerOuterContainer->Add(sbSizerLB, 0, wxEXPAND, 5);
+
   
   wxBoxSizer* bSizer18;
   bSizer18 = new wxBoxSizer(wxHORIZONTAL);
+  sbSizerLB->Add(bSizer18, 1, wxEXPAND, 5);
 
-  m_buttonAdd = new wxButton(m_pNMEAForm, wxID_ANY, _(""),
+  m_buttonAdd = new wxButton(m_pNMEAForm, wxID_ANY, _("Add Connection"),
                              wxDefaultPosition, wxDefaultSize, 0);
   bSizer18->Add(m_buttonAdd, 0, wxALL, 5);
 
@@ -2036,19 +2052,30 @@ void options::CreatePanel_NMEA(size_t parent, int border_size,
                                 wxDefaultPosition, wxDefaultSize, 0);
   m_buttonRemove->Enable(FALSE);
   bSizer18->Add(m_buttonRemove, 0, wxALL, 5);
-
-  //bSizer17->Add(bSizer18, 0, wxEXPAND, 5);
-  sbSizerLB->Add(bSizer18, 1, wxEXPAND, 5);
-  bSizerOuterContainer->Add(sbSizerLB, 0, wxEXPAND, 5);
+  
+ 
+//   wxBoxSizer* bSizer19 = new wxBoxSizer(wxHORIZONTAL);
+//   sbSizerLB->Add(bSizer19, 1, wxEXPAND, 5);
+// 
+   wxFont *dFont = GetOCPNScaledFont_PlugIn(_("Dialog"));
+   double font_size = dFont->GetPointSize() * 17/16;
+   wxFont *bFont = wxTheFontList->FindOrCreateFont( font_size, dFont->GetFamily(), dFont->GetStyle(), wxFONTWEIGHT_BOLD);
+// 
+//   m_stEditCon = new wxStaticText(m_pNMEAForm, wxID_ANY, _("Edit Selected Connection"));
+//   m_stEditCon->SetFont(*bFont);
+//   bSizer19->Add(m_stEditCon, 0, wxALL | wxEXPAND | wxALIGN_CENTER_HORIZONTAL, 5);
+// 
 
   //  Connections Properties
-  sbSizerConnectionProps = new wxStaticBoxSizer(
-      new wxStaticBox(m_pNMEAForm, wxID_ANY, _("Properties")), wxVERTICAL);
+  m_sbConnEdit = new wxStaticBox(m_pNMEAForm, wxID_ANY, _("Edit Selected Connection"));
+  m_sbConnEdit->SetFont(*bFont);
+  
+  sbSizerConnectionProps = new wxStaticBoxSizer( m_sbConnEdit, wxVERTICAL);
 
   wxBoxSizer* bSizer15;
   bSizer15 = new wxBoxSizer(wxHORIZONTAL);
 
-  sbSizerConnectionProps->Add(bSizer15, 0, wxEXPAND, 0);
+  sbSizerConnectionProps->Add(bSizer15, 0, wxTOP | wxEXPAND, 5);
 
   m_rbTypeSerial =
       new wxRadioButton(m_pNMEAForm, wxID_ANY, _("Serial"), wxDefaultPosition,
@@ -2611,6 +2638,8 @@ void options::OnConnectionToggleEnableMouse(wxMouseEvent& event) {
 void options::EnableConnection( ConnectionParams *conn, bool value){
     if(conn){
         conn->bEnabled = value;
+        conn->b_IsSetup = FALSE;  // trigger a rebuild/takedown of the connection
+        m_connection_enabled = conn->bEnabled;
     }
 }
 
@@ -2894,7 +2923,7 @@ void options::CreatePanel_Routes(size_t parent, int border_size,
   pAdvanceRouteWaypointOnArrivalOnly =
       new wxCheckBox(itemPanelRoutes, ID_DAILYCHECKBOX,
                      _("Advance route waypoint on arrival only"));
-  routeSizer->Add(pAdvanceRouteWaypointOnArrivalOnly, 0);
+  routeSizer->Add(pAdvanceRouteWaypointOnArrivalOnly, 0, wxALL, 5);
 
   
   //  Waypoints
@@ -2930,7 +2959,25 @@ void options::CreatePanel_Routes(size_t parent, int border_size,
    pWaypointDefaultIconChoice->SetMinSize( wxSize(GetCharHeight() * 15, rmin_size) );
    
   waypointSizer->AddSpacer(5);
-
+  // ScaMin 
+  wxFlexGridSizer* ScaMinSizer =
+      new wxFlexGridSizer(1, 2, group_item_spacing, group_item_spacing);
+  ScaMinSizer->AddGrowableCol(1);
+  waypointSizer->Add(ScaMinSizer, 0, wxLEFT | wxRIGHT | wxEXPAND,
+                     border_size);
+  pScaMinChckB = new wxCheckBox(itemPanelRoutes, wxID_ANY,
+                     _("Do show waypoints only at a chartscale greater then 1 :"));
+  ScaMinSizer->Add(pScaMinChckB, 0);
+  m_pText_ScaMin = new wxTextCtrl(itemPanelRoutes, -1);
+  ScaMinSizer->Add(m_pText_ScaMin, 0, wxALL | wxALIGN_RIGHT,
+                  group_item_spacing);
+    
+  //Overrule the Scamin settings
+  pScaMinOverruleChckB = new wxCheckBox(itemPanelRoutes, wxID_ANY,
+                     _("Overrule the settings for chartscale depending visibility and show always") );
+  waypointSizer->Add(pScaMinOverruleChckB, 0, wxALL, 5);
+  
+  waypointSizer->AddSpacer(5);
   //Range Rings  
   wxFlexGridSizer* waypointrrSelect =
       new wxFlexGridSizer(1, 2, group_item_spacing, group_item_spacing);
@@ -5022,7 +5069,7 @@ void options::CreatePanel_AIS(size_t parent, int border_size,
   pAlertGrid->Add(m_pPlay_Sound, 0, wxALL | wxALIGN_RIGHT, group_item_spacing);
 
   m_pCheck_Alert_Moored = new wxCheckBox(
-      panelAIS, -1, _("Supress Alerts for anchored/moored targets"));
+      panelAIS, -1, _("Suppress Alerts for anchored/moored targets"));
   pAlertGrid->Add(m_pCheck_Alert_Moored, 1, wxALL, group_item_spacing);
 
   wxStaticText* pStatic_Dummy2 = new wxStaticText(panelAIS, -1, _T(""));
@@ -5158,27 +5205,57 @@ void options::CreatePanel_UI(size_t parent, int border_size, int group_item_spac
   pToolbarAutoHide->Add(new wxStaticText(itemPanelFont, wxID_ANY, _("seconds")),
                         group_item_spacing);
 
+  wxBoxSizer* pShipsBellsSizer = new wxBoxSizer(wxHORIZONTAL);
+  miscOptions->Add(pShipsBellsSizer, 0, wxALL, group_item_spacing);
   // Sound options
   pPlayShipsBells =
       new wxCheckBox(itemPanelFont, ID_BELLSCHECKBOX, _("Play Ships Bells"));
-  miscOptions->Add(pPlayShipsBells, 0, wxALL, border_size);
+  pShipsBellsSizer->Add(pPlayShipsBells, 0, wxALL | wxEXPAND, border_size);
 
-  pSoundDeviceIndex = new wxSpinCtrl(itemPanelFont, wxID_ANY);
-  pSoundDeviceIndex->SetValue(g_iSoundDeviceIndex);
-  pSoundDeviceIndex->Hide();
+#ifdef USE_SYSTEM_CMD_SOUND
+  if ( g_bUIexpert ) {
+      wxBoxSizer* pSoundSizer = new wxBoxSizer( wxVERTICAL );
+      pShipsBellsSizer->Add( pSoundSizer, 0, wxALL | wxEXPAND, group_item_spacing );
+      pCmdSoundString = new wxTextCtrl( itemPanelFont, wxID_ANY, _T( "" ), wxDefaultPosition,
+          wxSize( 450, -1 ), wxTE_LEFT );
+      pSoundSizer->Add( new wxStaticText( itemPanelFont, wxID_ANY, _( "Audio Play command:" ) ), 0, wxALIGN_CENTER_HORIZONTAL | wxALL );
+      pSoundSizer->Add( pCmdSoundString, 1, wxEXPAND | wxALIGN_LEFT, border_size );
+  }
+#endif /* USE_SYSTEM_CMD_SOUND */
 
-  if (OCPN_Sound::DeviceCount() > 1) {
-    pSoundDeviceIndex->Show();
+  OcpnSound* sound = SoundFactory();
+  int deviceCount = sound->DeviceCount();
+  wxLogMessage("options: got device count: %d", deviceCount);
+  if (deviceCount >= 1) {
+    wxArrayString labels;
+    for (int i = 0; i < deviceCount; i += 1) {
+        if (!sound->IsOutputDevice(i)) {
+            continue;
+        }
+        wxString label(sound->GetDeviceInfo(i));
+        if (label == "")  {
+            label = _("Unknown device :") + std::to_string(i);
+        }
+        labels.Add(label);
+    }
+    pSoundDeviceIndex = new wxChoice();
+    if (pSoundDeviceIndex) {
+        pSoundDeviceIndex->Create(itemPanelFont,
+            wxID_ANY,
+            wxDefaultPosition,
+            wxDefaultSize,
+            labels);
+        pSoundDeviceIndex->SetSelection(g_iSoundDeviceIndex);
+        pSoundDeviceIndex->Show();
+        wxFlexGridSizer* pSoundDeviceIndexGrid = new wxFlexGridSizer(2);
+        miscOptions->Add(pSoundDeviceIndexGrid, 0, wxALL | wxEXPAND,
+            group_item_spacing);
 
-    wxFlexGridSizer* pSoundDeviceIndexGrid = new wxFlexGridSizer(2);
-    miscOptions->Add(pSoundDeviceIndexGrid, 0, wxALL | wxEXPAND,
-                     group_item_spacing);
-
-    wxStaticText* stSoundDeviceIndex =
-        new wxStaticText(itemPanelFont, wxID_STATIC, _("Sound Device Index"));
-    pSoundDeviceIndexGrid->Add(stSoundDeviceIndex, 0, wxALL, 5);
-    pSoundDeviceIndex->SetRange(-1, OCPN_Sound::DeviceCount() - 1);
-    pSoundDeviceIndexGrid->Add(pSoundDeviceIndex, 0, wxALL, border_size);
+        wxStaticText* stSoundDeviceIndex =
+            new wxStaticText(itemPanelFont, wxID_STATIC, _("Sound Device"));
+        pSoundDeviceIndexGrid->Add(stSoundDeviceIndex, 0, wxALL, 5);
+        pSoundDeviceIndexGrid->Add(pSoundDeviceIndex, 0, wxALL, border_size);
+    }
   }
 
   //  Mobile/Touchscreen checkboxes
@@ -5800,6 +5877,10 @@ void options::SetInitialSettings(void) {
   m_itemRadarRingsUnits->SetSelection(g_pNavAidRadarRingsStepUnits);
   m_colourOwnshipRangeRingColour->SetColour(g_colourOwnshipRangeRingsColour);
   
+  pScaMinChckB->SetValue( g_bUseWptScaMin );
+  m_pText_ScaMin->SetValue( wxString::Format(_T("%i"), g_iWpt_ScaMin ));
+  pScaMinOverruleChckB->SetValue( g_bOverruleScaMin );
+  
   OnRadarringSelect(eDummy);
 
   if (g_iWaypointRangeRingsNumber > 10) g_iWaypointRangeRingsNumber = 10;
@@ -5820,7 +5901,12 @@ void options::SetInitialSettings(void) {
 
   if(pPreserveScale) pPreserveScale->SetValue(g_bPreserveScaleOnX);
   pPlayShipsBells->SetValue(g_bPlayShipsBells);
-  pSoundDeviceIndex->SetValue(g_iSoundDeviceIndex);
+
+  if ( g_bUIexpert && pCmdSoundString )
+      pCmdSoundString->SetValue(g_CmdSoundString);
+
+  if (pSoundDeviceIndex)
+      pSoundDeviceIndex->SetSelection(g_iSoundDeviceIndex);
   //    pFullScreenToolbar->SetValue( g_bFullscreenToolbar );
   pTransparentToolbar->SetValue(g_bTransparentToolbar);
   pSDMMFormat->Select(g_iSDMMFormat);
@@ -5972,7 +6058,7 @@ void options::SetInitialSettings(void) {
   //  Reset the touch flag...
   connectionsaved = true;
   
-          
+  SetSelectedConnectionPanel( nullptr);
   
 }
 
@@ -6493,6 +6579,20 @@ ConnectionParams* options::CreateConnectionParamsFromSelectedItem(void) {
 
   ConnectionParams* pConnectionParams = new ConnectionParams();
 
+  UpdateConnectionParamsFromSelectedItem( pConnectionParams );
+  
+  ConnectionParamsPanel *pPanel = new ConnectionParamsPanel( m_scrollWinConnections, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+                             pConnectionParams, this);
+  pPanel->SetSelected(false);
+  boxSizerConnections->Add( pPanel, 0, wxEXPAND|wxALL, 0 );
+  pConnectionParams->m_optionsPanel = pPanel;
+
+  return pConnectionParams;
+
+}
+
+ConnectionParams* options::UpdateConnectionParamsFromSelectedItem(ConnectionParams *pConnectionParams) {
+
   pConnectionParams->Valid = TRUE;
   if (m_rbTypeSerial->GetValue())
     pConnectionParams->Type = SERIAL;
@@ -6637,6 +6737,10 @@ void options::OnApplyClick(wxCommandEvent& event) {
   icon_name = pWayPointMan->GetIconKey( pRoutepointDefaultIconChoice->GetSelection() );
   if(icon_name && icon_name->Length())
     g_default_routepoint_icon = *icon_name;
+  
+  g_bUseWptScaMin = pScaMinChckB->GetValue();
+  g_iWpt_ScaMin = wxAtoi( m_pText_ScaMin->GetValue() );
+  g_bOverruleScaMin = pScaMinOverruleChckB->GetValue();
 
   //  Any Font changes?
   if(m_bfontChanged)
@@ -6724,40 +6828,64 @@ void options::OnApplyClick(wxCommandEvent& event) {
   int lastPort = 0;
   NetworkProtocol lastNetProtocol = PROTO_UNDEFINED;
   
-  int itemIndex = -1;
-  if (mSelectedConnectionPanel) {
-    ConnectionParams* cpo = mSelectedConnectionPanel->m_pConnectionParams;
-    if (cpo) {
-      lastAddr = cpo->NetworkAddress;
-      lastPort = cpo->NetworkPort;
-      lastNetProtocol = cpo->NetProtocol;
-      itemIndex = mSelectedConnectionPanel->m_index;
-    }
+  if (mSelectedConnection) {
+    ConnectionParams* cpo = mSelectedConnection;
+    lastAddr = cpo->NetworkAddress;
+    lastPort = cpo->NetworkPort;
+    lastNetProtocol = cpo->NetProtocol;
   }
 
   if (!connectionsaved) {
-    ConnectionParams* cp = CreateConnectionParamsFromSelectedItem();
-    if (cp != NULL) {
-      if (itemIndex >= 0) {
-        g_pConnectionParams->RemoveAt(itemIndex);
-        g_pConnectionParams->Insert(cp, itemIndex);
+    size_t nCurrentPanelCount = g_pConnectionParams->GetCount();
+    ConnectionParams *cp = NULL;
+    int old_priority = -1;
+    {
+      if (mSelectedConnection) {
+        cp =  mSelectedConnection;
+        old_priority = cp->Priority;
+        UpdateConnectionParamsFromSelectedItem( cp );
+        cp->b_IsSetup = false;
+
+        //delete g_pConnectionParams->Item(itemIndex)->m_optionsPanel;
+        //old_priority = g_pConnectionParams->Item(itemIndex)->Priority;
+        //g_pConnectionParams->RemoveAt(itemIndex);
+        //g_pConnectionParams->Insert(cp, itemIndex);
+        //mSelectedConnection = cp;
+        //cp->m_optionsPanel->SetSelected( true );
       } else {
-        g_pConnectionParams->Add(cp);
+        cp = CreateConnectionParamsFromSelectedItem();
+        if(cp)
+            g_pConnectionParams->Add(cp);
       }
 
       //  Record the previous parameters, if any
-      cp->LastNetProtocol = lastNetProtocol;
-      cp->LastNetworkAddress = lastAddr;
-      cp->LastNetworkPort = lastPort;
+      if(cp){
+        cp->LastNetProtocol = lastNetProtocol;
+        cp->LastNetworkAddress = lastAddr;
+        cp->LastNetworkPort = lastPort;
+      }
 
-      FillSourceList();
-//      m_lcSources->SetItemState(itemIndex, wxLIST_STATE_SELECTED, wxLIST_STATE_SELECTED);
-//      m_lcSources->Refresh();
+      if(g_pConnectionParams->GetCount() != nCurrentPanelCount)
+        FillSourceList();
+      else if(old_priority >= 0){
+          if(old_priority != cp->Priority)             // need resort
+             UpdateSourceList( true );
+          else
+             UpdateSourceList( false );
+      }
+          
+
+              
+      
       connectionsaved = TRUE;
-    } else {
-      ::wxEndBusyCursor();
-      if (m_bNMEAParams_shown) event.SetInt(wxID_STOP);
     }
+//     else {
+//       ::wxEndBusyCursor();
+//       if (m_bNMEAParams_shown) event.SetInt(wxID_STOP);
+//     }
+    
+    SetSelectedConnectionPanel( nullptr );
+
   }
 
   // Recreate datastreams that are new, or have been edited
@@ -6866,8 +6994,17 @@ void options::OnApplyClick(wxCommandEvent& event) {
 
   if(pPreserveScale) g_bPreserveScaleOnX = pPreserveScale->GetValue();
 
+  if ( g_bUIexpert && pCmdSoundString) {
+      g_CmdSoundString = pCmdSoundString->GetValue( );
+      if ( wxIsEmpty( g_CmdSoundString ) ) {
+          g_CmdSoundString = wxString( SYSTEM_SOUND_CMD );
+          pCmdSoundString->SetValue( g_CmdSoundString );
+      }
+  }
+
   g_bPlayShipsBells = pPlayShipsBells->GetValue();
-  g_iSoundDeviceIndex = pSoundDeviceIndex->GetValue();
+  if (pSoundDeviceIndex)
+      g_iSoundDeviceIndex = pSoundDeviceIndex->GetSelection();
   g_bTransparentToolbar = pTransparentToolbar->GetValue();
   g_iSDMMFormat = pSDMMFormat->GetSelection();
   g_iDistanceFormat = pDistanceFormat->GetSelection();
@@ -7975,33 +8112,17 @@ void options::OnButtonSelectSound(wxCommandEvent& event) {
   if (response == wxID_OK) {
     g_sAIS_Alert_Sound_File = g_Platform->NormalizePath(sel_file);
 
-    g_anchorwatch_sound.UnLoad();
+    g_anchorwatch_sound->Stop();
   }
 }
 
 void options::OnButtonTestSound(wxCommandEvent& event) {
-  OCPN_Sound AIS_Sound;
-  AIS_Sound.Create(g_sAIS_Alert_Sound_File);
-
-  if (AIS_Sound.IsOk()) {
-#if defined(__OCPN__ANDROID__)
-    qDebug() << "Options play";
-    AIS_Sound.Play();
-#else
-#if defined(__WXMSW__) || defined(__WXOSX__)
-    AIS_Sound.Play(wxSOUND_SYNC);
-#else
-    AIS_Sound.Play();
-    int t = 0;
-    while (AIS_Sound.IsPlaying() && (t < 5)) {
-      wxSleep(1);
-      t++;
-    }
-    if (AIS_Sound.IsPlaying()) AIS_Sound.Stop();
-#endif
-#endif
-  }
+    std::unique_ptr<OcpnSound> AIS_Sound(SoundFactory());
+    AIS_Sound->SetCmd( g_CmdSoundString.mb_str( wxConvUTF8 ) );
+    AIS_Sound->Load(g_sAIS_Alert_Sound_File, g_iSoundDeviceIndex);
+    AIS_Sound->Play();
 }
+
 
 wxString GetOCPNKnownLanguage(wxString lang_canonical, wxString& lang_dir) {
   wxString return_string;
@@ -8758,6 +8879,7 @@ void options::ShowNMEACommon(bool visible) {
     sbSizerOutFilter->SetDimension(0, 0, 0, 0);
     sbSizerInFilter->SetDimension(0, 0, 0, 0);
     sbSizerConnectionProps->SetDimension(0, 0, 0, 0);
+    m_sbConnEdit->SetLabel(_T(""));
   }
   m_bNMEAParams_shown = visible;
 }
@@ -8813,10 +8935,10 @@ void options::SetNMEAFormToSerial(void) {
   ShowNMEASerial(TRUE);
 
   m_pNMEAForm->FitInside();
-  m_pNMEAForm->Layout();
+//  m_pNMEAForm->Layout();
   Fit();
-  Layout();
-  RecalculateSize();
+//  Layout();
+//  RecalculateSize();
   SetDSFormRWStates();
 }
 
@@ -8827,10 +8949,10 @@ void options::SetNMEAFormToNet(void) {
   ShowNMEABT(FALSE);
   ShowNMEASerial(FALSE);
   m_pNMEAForm->FitInside();
-  m_pNMEAForm->Layout();
+//  m_pNMEAForm->Layout();
   Fit();
-  Layout();
-  RecalculateSize();
+//  Layout();
+//  RecalculateSize();
   SetDSFormRWStates();
 }
 
@@ -8841,10 +8963,10 @@ void options::SetNMEAFormToGPS(void) {
   ShowNMEABT(FALSE);
   ShowNMEASerial(FALSE);
   m_pNMEAForm->FitInside();
-  m_pNMEAForm->Layout();
+//  m_pNMEAForm->Layout();
   Fit();
-  Layout();
-  RecalculateSize();
+//  Layout();
+//  RecalculateSize();
   SetDSFormRWStates();
 }
 
@@ -8855,10 +8977,10 @@ void options::SetNMEAFormToBT(void) {
   ShowNMEABT(TRUE);
   ShowNMEASerial(FALSE);
   m_pNMEAForm->FitInside();
-  m_pNMEAForm->Layout();
+//  m_pNMEAForm->Layout();
   Fit();
-  Layout();
-  RecalculateSize();
+//  Layout();
+//  RecalculateSize();
   SetDSFormRWStates();
 }
 
@@ -8869,10 +8991,10 @@ void options::ClearNMEAForm(void) {
   ShowNMEABT(FALSE);
   ShowNMEASerial(FALSE);
   m_pNMEAForm->FitInside();
-  m_pNMEAForm->Layout();
+//  m_pNMEAForm->Layout();
   Fit();
-  Layout();
-  RecalculateSize();
+//  Layout();
+//  RecalculateSize();
 }
 
 wxString StringArrayToString(wxArrayString arr) {
@@ -9017,51 +9139,130 @@ void options::SetDefaultConnectionParams(void) {
   
 }
 
-void options::OnAddDatasourceClick(wxCommandEvent& event) {
- 
-  //  Unselect all panels
-  for( size_t i=0 ; i < mConnectionsPanelList.size() ; i++)
-    mConnectionsPanelList[i]->SetSelected(false);;
-
-  connectionsaved = FALSE;
-  SetDefaultConnectionParams();
-
-  m_buttonRemove->Disable();
-
-  RecalculateSize();
-}
+bool options::SortSourceList(void) {
+    
+    if(g_pConnectionParams->Count() < 2)
+        return false;
+    
+    std::vector<int> ivec;
+    for (size_t i = 0; i < g_pConnectionParams->Count(); i++)
+        ivec.push_back(i);
+    
+    bool did_sort = false;
+    bool did_swap = true;
+    while(did_swap){
+        did_swap = false;
+        for (size_t j=1 ; j < ivec.size() ; j++){
+            ConnectionParams *c1 = g_pConnectionParams->Item(ivec[j]);
+            ConnectionParams *c2 = g_pConnectionParams->Item(ivec[j-1]);
+            
+            if(c1->Priority > c2->Priority){
+                int t = ivec[j-1];
+                ivec[j-1] = ivec[j];
+                ivec[j] = t;
+                did_swap = true;
+                did_sort = true;
+            }
+        }
+    }
+    
+    //if(did_sort)
+    {
+        boxSizerConnections = new wxBoxSizer(wxVERTICAL);
+        m_scrollWinConnections->SetSizer(boxSizerConnections );
+        
+        for(size_t i=0 ; i < ivec.size() ; i++){
+            ConnectionParamsPanel *pPanel = g_pConnectionParams->Item(ivec[i])->m_optionsPanel;
+            boxSizerConnections->Add( pPanel, 0, wxEXPAND|wxALL, 0 );
+        }
+    }
+    
+    return did_sort;
+    
+}           
 
 void options::FillSourceList(void) {
   m_buttonRemove->Enable(FALSE);
   
-  //  Remove all panels
-  for( size_t i=0 ; i < mConnectionsPanelList.size() ; i++)
-    delete mConnectionsPanelList[i];
-  mConnectionsPanelList.clear();
-  
+  // Add new panels as necessary
   for (size_t i = 0; i < g_pConnectionParams->Count(); i++) {
-      ConnectionParamsPanel *pPanel = new ConnectionParamsPanel( m_scrollWinConnections, wxID_ANY, wxDefaultPosition, wxDefaultSize,
-                             g_pConnectionParams->Item(i), this, i);
-      pPanel->SetSelected(false);
-      boxSizerConnections->Add( pPanel, 0, wxEXPAND|wxALL, 0 );
-      mConnectionsPanelList.push_back(pPanel);
+      
+      if(!g_pConnectionParams->Item(i)->m_optionsPanel){
+            ConnectionParamsPanel *pPanel = new ConnectionParamsPanel( m_scrollWinConnections, wxID_ANY, wxDefaultPosition, wxDefaultSize,
+                             g_pConnectionParams->Item(i), this);
+            pPanel->SetSelected(false);
+            boxSizerConnections->Add( pPanel, 0, wxEXPAND|wxALL, 0 );
+            g_pConnectionParams->Item(i)->m_optionsPanel = pPanel;
+      }
+      else{
+          g_pConnectionParams->Item(i)->m_optionsPanel->Update(g_pConnectionParams->Item(i));
+      }
 
   }
-  boxSizerConnections->Layout();
+  SortSourceList();
+  m_scrollWinConnections->Layout();
   
-  mSelectedConnectionPanel = NULL;
-  m_buttonAdd->SetLabel(_("Add Connection"));
+  mSelectedConnection = NULL;
+  m_buttonAdd->Enable( true );
 
 }
 
-void options::OnRemoveDatasourceClick(wxCommandEvent& event) {
-  if(mSelectedConnectionPanel){
-      g_pConnectionParams->RemoveAt(mSelectedConnectionPanel->m_index);
+void options::UpdateSourceList( bool bResort ) {
+   
+    for (size_t i = 0; i < g_pConnectionParams->Count(); i++){
+        ConnectionParams *cp = g_pConnectionParams->Item(i);
+        ConnectionParamsPanel *panel = cp->m_optionsPanel;
+        if(panel)
+            panel->Update(g_pConnectionParams->Item(i));
+    }
 
-      DataStream* pds_existing = g_pMUX->FindStream(mSelectedConnectionPanel->m_pConnectionParams->GetDSPort());
-      if (pds_existing)
-          g_pMUX->StopAndRemoveStream(pds_existing);
-      
+    if(bResort){
+        SortSourceList();
+    }
+    
+    m_scrollWinConnections->Layout();
+}
+
+void options::OnAddDatasourceClick(wxCommandEvent& event) {
+ 
+  //  Unselect all panels
+  for (size_t i = 0; i < g_pConnectionParams->Count(); i++) 
+    g_pConnectionParams->Item(i)->m_optionsPanel->SetSelected( false );
+
+  connectionsaved = FALSE;
+  SetDefaultConnectionParams();
+  m_sbConnEdit->SetLabel(_T("Configure new connection"));
+
+  m_buttonRemove->Disable();
+  m_buttonAdd->Disable();
+
+  RecalculateSize();
+}
+
+
+void options::OnRemoveDatasourceClick(wxCommandEvent& event) {
+  if(mSelectedConnection){
+      // Find the index
+      int index = -1;
+      ConnectionParams *cp = NULL;
+      for (size_t i = 0; i < g_pConnectionParams->Count(); i++){
+        cp = g_pConnectionParams->Item(i);
+        if(mSelectedConnection == cp){
+            index = i;
+            break;
+        }
+      }
+            
+      if((index >= 0) && (cp)){
+        delete g_pConnectionParams->Item(index)->m_optionsPanel;  
+        g_pConnectionParams->RemoveAt(index);
+
+        DataStream* pds_existing = g_pMUX->FindStream(cp->GetDSPort());
+        if (pds_existing)
+            g_pMUX->StopAndRemoveStream(pds_existing);
+        //delete mSelectedConnection->m_optionsPanel;
+        mSelectedConnection = NULL;
+      }
    }
 
   //  Mark connection deleted
@@ -9082,23 +9283,26 @@ void options::OnSelectDatasource(wxListEvent& event) {
 
 void options::SetSelectedConnectionPanel( ConnectionParamsPanel *panel ) {
   //  Only one panel can be selected at any time  
-  //  Clear all selections
+  //  Clear any selections
 
-  for( size_t i=0 ; i < mConnectionsPanelList.size() ; i++)
-    mConnectionsPanelList[i]->SetSelected( false );
+  if(mSelectedConnection && mSelectedConnection->m_optionsPanel)
+      mSelectedConnection->m_optionsPanel->SetSelected( false );
   
-  mSelectedConnectionPanel = panel;
   if(panel){
+    mSelectedConnection = panel->m_pConnectionParams;
     panel->SetSelected( true );  
-    SetConnectionParams(panel->m_pConnectionParams);
+    SetConnectionParams(mSelectedConnection);
     m_buttonRemove->Enable();
     m_buttonAdd->Disable();
-    m_buttonAdd->SetLabel(_("Editing connection..."));
+    m_sbConnEdit->SetLabel(_T("Edit selected connection"));
+
   }
   else{
+    mSelectedConnection = NULL;
     m_buttonRemove->Disable();
     m_buttonAdd->Enable();
-    m_buttonAdd->SetLabel(_("Add Connection"));
+    m_sbConnEdit->SetLabel(_T(""));
+    ClearNMEAForm();
   }
      
 }

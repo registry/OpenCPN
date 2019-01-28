@@ -24,6 +24,7 @@
 
 #include "wx/tokenzr.h"
 
+#include "SoundFactory.h"
 #include "AIS_Decoder.h"
 #include "AIS_Target_Data.h"
 #include "AISTargetAlertDialog.h"
@@ -35,6 +36,7 @@
 #include "pluginmanager.h"
 #include "Track.h"
 #include <multiplexer.h>
+#include "config.h"
 
 #if !defined(NAN)
     static const long long lNaN = 0xfff8000000000000;
@@ -77,7 +79,7 @@ extern int      g_Show_Target_Name_Scale;
 extern bool     g_bAllowShowScaled;
 extern bool     g_bShowScaled;
 extern bool     g_bInlandEcdis;
-
+extern int      g_iSoundDeviceIndex;
 extern bool     g_bWplIsAprsPosition;
 extern double gLat;
 extern double gLon;
@@ -97,14 +99,18 @@ extern OCPNPlatform     *g_Platform;
 extern PlugInManager             *g_pi_manager;
 extern Multiplexer      *g_pMUX;
 
+extern wxString g_CmdSoundString;
+
 bool g_benableAISNameCache;
 bool g_bUseOnlyConfirmedAISName;
 wxString GetShipNameFromFile(int);
 
+wxDEFINE_EVENT(SOUND_PLAYED_EVTYPE, wxCommandEvent);
+
 BEGIN_EVENT_TABLE(AIS_Decoder, wxEvtHandler)
     EVT_TIMER(TIMER_AIS1, AIS_Decoder::OnTimerAIS)
-    EVT_TIMER(TIMER_AISAUDIO, AIS_Decoder::OnTimerAISAudio)
     EVT_TIMER(TIMER_DSC, AIS_Decoder::OnTimerDSC)
+    EVT_COMMAND(wxID_ANY, SOUND_PLAYED_EVTYPE, AIS_Decoder::OnSoundFinishedAISAudio)
 END_EVENT_TABLE()
 
 static int n_msgs;
@@ -119,6 +125,17 @@ static double arpa_ref_hdg = NAN;
 
 extern  const wxEventType wxEVT_OCPN_DATASTREAM;
 extern int              gps_watchdog_timeout_ticks;
+extern bool g_bquiting;
+
+static void onSoundFinished(void* ptr)
+{
+    if (!g_bquiting) {
+        auto aisDecoder = static_cast<AIS_Decoder*>(ptr);
+        wxCommandEvent ev(SOUND_PLAYED_EVTYPE);
+        wxPostEvent(aisDecoder, ev);
+    }
+}
+
 
 AIS_Decoder::AIS_Decoder( wxFrame *parent )
 {
@@ -157,10 +174,13 @@ AIS_Decoder::AIS_Decoder( wxFrame *parent )
 
     g_pais_alert_dialog_active = NULL;
     m_bAIS_Audio_Alert_On = false;
+    m_AIS_Sound = 0;
 
     m_n_targets = 0;
 
     m_parent_frame = parent;
+
+    m_bAIS_AlertPlaying = false;
 
     TimerAIS.SetOwner(this, TIMER_AIS1);
     TimerAIS.Start(TIMER_AIS_MSEC,wxTIMER_CONTINUOUS);
@@ -287,8 +307,8 @@ void AIS_Decoder::BuildERIShipTypeHash(void)
       make_hash_ERI(8441, _("Ferry"));
       make_hash_ERI(8442, _("Red cross ship"));
       make_hash_ERI(8443, _("Cruise ship"));
-      make_hash_ERI(8444, _("Passenger ship without accomodation"));
-      make_hash_ERI(8460, _("Vessel, work maintainance craft, floating derrick, cable-ship, buoy-ship, dredge"));
+      make_hash_ERI(8444, _("Passenger ship without accommodation"));
+      make_hash_ERI(8460, _("Vessel, work maintenance craft, floating derrick, cable-ship, buoy-ship, dredge"));
       make_hash_ERI(8480, _("Fishing boat"));
       make_hash_ERI(8500, _("Barge, tanker, chemical"));
       make_hash_ERI(1500, _("General cargo Vessel maritime"));
@@ -2293,22 +2313,11 @@ void AIS_Decoder::UpdateOneCPA( AIS_Target_Data *ptarget )
     }
 }
 
-void AIS_Decoder::OnTimerAISAudio( wxTimerEvent& event )
+void AIS_Decoder::OnSoundFinishedAISAudio( wxCommandEvent& event )
 {
-    if( g_bAIS_CPA_Alert_Audio && m_bAIS_Audio_Alert_On ) {
-        if(!m_AIS_Sound.IsOk() )
-             m_AIS_Sound.Create( g_sAIS_Alert_Sound_File );
-             
-#ifndef __WXMSW__
-       if( m_AIS_Sound.IsOk() && !m_AIS_Sound.IsPlaying())
-            m_AIS_Sound.Play();
-#else
-       if( m_AIS_Sound.IsOk() )
-                m_AIS_Sound.Play();
-#endif
-    }
-    
-    m_AIS_Audio_Alert_Timer.Start( TIMER_AIS_AUDIO_MSEC, wxTIMER_CONTINUOUS );
+    // By clearing this flag the main event loop will trigger repeated
+    // sounds for as long as the alert condition remains.
+    m_bAIS_AlertPlaying = false;
 }
 
 void AIS_Decoder::OnTimerDSC( wxTimerEvent& event )
@@ -2591,24 +2600,22 @@ void AIS_Decoder::OnTimerAIS( wxTimerEvent& event )
         m_bAIS_Audio_Alert_On = false;
 
     if( m_bAIS_Audio_Alert_On ) {
-        if( !m_AIS_Audio_Alert_Timer.IsRunning() ) {
-            m_AIS_Audio_Alert_Timer.SetOwner( this, TIMER_AISAUDIO );
-            m_AIS_Audio_Alert_Timer.Start( TIMER_AIS_AUDIO_MSEC );
-
-            if( !m_AIS_Sound.IsOk() )
-                m_AIS_Sound.Create( g_sAIS_Alert_Sound_File );
-            
-#ifndef __WXMSW__
-            if( m_AIS_Sound.IsOk() && !m_AIS_Sound.IsPlaying())
-                m_AIS_Sound.Play();
-#else
-            if( m_AIS_Sound.IsOk() )
-                m_AIS_Sound.Play();
-#endif
+        if (!m_AIS_Sound) {
+            m_AIS_Sound = SoundFactory();
         }
-    } else
-        m_AIS_Audio_Alert_Timer.Stop();
-
+        if ( !AIS_AlertPlaying() ) {
+            m_bAIS_AlertPlaying = true;
+            m_AIS_Sound->SetCmd( g_CmdSoundString.mb_str( wxConvUTF8 ) );
+            m_AIS_Sound->Load(g_sAIS_Alert_Sound_File, g_iSoundDeviceIndex);
+            if ( m_AIS_Sound->IsOk( ) ) {
+                m_AIS_Sound->SetFinishedCallback( onSoundFinished, this );
+                if ( !m_AIS_Sound->Play( ) )
+                    m_bAIS_AlertPlaying = false;
+            }
+            else
+                m_bAIS_AlertPlaying = false;
+        }
+    }
     //  If a SART Alert is active, check to see if the MMSI has special properties set 
     //  indicating that this Alert is a MOB for THIS ship.
     if(palert_target && (palert_target->Class == AIS_SART) ){

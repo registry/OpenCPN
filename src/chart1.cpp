@@ -22,6 +22,7 @@
  *   Free Software Foundation, Inc.,                                       *
  *   51 Franklin Street, Fifth Floor, Boston, MA 02110-1301,  USA.         *
  **************************************************************************/
+#include <memory>
 #include "wx/wxprec.h"
 
 #ifndef  WX_PRECOMP
@@ -45,7 +46,6 @@
 #include <wx/clrpicker.h>
 #include "wx/tokenzr.h"
 #include "wx/dir.h"
-
 #include <wx/dialog.h>
 
 #include "dychart.h"
@@ -86,7 +86,8 @@
 #include "tcmgr.h"
 #include "ais.h"
 #include "chartimg.h"               // for ChartBaseBSB
-#include "routeprop.h"
+#include "MarkInfo.h"
+#include "RoutePropDlgImpl.h"
 #include "toolbar.h"
 #include "compass.h"
 #include "datastream.h"
@@ -121,6 +122,8 @@
 #include "CanvasConfig.h"
 #include "ConfigMgr.h"
 #include "MUIBar.h"
+#include "OCPN_Sound.h"
+#include "SoundFactory.h"
 
 #ifdef ocpnUSE_GL
 #include "glChartCanvas.h"
@@ -149,10 +152,6 @@
 #endif
 
 #include <wx/jsonreader.h>
-
-#ifdef OCPN_USE_PORTAUDIO
-#include "portaudio.h"
-#endif
 
 #ifdef __OCPN__ANDROID__
 #include "androidUTIL.h"
@@ -189,6 +188,7 @@ void RedirectIOToConsole();
 OCPNPlatform              *g_Platform;
 
 bool                      g_bFirstRun;
+bool                      g_bUpgradeInProcess;
 
 bool                      g_bPauseTest;
 int                       g_unit_test_1;
@@ -226,7 +226,7 @@ Select                    *pSelectAIS;
 Routeman                  *g_pRouteMan;
 WayPointman               *pWayPointMan;
 MarkInfoDlg               *g_pMarkInfoDialog;
-RouteProp                 *pRoutePropDialog;
+RoutePropDlgImpl          *pRoutePropDialog;
 TrackPropDlg              *pTrackPropDialog;
 RouteManagerDialog        *pRouteManagerDialog;
 GoToPositionDialog        *pGoToPositionDialog;
@@ -280,9 +280,10 @@ wxArrayOfConnPrm          *g_pConnectionParams;
 
 wxDateTime                g_start_time;
 wxDateTime                g_loglast_time;
-OCPN_Sound                bells_sound[2];
+static OcpnSound* _bells_sounds[]  = {SoundFactory(), SoundFactory()};
+std::vector<OcpnSound*>   bells_sound(_bells_sounds, _bells_sounds + 2  );
 
-OCPN_Sound                g_anchorwatch_sound;
+OcpnSound*                g_anchorwatch_sound = SoundFactory();
 
 RoutePoint                *pAnchorWatchPoint1;
 RoutePoint                *pAnchorWatchPoint2;
@@ -334,6 +335,9 @@ wxColour                  g_colourWaypointRangeRingsColour;
 bool                      g_bWayPointPreventDragging;
 bool                      g_bConfirmObjectDelete;
 wxColour                  g_colourOwnshipRangeRingsColour;
+int                       g_iWpt_ScaMin;
+bool                      g_bUseWptScaMin;
+bool                      g_bShowWptName;
 
 // Set default color scheme
 ColorScheme               global_color_scheme = GLOBAL_COLOR_SCHEME_DAY;
@@ -433,6 +437,7 @@ bool                      g_bAIS_CPA_Alert;
 bool                      g_bAIS_CPA_Alert_Audio;
 AISTargetAlertDialog      *g_pais_alert_dialog_active;
 AISTargetQueryDialog      *g_pais_query_dialog_active;
+int                       g_iSoundDeviceIndex;
 
 int                       g_ais_alert_dialog_x, g_ais_alert_dialog_y;
 int                       g_ais_alert_dialog_sx, g_ais_alert_dialog_sy;
@@ -736,6 +741,8 @@ extern options          *g_pOptions;
 int n_NavMessageShown;
 wxString g_config_version_string;
 
+wxString g_CmdSoundString;
+
 bool             g_btouch;
 bool             g_bresponsive;
 
@@ -762,6 +769,9 @@ unsigned int     g_canvasConfig;
 bool             g_useMUI;
 bool             g_bmasterToolbarFull = true;
 bool             g_bEffects = true;
+
+int              g_memUsed;
+SENCThreadManager *g_SencThreadManager;
 
 WX_DEFINE_ARRAY_PTR(ChartCanvas*, arrayofCanvasPtr);
 
@@ -1127,6 +1137,9 @@ void LoadS57()
     if(ps52plib) // already loaded?
         return;
 
+    //  Start a SENC Thread manager
+    g_SencThreadManager = new SENCThreadManager();
+
 //      Set up a useable CPL library error handler for S57 stuff
     CPLSetErrorHandler( MyCPLErrorHandler );
 
@@ -1473,19 +1486,19 @@ void ParseAllENC()
     
     int thread_count = 0;
     ParseENCWorkerThread **workers = NULL;
-    /*    
-     *    extern int              g_nCPUCount;
-     *    if(g_nCPUCount > 0)
-     *        thread_count = g_nCPUCount;
-     *    else
-     *        thread_count = wxThread::GetCPUCount();
-     *        
-     *    if (thread_count < 1) {
-     *        // obviously there's a least one CPU!
-     *        thread_count = 1;
-     }
-     */
-    thread_count = 1; // for now because there is a problem with more than 1
+        
+    extern int              g_nCPUCount;
+    if(g_nCPUCount > 0)
+        thread_count = g_nCPUCount;
+    else
+        thread_count = wxThread::GetCPUCount();
+            
+    if (thread_count < 1) {
+        // obviously there's a least one CPU!
+        thread_count = 1;
+    }
+    
+    //thread_count = 1; // for now because there is a problem with more than 1
     
     #if 0    
     workers = new ParseENCWorkerThread*[thread_count];
@@ -1564,8 +1577,9 @@ void ParseAllENC()
                 
                 newChart->SetNativeScale(scale);
                 newChart->SetFullExtent(ext);
+                newChart->DisableBackgroundSENC();
                 
-                newChart->FindOrCreateSenc(filename);
+                newChart->FindOrCreateSenc(filename, false);    // no progress dialog required
                 delete newChart;
                 
                 if(wxThread::IsMain()){
@@ -1964,6 +1978,9 @@ bool MyApp::OnInit()
     wxLogMessage( _T("wxLocale support not available") );
 #endif
 
+    // Is this an upgrade? 
+    g_bUpgradeInProcess = (vs != g_config_version_string);
+    
 //  Send the Welcome/warning message if it has never been sent before,
 //  or if the version string has changed at all
 //  We defer until here to allow for localization of the message
@@ -2032,6 +2049,11 @@ bool MyApp::OnInit()
     g_memCacheLimit = 100 * 1024;
 #endif
 
+#ifdef __WXMAC__
+    g_memCacheLimit = 400 * 1024;
+    //g_nCacheLimit = 20;
+#endif    
+
 //      Establish location and name of chart database
     ChartListFileName = newPrivateFileName(g_Platform->GetPrivateDataDir(), "chartlist.dat", "CHRTLIST.DAT");
 
@@ -2085,9 +2107,6 @@ bool MyApp::OnInit()
         g_sAIS_Alert_Sound_File = g_Platform->NormalizePath(default_sound);
     }
 
-
-    g_StartTime = wxInvalidDateTime;
-    g_StartTimeTZ = 1;                // start with local times
     gpIDX = NULL;
     gpIDXn = 0;
 
@@ -2163,7 +2182,7 @@ bool MyApp::OnInit()
     app_style |= wxWANTS_CHARS;
 
 // Create the main frame window
-    wxString myframe_window_title = wxString::Format(wxT("OpenCPN %i.%i.%i"),
+    wxString myframe_window_title = wxString::Format(wxT("OpenCPN %i.%i.%s"),
             VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH); //Gunther
 
     if( g_bportable ) {
@@ -2178,6 +2197,9 @@ bool MyApp::OnInit()
 
     gFrame = new MyFrame( NULL, myframe_window_title, position, new_frame_size, app_style ); //Gunther
     
+    //  Do those platform specific initialization things that need gFrame
+    g_Platform->Initialize_3();
+
 //  Initialize the Plugin Manager
     g_pi_manager = new PlugInManager( gFrame );
 
@@ -2506,7 +2528,7 @@ extern ocpnGLOptions g_GLOptions;
 
     wxLogMessage( wxString::Format(_("OpenCPN Initialized in %ld ms."), init_sw.Time() ) );
 
-    OCPNPlatform::Initialize_3( );
+    OCPNPlatform::Initialize_4( );
     
     if( n_NavMessageShown == 1 ) {
         //In case the user accepted the "not for navigation" nag, persist it here...
@@ -2620,12 +2642,6 @@ int MyApp::OnExit()
 #endif
 #endif
 
-#ifdef OCPN_USE_PORTAUDIO
-    if(portaudio_initialized)
-        Pa_Terminate();
-#endif
-
-
     //      Restore any changed system colors
 #ifdef __WXMSW__
     RestoreSystemColors();
@@ -2696,6 +2712,7 @@ EVT_POWER_SUSPENDED(MyFrame::OnSuspended)
 EVT_POWER_SUSPEND_CANCEL(MyFrame::OnSuspendCancel)
 EVT_POWER_RESUME(MyFrame::OnResume)
 #endif // wxHAS_POWER_EVENTS
+
 END_EVENT_TABLE()
 
 // My frame constructor
@@ -2787,7 +2804,8 @@ MyFrame::MyFrame( wxFrame *frame, const wxString& title, const wxPoint& pos, con
 
     Connect( wxEVT_OCPN_THREADMSG, (wxObjectEventFunction) (wxEventFunction) &MyFrame::OnEvtTHREADMSG );
 
-
+    //  And from the thread SENC creator
+    Connect( wxEVT_OCPN_BUILDSENCTHREAD, (wxObjectEventFunction) (wxEventFunction) &MyFrame::OnSENCEvtThread );
     //        Establish the system icons for the frame.
 
 #ifdef __WXMSW__
@@ -2845,6 +2863,37 @@ try {
     	std::cout << "Exception " << e.what() << std::endl;
     }
 }
+
+void MyFrame::OnSENCEvtThread( OCPN_BUILDSENC_ThreadEvent & event)
+{
+    s57chart *chart;
+    switch(event.type){
+       case SENC_BUILD_STARTED:
+            //printf("Myframe SENC build started\n");
+            break;
+        case SENC_BUILD_DONE_NOERROR:
+            //printf("Myframe SENC build done no error\n");
+            chart = event.m_ticket->m_chart;
+            if(chart){
+                chart->PostInit(FULL_INIT, global_color_scheme);
+               // ..For each canvas, force an S52PLIB reconfig...
+                for(unsigned int i=0 ; i < g_canvasArray.GetCount() ; i++){
+                    ChartCanvas *cc = g_canvasArray.Item(i);
+                        if(cc)
+                            cc->ClearS52PLIBStateHash();         // Force a S52 PLIB re-configure
+                }
+            }
+
+            ReloadAllVP();
+            break;
+        case SENC_BUILD_DONE_ERROR:
+            //printf("Myframe SENC build done ERROR\n");
+            break;
+        default:
+            break;
+    }
+}
+
 
 void MyFrame::OnEraseBackground( wxEraseEvent& event )
 {
@@ -3365,6 +3414,41 @@ ChartCanvas *MyFrame::GetCanvasUnderMouse()
     return NULL;    
 }
 
+int MyFrame::GetCanvasIndexUnderMouse()
+{
+    wxPoint screenPoint = ::wxGetMousePosition();
+    ChartCanvas *canvas = NULL;
+    canvasConfig *cc;
+    
+    switch(g_canvasConfig){
+        case 1:
+            cc = g_canvasConfigArray.Item(0);
+            if(cc ){
+                ChartCanvas *canvas = cc->canvas;
+                if(canvas->GetScreenRect().Contains(/*canvas->ScreenToClient*/(screenPoint)))
+                    return 0;
+            }
+            cc = g_canvasConfigArray.Item(1);
+            if(cc ){
+                ChartCanvas *canvas = cc->canvas;
+                if(canvas->GetScreenRect().Contains(/*canvas->ScreenToClient*/(screenPoint)))
+                    return 1;
+            }
+            break;
+            
+        default:
+            cc = g_canvasConfigArray.Item(0);
+            if(cc ){
+                ChartCanvas *canvas = cc->canvas;
+                if(canvas->GetScreenRect().Contains(canvas->ScreenToClient(screenPoint)))
+                    return 0;
+            }
+    }
+        
+    return -1;    
+}
+
+
 bool MyFrame::DropMarker( bool atOwnShip )
 {
     double lat, lon;
@@ -3385,7 +3469,8 @@ bool MyFrame::DropMarker( bool atOwnShip )
     pWP->m_bIsolatedMark = true;                      // This is an isolated mark
     pSelect->AddSelectableRoutePoint( lat, lon, pWP );
     pConfig->AddNewWayPoint( pWP, -1 );    // use auto next num
-    
+    if( pWP->GetScaMin() < GetCanvasUnderMouse()->GetScaleValue() ) 
+        pWP->ShowScaleWarningMessage(GetCanvasUnderMouse());
     if( pRouteManagerDialog && pRouteManagerDialog->IsShown() )
         pRouteManagerDialog->UpdateWptListCtrl();
 //     undo->BeforeUndoableAction( Undo_CreateWaypoint, pWP, Undo_HasParent, NULL );
@@ -4881,7 +4966,7 @@ void MyFrame::ActivateMOB( void )
     pWP_MOB->m_bKeepXRoute = true;
     pWP_MOB->m_bIsolatedMark = true;
     pWP_MOB->SetWaypointArrivalRadius( -1.0 ); // Negative distance is code to signal "Never Arrive"
-
+    pWP_MOB->SetUseSca(false); //Do not use scaled hiding for MOB 
     pSelect->AddSelectableRoutePoint( gLat, gLon, pWP_MOB );
     pConfig->AddNewWayPoint( pWP_MOB, -1 );       // use auto next num
 
@@ -5721,6 +5806,7 @@ void MyFrame::JumpToPosition( ChartCanvas *cc, double lat, double lon, double sc
     vLon = lon;
     cc->StopMovement();
     cc->m_bFollow = false;
+    cc->UpdateFollowButtonState();
     
     if( !cc->GetQuiltMode() ) {
         double skew = 0;
@@ -5905,7 +5991,7 @@ int MyFrame::DoOptionsDialog()
     if(last_ChartScaleFactorExp != g_ChartScaleFactor)
         rr |= S52_CHANGED;
 
-    bool b_refresh = false;
+    bool b_refresh = true;
     
     bool ccRightSizeChanged = false;
     if( g_canvasConfig > 0 ){
@@ -6882,14 +6968,15 @@ void MyFrame::OnBellsTimer(wxTimerEvent& event)
     if(bells <= 0)
         return;
 
-    if( !bells_sound[bells - 1].IsOk() )            // load the bells sound
+    if( !bells_sound[bells - 1]->IsOk() )            // load the bells sound
     {
         wxString soundfile = _T("sounds");
         appendOSDirSlash( &soundfile );
         soundfile += wxString( bells_sound_file_name[bells - 1], wxConvUTF8 );
         soundfile.Prepend( g_Platform->GetSharedDataDir() );
-        bells_sound[bells - 1].Create( soundfile );
-        if( !bells_sound[bells - 1].IsOk() ) {
+        bells_sound[bells - 1]->SetCmd( g_CmdSoundString.mb_str( wxConvUTF8 ) );
+        bells_sound[bells - 1]->Load( soundfile );
+        if( !bells_sound[bells - 1]->IsOk() ) {
             wxLogMessage( _T("Failed to load bells sound file: ") + soundfile );
             return;
         }
@@ -6897,7 +6984,7 @@ void MyFrame::OnBellsTimer(wxTimerEvent& event)
         wxLogMessage( _T("Using bells sound file: ") + soundfile );
     }
 
-    bells_sound[bells - 1].Play();
+    bells_sound[bells - 1]->Play();
     m_BellsToPlay -= bells;
 
     BellsTimer.Start(2000, wxTIMER_ONE_SHOT);
@@ -7859,13 +7946,29 @@ void MyFrame::MouseEvent( wxMouseEvent& event )
 
 //      Memory monitor support
 
+#ifdef __WXMAC__
+#include <mach/mach.h>
+#include <mach/message.h>  // for mach_msg_type_number_t
+#include <mach/kern_return.h>  // for kern_return_t
+#include <mach/task_info.h>
+#include <stdio.h>
+#include <malloc/malloc.h>
+#endif
+
+#ifdef __WXGTK__
+#include <malloc.h>
+#endif
+
+int g_lastMemTick;
+extern long g_tex_mem_used;
+
 bool GetMemoryStatus( int *mem_total, int *mem_used )
 {
 #ifdef __OCPN__ANDROID__
     return androidGetMemoryStatus( mem_total, mem_used );
 #endif
 
-#ifdef __LINUX__
+#ifdef __WXGTK__
 
 //      Use filesystem /proc/self/statm to determine memory status
 //	Provides information about memory usage, measured in pages.  The columns are:
@@ -7938,6 +8041,29 @@ bool GetMemoryStatus( int *mem_total, int *mem_used )
             }
         }
     }
+    
+           struct mallinfo mi;
+
+           mi = mallinfo();
+
+           //printf("Total non-mmapped bytes (arena):       %d\n", mi.arena);
+           //printf("# of free chunks (ordblks):            %d\n", mi.ordblks);
+           //printf("# of free fastbin blocks (smblks):     %d\n", mi.smblks);
+           //printf("# of mapped regions (hblks):           %d\n", mi.hblks);
+           //printf("Bytes in mapped regions (hblkhd):      %d\n", mi.hblkhd);
+           //printf("Max. total allocated space (usmblks):  %d\n", mi.usmblks);
+           //printf("Free bytes held in fastbins (fsmblks): %d\n", mi.fsmblks);
+           printf("Total allocated space (uordblks):      %d\n", mi.uordblks / 1000);
+           //printf("Total free space (fordblks):           %d\n", mi.fordblks);
+           //printf("Topmost releasable block (keepcost):   %d\n", mi.keepcost);
+
+           printf("\n");
+           
+           if(mem_used)
+               *mem_used = mi.uordblks / 1024;
+
+           printf("mem_used (Mb):  %d\n", *mem_used / 1024);
+
 
 #endif
 
@@ -7999,6 +8125,40 @@ bool GetMemoryStatus( int *mem_total, int *mem_used )
 
         *mem_total = statex.ullTotalPhys / 1024;
     }
+#endif
+
+#ifdef __WXMAC__
+
+    if(g_tick != g_lastMemTick){
+      malloc_zone_pressure_relief(NULL, 0);
+
+      int bytesInUse = 0;
+      int blocksInUse = 0;
+      int sizeAllocated = 0;
+      
+        malloc_statistics_t stats;
+        stats.blocks_in_use = 0;
+        stats.size_in_use = 0;
+        stats.max_size_in_use = 0;
+        stats.size_allocated = 0;
+        malloc_zone_statistics(NULL, &stats);
+        bytesInUse += stats.size_in_use;
+        blocksInUse += stats.blocks_in_use;
+        sizeAllocated += stats.size_allocated;
+
+        g_memUsed = sizeAllocated / 1024;
+
+        //printf("mem_used (Mb):  %d   %d \n", g_tick, g_memUsed / 1024);
+        g_lastMemTick = g_tick;
+    }
+
+    if(mem_used)
+       *mem_used = g_memUsed;
+    if(mem_total)
+       *mem_total = 4000;
+
+      
+
 #endif
 
     return true;
@@ -9087,14 +9247,14 @@ void MyFrame::ActivateAISMOBRoute( AIS_Target_Data *ptarget )
     pWP_MOB->m_bIsolatedMark = true;
     pSelect->AddSelectableRoutePoint( ptarget->Lat, ptarget->Lon, pWP_MOB );
     pConfig->AddNewWayPoint( pWP_MOB, -1 );       // use auto next num
-
+    pWP_MOB->SetUseSca(false); //Do not use scaled hiding for MOB
 
     /* We want to start tracking any MOB in range (Which will trigger false alarms with messages received over the network etc., but will a) not discard nearby event even in case our GPS is momentarily unavailable and b) work even when the boat is stationary, in which case some GPS units do not provide COG)
     if( bGPSValid && !std::isnan(gCog) && !std::isnan(gSog) ) { */
         RoutePoint *pWP_src = new RoutePoint( gLat, gLon, g_default_wp_icon,
                                               wxString( _( "Own ship" ) ), wxEmptyString );
         pSelect->AddSelectableRoutePoint( gLat, gLon, pWP_src );
-
+        pWP_MOB->SetUseSca(false); //Do not use scaled hiding for MOB
         pAISMOBRoute = new Route();
         pRouteList->Append( pAISMOBRoute );
 
