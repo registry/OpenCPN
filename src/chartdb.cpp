@@ -1155,6 +1155,9 @@ CacheEntry *ChartDB::FindOldestDeleteCandidate( bool blog)
                 
                 pret = pce;
             }
+            else
+                wxLogMessage(_T("All chart in cache locked, size: %d"), nCache);
+ 
         }
         
     
@@ -1174,6 +1177,10 @@ ChartBase *ChartDB::OpenChartUsingCache(int dbindex, ChartInitFlag init_flag)
       wxString ChartFullPath(cte.GetpFullPath(), wxConvUTF8 );
       ChartTypeEnum chart_type = (ChartTypeEnum)cte.GetChartType();
       ChartFamilyEnum chart_family = (ChartFamilyEnum)cte.GetChartFamily();
+      
+      wxString msg1;
+      msg1.Printf(_T("OpenChartUsingCache:  type %d  "), chart_type);
+//      wxLogMessage(msg1 + ChartFullPath);
       
       if(cte.GetLatMax() > 90.0)          // Chart has been disabled...
           return NULL;
@@ -1201,10 +1208,13 @@ ChartBase *ChartDB::OpenChartUsingCache(int dbindex, ChartInitFlag init_flag)
         }
         m_cache_mutex.Unlock();
       }
-      
+ 
 
       if(bInCache)
       {
+          wxString msg;
+          msg.Printf(_T("OpenChartUsingCache, IN cache: cache size: %d\n"), pChartCache->GetCount());
+//          wxLogMessage(msg);
           if(FULL_INIT == init_flag)                            // asking for full init?
           {
               if(Ch->IsReadyToRender())
@@ -1255,8 +1265,15 @@ ChartBase *ChartDB::OpenChartUsingCache(int dbindex, ChartInitFlag init_flag)
             //    Check memory status to see if enough room to open another chart
                     int mem_used;
                     GetMemoryStatus(0, &mem_used);
-    //                  printf(" ChartdB Mem_total: %d  mem_used: %d  lock: %d\n", mem_total, mem_used, m_b_locked);
-                    
+
+                    wxString msg;
+                    msg.Printf(_T("OpenChartUsingCache, NOT in cache:   cache size: %d\n"),  pChartCache->GetCount());
+                    wxLogMessage(msg);
+                    wxString msg1;
+                    msg1.Printf(_T("   OpenChartUsingCache:  type %d  "), chart_type);
+                    wxLogMessage(msg1 + ChartFullPath);
+
+
                     if((mem_used > g_memCacheLimit * 8 / 10) && (pChartCache->GetCount() > 2)) {
                         wxString msg(_T("Removing oldest chart from cache: "));
                         while (1)
@@ -1303,6 +1320,8 @@ ChartBase *ChartDB::OpenChartUsingCache(int dbindex, ChartInitFlag init_flag)
 
 
 //#endif      // ndef __WXMSW__
+
+            wxLogMessage(_T("Creating new chart"));
 
             if(chart_type == CHART_TYPE_KAP)
                   Ch = new ChartKAP();
@@ -1420,8 +1439,10 @@ ChartBase *ChartDB::OpenChartUsingCache(int dbindex, ChartInitFlag init_flag)
             }
 
 
-            else
+            else{
                   Ch = NULL;
+                  wxLogMessage(_T("Unknown chart type"));
+            }
 
 
             if(Ch)
@@ -1479,6 +1500,8 @@ ChartBase *ChartDB::OpenChartUsingCache(int dbindex, ChartInitFlag init_flag)
                   }
                   else if(INIT_FAIL_REMOVE == ir)                 // some problem in chart Init()
                   {
+                        wxLogMessage(wxString::Format(_T("Problem initializing Chart %s"), msg_fn.c_str()));
+
                         delete Ch;
                         Ch = NULL;
 
@@ -1487,6 +1510,7 @@ ChartBase *ChartDB::OpenChartUsingCache(int dbindex, ChartInitFlag init_flag)
                   }
                   else if((INIT_FAIL_RETRY == ir) || (INIT_FAIL_NOERROR == ir))   // recoverable problem in chart Init()
                   {
+                        wxLogMessage(wxString::Format(_T("Recoverable problem initializing Chart %s"), msg_fn.c_str()));
                         delete Ch;
                         Ch = NULL;
                   }
@@ -1494,7 +1518,7 @@ ChartBase *ChartDB::OpenChartUsingCache(int dbindex, ChartInitFlag init_flag)
 
                   if(INIT_OK != ir)
                   {
-                        if(INIT_FAIL_NOERROR != ir)
+                        if(1/*INIT_FAIL_NOERROR != ir*/)
                         {
                               wxLogMessage(wxString::Format(_T("   OpenChartFromStack... Error opening chart %s ... return code %d"), msg_fn.c_str(), ir));
                         }

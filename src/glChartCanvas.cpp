@@ -600,21 +600,17 @@ void glChartCanvas::OnSize( wxSizeEvent& event )
 
     
     // this is also necessary to update the context on some platforms
-#if !wxCHECK_VERSION(3,0,0)    
-    wxGLCanvas::OnSize( event );
-#else
     // OnSize can be called with a different OpenGL context (when a plugin uses a different GL context).
     if( m_bsetup && m_pcontext && IsShown()) {
         SetCurrent(*m_pcontext);
     }
-#endif
-    
+
     /* expand opengl widget to fill viewport */
-    if( GetSize() != m_pParentCanvas->GetSize() ) {
-        SetSize( m_pParentCanvas->GetSize() );
-        if( m_bsetup )
-            BuildFBO();
-    }
+     if( GetSize() != m_pParentCanvas->GetSize() ) {
+         SetSize( m_pParentCanvas->GetSize() );
+         if( m_bsetup )
+             BuildFBO();
+     }
 
     GetClientSize( &m_pParentCanvas->m_canvas_width, &m_pParentCanvas->m_canvas_height );
 }
@@ -833,6 +829,13 @@ void glChartCanvas::SetupOpenGL()
     if( GetRendererString().Find( _T("RADEON X600") ) != wxNOT_FOUND )
         s_b_useScissorTest = false;
 
+    // Mac scissor test is not useable, since the Size() and ClientSize() of GL window on this platform 
+    // do not match...
+#ifdef __WXOSX__
+    s_b_useScissorTest = false;
+#endif    
+    
+    
     //  This little hack fixes a problem seen with some Intel 945 graphics chips
     //  We need to not do anything that requires (some) complicated stencil operations.
 
@@ -905,6 +908,11 @@ void glChartCanvas::SetupOpenGL()
         !s_glDeleteRenderbuffers )
         m_b_DisableFBO = true;
 
+    //  Disable FBO on Mac
+    //  TODO correct this by fixing geometry calculations in the buffer
+#ifdef __WXOSX__
+        m_b_DisableFBO = true;
+#endif    
     
     // VBO??
     
@@ -2783,6 +2791,7 @@ void glChartCanvas::RenderQuiltViewGL( ViewPort &vp, const OCPNRegion &rect_regi
                                 if(Chs57->m_RAZBuilt){
                                     RenderNoDTA(vp, get_region);
                                     Chs57->RenderRegionViewOnGLNoText( *m_pcontext, vp, rect_region, get_region );
+                                    DisableClipRegion();
                                 }
                                 else{
                                     // The SENC is quesed for building, so..
@@ -3505,6 +3514,14 @@ void glChartCanvas::Render()
     int w, h;
     GetClientSize( &w, &h );
 
+#ifdef __WXOSX__    
+    h = m_pParentCanvas->GetClientSize().y;
+#endif    
+    
+//     wxString msg;
+//     msg.Printf(_T("size y:  %d  %d  %d  %d"), GetSize().y, GetClientSize().y, m_pParentCanvas->GetSize().y, m_pParentCanvas->GetClientSize().y);
+//     wxLogMessage(msg);
+    
     OCPNRegion screen_region(wxRect(0, 0, VPoint.pix_width, VPoint.pix_height));
 
     glViewport( 0, 0, (GLint) w, (GLint) h );
@@ -3646,7 +3663,6 @@ void glChartCanvas::Render()
                     glTexEnvi( GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE );
                                 
                     //    Render the reuseable portion of the cached texture
-                                
                     // Render the cached texture as quad to FBO(m_blit_tex) with offsets
                     int x1, x2, y1, y2;
 
@@ -3678,7 +3694,7 @@ void glChartCanvas::Render()
                     glDisable( g_texture_rectangle_format );
                 }
 
-                } else { // must redraw the entire screen
+            } else { // must redraw the entire screen
                     ( s_glFramebufferTexture2D )( GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT,
                                                 g_texture_rectangle_format,
                                                 m_cache_tex[m_cache_page], 0 );
