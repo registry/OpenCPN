@@ -2108,6 +2108,7 @@ void PlugInManager::SendBaseConfigToAllPlugIns()
     v[_T("OpenCPN Version Minor")] = VERSION_MINOR;
     v[_T("OpenCPN Version Patch")] = VERSION_PATCH;
     v[_T("OpenCPN Version Date")] = VERSION_DATE;
+    v[_T("OpenCPN Version Full")] = VERSION_FULL;
     
     // Some useful display metrics
     if(g_MainToolbar){
@@ -2136,6 +2137,7 @@ void PlugInManager::SendS52ConfigToAllPlugIns( bool bReconfig )
     v[_T("OpenCPN Version Minor")] = VERSION_MINOR;
     v[_T("OpenCPN Version Patch")] = VERSION_PATCH;
     v[_T("OpenCPN Version Date")] = VERSION_DATE;
+    v[_T("OpenCPN Version Full")] = VERSION_FULL;
     
     //  S52PLIB state
     if(ps52plib){
@@ -6845,6 +6847,18 @@ bool ShuttingDown( void )
 wxWindow* GetCanvasUnderMouse( void )
 {
     return gFrame->GetCanvasUnderMouse();
+}
+
+int GetCanvasIndexUnderMouse( void )
+{
+    ChartCanvas *l_canvas = gFrame->GetCanvasUnderMouse();
+    if(l_canvas) {
+        for(int i = 0; i < g_canvasArray.GetCount(); ++i) {
+            if(l_canvas == g_canvasArray[i])
+                return i;
+        }
+    }
+    return 0;
 }
 
 // std::vector<wxWindow *> GetCanvasArray()

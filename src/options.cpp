@@ -2966,7 +2966,7 @@ void options::CreatePanel_Routes(size_t parent, int border_size,
   waypointSizer->Add(ScaMinSizer, 0, wxLEFT | wxRIGHT | wxEXPAND,
                      border_size);
   pScaMinChckB = new wxCheckBox(itemPanelRoutes, wxID_ANY,
-                     _("Do show waypoints only at a chartscale greater then 1 :"));
+                     _("Show waypoints only at a chartscale greater than 1 :"));
   ScaMinSizer->Add(pScaMinChckB, 0);
   m_pText_ScaMin = new wxTextCtrl(itemPanelRoutes, -1);
   ScaMinSizer->Add(m_pText_ScaMin, 0, wxALL | wxALIGN_RIGHT,
@@ -2974,7 +2974,7 @@ void options::CreatePanel_Routes(size_t parent, int border_size,
     
   //Overrule the Scamin settings
   pScaMinOverruleChckB = new wxCheckBox(itemPanelRoutes, wxID_ANY,
-                     _("Overrule the settings for chartscale depending visibility and show always") );
+                     _("Override the settings for chartscale based visibility and show always") );
   waypointSizer->Add(pScaMinOverruleChckB, 0, wxALL, 5);
   
   waypointSizer->AddSpacer(5);
@@ -9417,7 +9417,7 @@ SentenceListDlg::SentenceListDlg(wxWindow* parent, FilterDirection dir,
   Populate(list);
 }
 
-const wxString SentenceListDlg::GetBoxLabel(void) const {
+wxString SentenceListDlg::GetBoxLabel(void) const {
   if (m_dir == FILTER_OUTPUT)
     return m_type == WHITELIST ? _("Transmit sentences") : _("Drop sentences");
   else
@@ -9599,39 +9599,39 @@ OpenGLOptionsDlg::OpenGLOptionsDlg(wxWindow* parent)
   Centre();
 }
 
-const bool OpenGLOptionsDlg::GetAcceleratedPanning(void) const {
+bool OpenGLOptionsDlg::GetAcceleratedPanning(void) const {
   return m_cbUseAcceleratedPanning->GetValue();
 }
 
-const bool OpenGLOptionsDlg::GetTextureCompression(void) const {
+bool OpenGLOptionsDlg::GetTextureCompression(void) const {
   return m_cbTextureCompression->GetValue();
 }
 
-const bool OpenGLOptionsDlg::GetPolygonSmoothing(void) const {
+bool OpenGLOptionsDlg::GetPolygonSmoothing(void) const {
     return m_cbPolygonSmoothing->GetValue();
 }
 
-const bool OpenGLOptionsDlg::GetLineSmoothing(void) const {
+bool OpenGLOptionsDlg::GetLineSmoothing(void) const {
     return m_cbLineSmoothing->GetValue();
 }
 
-const bool OpenGLOptionsDlg::GetShowFPS(void) const {
+bool OpenGLOptionsDlg::GetShowFPS(void) const {
   return m_cbShowFPS->GetValue();
 }
 
-const bool OpenGLOptionsDlg::GetSoftwareGL(void) const {
+bool OpenGLOptionsDlg::GetSoftwareGL(void) const {
   return m_cbSoftwareGL->GetValue();
 }
 
-const bool OpenGLOptionsDlg::GetTextureCompressionCaching(void) const {
+bool OpenGLOptionsDlg::GetTextureCompressionCaching(void) const {
   return m_cbTextureCompressionCaching->GetValue();
 }
 
-const bool OpenGLOptionsDlg::GetRebuildCache(void) const {
+bool OpenGLOptionsDlg::GetRebuildCache(void) const {
   return m_brebuild_cache;
 }
 
-const int OpenGLOptionsDlg::GetTextureMemorySize(void) const {
+int OpenGLOptionsDlg::GetTextureMemorySize(void) const {
   return m_sTextureMemorySize->GetValue();
 }
 
@@ -9718,7 +9718,7 @@ void OpenGLOptionsDlg::OnButtonClear(wxCommandEvent& event) {
   }
 }
 
-const wxString OpenGLOptionsDlg::GetTextureCacheSize(void) {
+wxString OpenGLOptionsDlg::GetTextureCacheSize(void) {
   wxString path = g_Platform->GetPrivateDataDir();
   appendOSDirSlash(&path);
   path.append(_T("raster_texture_cache"));

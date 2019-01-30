@@ -736,8 +736,9 @@ extern DECL_EXP wxString getUsrSpeedUnit_Plugin( int unit = -1 );
 extern DECL_EXP wxString GetNewGUID();
 extern "C" DECL_EXP bool PlugIn_GSHHS_CrossesLand(double lat1, double lon1, double lat2, double lon2);
 /**
- * Synchronous play a sound file. Supported formats depends on sound backend.
-*/
+ * Start playing a sound file asynchronously. Supported formats depends
+ * on sound backend.
+ */
 extern DECL_EXP void PlugInPlaySound( wxString &sound_file );
 
 
@@ -1089,9 +1090,10 @@ extern DECL_EXP double GetCanvasTilt();
 extern DECL_EXP void SetCanvasTilt(double tilt);
 
 /**
-* Synchronous play a sound file. Supported formats depends on sound backend. The
-* deviceIx is only used on platforms using the portaudio sound backend.
-*/
+ * Start playing a sound file asynchronously. Supported formats depends
+ * on sound backend. The deviceIx is only used on platforms using the
+ * portaudio sound backend where -1 indicates the default device.
+ */
 extern DECL_EXP bool PlugInPlaySoundEx( wxString &sound_file, int deviceIndex=-1 );
 extern DECL_EXP void AddChartDirectory( wxString &path );
 extern DECL_EXP void ForceChartDBUpdate();
@@ -1310,6 +1312,7 @@ extern DECL_EXP std::unique_ptr<PlugIn_Route> GetRoute_Plugin( const wxString& )
 extern DECL_EXP std::unique_ptr<PlugIn_Track> GetTrack_Plugin( const wxString& );
 
 extern DECL_EXP wxWindow* GetCanvasUnderMouse( );
+extern DECL_EXP int GetCanvasIndexUnderMouse( );
 //extern DECL_EXP std::vector<wxWindow *> GetCanvasArray();
 extern DECL_EXP wxWindow *GetCanvasByIndex( int canvasIndex );
 extern DECL_EXP int GetCanvasCount( );
